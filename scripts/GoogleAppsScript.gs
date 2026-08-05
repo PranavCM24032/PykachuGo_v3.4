@@ -32,9 +32,14 @@ var LEVEL_HEADERS = [
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
-  lock.tryLock(10000);
+  var lockAcquired = lock.tryLock(10000);
 
   try {
+    if (!lockAcquired) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "lock unavailable" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureSheetsExist(ss);
 
@@ -58,7 +63,9 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -155,31 +162,20 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
     record.nodesPath = vals[9] || '';
     record.lastNode = vals[10] || '';
     record.totalScans = parseInt(vals[11] || 0);
-    record.pointsEarned = parseInt(vals[12] || 0);
-    record.pointsLost = parseInt(vals[13] || 0);
-  }
-
-  // Track scanned/unlocked nodes in the path
-  var node = (data.linkId || data.puzzleLink || data.scannedData || '').toString();
-  if (node && (action === 'QR_SCANNED' || action === 'PUZZLE_UNLOCKED')) {
-    var nodesList = record.nodesPath ? record.nodesPath.split(' -> ') : [];
-    if (nodesList.indexOf(node) === -1) nodesList.push(node);
-    record.nodesPath = nodesList.join(' -> ');
-    record.lastNode = node;
-    record.totalScans = nodesList.length;
+    record.pointsEarned = Number(vals[12] || 0);
+    record.pointsLost = Number(vals[13] || 0);
   }
 
   if (action === 'SOLVED') {
-    record.status = 'SOLVED';
-    record.solveTime = timestamp;
-    record.lastActive = timestamp;
-    // Points: first solves add to earned, repeat solves subtract (lost)
-    var pts = parseInt(data.pointsEarned || 0);
+    var pts = Number(data.pointsEarned || 0);
     if (pts > 0) {
       record.pointsEarned += pts;
     } else if (pts < 0) {
       record.pointsLost += Math.abs(pts);
     }
+    record.status = 'SOLVED';
+    record.solveTime = timestamp;
+    record.lastActive = timestamp;
   } else if (action === 'WRONG_ATTEMPT') {
     record.wrongAttempts += 1;
     record.status = 'RETRYING';

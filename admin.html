@@ -238,6 +238,15 @@
                         <span class="text-xs font-bold text-white tracking-wider">SYNC</span>
                     </div>
                 </button>
+                <button onclick="wipeData()"
+                    class="reset-btn relative px-3 py-2 bg-amber-500 hover:bg-amber-400 transition-all rounded-lg flex items-center gap-2 text-white font-semibold shadow-lg shadow-amber-500/20 active:scale-95"
+                    title="Start new admin session">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v6h6M20 20v-6h-6M7 17a7 7 0 1110-10m-2 2l3-3m0 0l-3 3m3-3h-3" />
+                    </svg>
+                    <span class="text-xs tracking-wider">NEW START</span>
+                </button>
             </div>
         </div>
     </header>
@@ -341,7 +350,7 @@
                 </div>
 
                 <div class="mt-6 pt-6 border-t border-slate-800">
-                    <a href="https://docs.google.com/spreadsheets/d/1MtuD9B1veNjlokeToeRZ1gRTZqjKiT55hd0R4y9UO-c/edit?gid=1609955468#gid=1609955468"
+                    <a href="https://docs.google.com/spreadsheets/d/14lLeSd_nXdM8ZLr1Dlud6Z2r2Qp7pS3rJGjxIZDkhfY/edit?gid=1478523511#gid=1478523511"
                         target="_blank"
                         class="flex items-center justify-center gap-2 w-full py-3 sm:py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/20 transition-all">
                         <span>OPEN MASTER GOOGLE SHEET</span>
@@ -365,6 +374,8 @@
                     3</button>
                 <button onclick="setActiveTab('LB')" id="tab-LB"
                     class="tab-btn px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap">LEADERBOARD</button>
+                <button onclick="setActiveTab('ROSTER')" id="tab-ROSTER"
+                    class="tab-btn px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap">ROSTER LOG</button>
             </div>
 
             <div class="glass-panel flex-1 rounded-xl overflow-hidden flex flex-col">
@@ -381,9 +392,9 @@
                 </div>
 
                 <div class="flex-1 overflow-x-auto flex flex-col min-w-0">
-                    <div class="min-w-[1120px] flex flex-col flex-1">
+                    <div class="min-w-[680px] flex flex-col flex-1">
                         <div class="grid gap-1 px-3 py-2.5 bg-slate-950/90 border-b border-slate-800 text-[8px] font-bold text-slate-400 uppercase tracking-widest font-mono text-center"
-                            style="grid-template-columns: 32px 95px 70px 130px 85px 75px 55px 55px 55px 80px 85px 55px 62px 62px;">
+                            style="grid-template-columns: 30px 88px 55px 1.5fr 76px 68px 36px 36px 42px 70px 1fr 36px 62px;">
                             <div class="text-center font-mono">#</div>
                             <div class="text-center font-mono text-blue-400">Last Active</div>
                             <div class="text-center font-mono text-slate-400">TID</div>
@@ -396,8 +407,7 @@
                             <div class="text-center font-mono text-emerald-400">Solve Time</div>
                             <div class="text-center font-mono text-cyan-400">Last Node</div>
                             <div class="text-center font-mono text-slate-400">Scans</div>
-                            <div class="text-center font-mono text-emerald-300">Pts Earned</div>
-                            <div class="text-center font-mono text-red-300">Pts Lost</div>
+                            <div class="text-center font-mono text-amber-300" title="Points = Earned - Lost">Points</div>
                         </div>
 
                         <div id="logsContainer"
@@ -428,7 +438,7 @@
 
     <script>
         const CONFIG = {
-            SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwGWidAlGFLH-182G93vuyqvujdRV1bSWW07f8RkZOKtuVoBsBdRJ3z-xD7aLwfjc5t/exec',
+            SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz3RewVeLAubnJF7UDk8dLyTMfmJ9l8Gkq9WrZZ2suMVv2mH7QAWba2XNIBgH4Wd4k/exec',
             TOKEN: 'pyk2026@secGX42',
             REFRESH_RATE: 5000,
             MAX_LOGS: 500,
@@ -623,9 +633,10 @@
             const typeFilter = document.getElementById('typeFilter').value;
             const levelFilterDropdown = document.getElementById('levelFilter').value;
 
-            const L_COLS = "32px 95px 70px 130px 85px 75px 55px 55px 55px 80px 85px 55px 62px 62px";
+            const L_COLS = "30px 88px 55px 1.5fr 76px 68px 36px 36px 42px 70px 1fr 36px 62px";
             const REG_COLS = "35px 140px 90px 180px 110px 130px";
             const LB_COLS = "40px 120px 1fr 150px 80px 110px";
+            const ROSTER_COLS = "35px 1.4fr 100px 110px 2fr";
 
             if (state.activeTab === 'REG') {
                 header.style.gridTemplateColumns = REG_COLS;
@@ -649,6 +660,16 @@
                     <div class="text-center font-mono text-emerald-300">Total Pts</div>
                 `;
                 header.className = "grid gap-1 px-3 py-2.5 bg-slate-950/90 border-b border-slate-800 text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono text-center";
+            } else if (state.activeTab === 'ROSTER') {
+                header.style.gridTemplateColumns = ROSTER_COLS;
+                header.innerHTML = `
+                    <div class="text-center font-mono">#</div>
+                    <div class="text-left font-bold pl-1">Team Name</div>
+                    <div class="text-center font-mono text-blue-400">TID</div>
+                    <div class="text-center font-mono text-slate-400">Security Key</div>
+                    <div class="text-left font-mono text-emerald-300">Team Members</div>
+                `;
+                header.className = "grid gap-1 px-3 py-2.5 bg-slate-950/90 border-b border-slate-800 text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono text-center";
             } else {
                 header.style.gridTemplateColumns = L_COLS;
                 header.innerHTML = `
@@ -664,8 +685,7 @@
                     <div class="text-center font-mono text-emerald-400">Solve Time</div>
                     <div class="text-center font-mono text-cyan-400">Last Node</div>
                     <div class="text-center font-mono text-slate-400">Scans</div>
-                    <div class="text-center font-mono text-emerald-300">Pts Earned</div>
-                    <div class="text-center font-mono text-red-300">Pts Lost</div>
+                    <div class="text-center font-mono text-amber-300" title="Points = Earned - Lost">Points</div>
                 `;
                 header.className = "grid gap-1 px-3 py-2.5 bg-slate-950/90 border-b border-slate-800 text-[8px] font-bold text-slate-400 uppercase tracking-widest font-mono text-center";
             }
@@ -848,6 +868,40 @@
                 return;
             }
 
+            if (state.activeTab === 'ROSTER') {
+                let roster = Array.isArray(state.teams) ? state.teams.slice() : [];
+                if (searchTerm) {
+                    roster = roster.filter(t => {
+                        const haystack = ((t.team || '') + ' ' + (t.tid || '') + ' ' + (Array.isArray(t.team_members) ? t.team_members.join(' ') : '')).toLowerCase();
+                        return haystack.includes(searchTerm);
+                    });
+                }
+                document.getElementById('teamCount').textContent = roster.length;
+
+                if (roster.length === 0) {
+                    container.innerHTML = `
+                        <div class="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 fade-in py-12">
+                            <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span class="font-mono text-xs">NO ROSTER DATA AVAILABLE</span>
+                            ${state.usingCachedData ? '<span class="text-[10px] text-amber-500 mt-1">(Using cached data)</span>' : ''}
+                        </div>`;
+                    return;
+                }
+
+                container.innerHTML = roster.map((t, i) => {
+                    const members = (Array.isArray(t.team_members) && t.team_members.length) ? t.team_members.join(' | ') : '-';
+                    return `
+                    <div class="grid gap-1 px-3 py-2.5 border-b border-slate-800/50 hover:bg-white/5 transition-all items-center text-[10px] sm:text-xs text-center fade-in" style="grid-template-columns: ${ROSTER_COLS}">
+                        <div class="text-slate-500 font-mono">${i + 1}</div>
+                        <div class="text-left font-bold text-slate-200 truncate pl-1" title="${escapeHTML(t.team)}">${escapeHTML(t.team)}</div>
+                        <div class="font-mono text-blue-400 truncate" title="${escapeHTML(t.tid || '')}">${escapeHTML(t.tid || '-')}</div>
+                        <div class="font-mono text-slate-400 truncate" title="${escapeHTML(t.passwordHash || '')}">${escapeHTML(t.passwordHash || '-')}</div>
+                        <div class="text-left font-mono text-emerald-300 truncate pl-1" title="${escapeHTML(members)}">${escapeHTML(members)}</div>
+                    </div>`;
+                }).join('');
+                return;
+            }
+
             if (leaderboard.length === 0) {
                 container.innerHTML = `
                     <div class="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 fade-in py-12">
@@ -903,6 +957,8 @@
                     '<span class="text-yellow-400 font-bold">YES</span>' :
                     '<span class="text-slate-600">NO</span>';
 
+                const netPts = (parseInt(lvlData.pointsEarned || 0, 10) - parseInt(lvlData.pointsLost || 0, 10));
+
                 return `
                 <div class="grid gap-1 px-3 py-2 border-b border-slate-800/50 transition-all items-center hover:bg-white/5 text-[9px] text-center fade-in" style="grid-template-columns: ${L_COLS}">
                     <div class="text-slate-500 font-mono">${index + 1}</div>
@@ -917,8 +973,7 @@
                     <div class="font-mono text-emerald-400 text-[8px]">${escapeHTML(solveTimeStr)}</div>
                     <div class="font-mono text-cyan-400 truncate text-[8px]" title="${escapeHTML(lvlData.nodesPath)}">${escapeHTML(lvlData.lastNode)}</div>
                     <div class="font-mono text-slate-400 text-[8px]">${lvlData.totalScans || 0}</div>
-                    <div class="font-mono text-emerald-300 text-[8px] font-bold">${lvlData.pointsEarned || 0}</div>
-                    <div class="font-mono text-red-300 text-[8px] font-bold">${lvlData.pointsLost || 0}</div>
+                    <div class="font-mono text-[8px] font-bold ${netPts > 0 ? 'text-emerald-300' : netPts < 0 ? 'text-red-300' : 'text-slate-500'}" title="Earned ${lvlData.pointsEarned || 0} - Lost ${lvlData.pointsLost || 0}">${netPts}</div>
                 </div>`;
             }).join('');
         }
@@ -972,7 +1027,7 @@
         }
 
         function wipeData() {
-            if (confirm('Wipe ALL displayed data? This will clear the UI but keep cache. Use "Clear Cache" to remove stored data.')) {
+            if (confirm('Start a new admin session? This will clear the displayed data and refresh the dashboard.')) {
                 const container = document.getElementById('logsContainer');
                 container.innerHTML = `
                     <div class="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 fade-in">
@@ -980,14 +1035,14 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
-                        <span class="font-mono text-xs">DATA WIPED - REFRESHING...</span>
+                        <span class="font-mono text-xs">NEW START INITIATED...</span>
                     </div>`;
 
                 document.getElementById('teamCount').textContent = '0';
                 document.getElementById('badgeCount').textContent = '0';
 
                 const status = document.getElementById('systemStatus');
-                status.textContent = 'DATA WIPED';
+                status.textContent = 'NEW START';
                 status.className = 'text-xs font-mono text-amber-400 pulse-alert';
 
                 setTimeout(() => {
