@@ -3,6 +3,17 @@
 // ==============================
 const SESSION_BUFFER_KEY = 'pykachuSessionBuffer';
 
+// Sliding window rate limit for Google Sheets API calls (protects Apps Script quota).
+const sheetsRateLimiter = new SlidingWindowRateLimiter({
+    limit: 30,               // max requests per window
+    windowMs: 60000,         // 60s rolling window
+    persistKey: 'pykachuSheetsRateLimit' // surviving reloads
+});
+
+async function waitForSheetsSlot() {
+    return await sheetsRateLimiter.acquire();
+}
+
 function getSessionBuffer() {
     try {
         return JSON.parse(localStorage.getItem(SESSION_BUFFER_KEY) || '[]');
@@ -85,16 +96,27 @@ async function sendToGoogleSheets(payload) {
         return false;
     }
     try {
-        await fetch(GOOGLE_SCRIPT_URL, {
+        // Throttle to a max of N requests per sliding window
+        await waitForSheetsSlot();
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
-            mode: 'no-cors',
+            mode: 'cors',
             cache: 'no-cache',
             keepalive: true,
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ ...payload, token: GOOGLE_SCRIPT_TOKEN })
         });
-        console.log(`[Sheets] Sent: ${payload.action}`);
-        return true;
+        if (!res.ok) {
+            console.warn(`[Sheets] HTTP error ${res.status} for ${payload.action}`);
+            return false;
+        }
+        const json = await res.json();
+        if (json.status === 'success' || json.status === 'OK') {
+            console.log(`[Sheets] Confirmed written: ${payload.action}`);
+            return true;
+        }
+        console.warn(`[Sheets] Script returned error for ${payload.action}:`, json.message || json);
+        return false;
     } catch (e) {
         console.warn(`[Sheets] Send failed for ${payload.action}:`, e);
         return false;
@@ -114,16 +136,22 @@ async function flushSessionBuffer() {
     }
 
     try {
-        await fetch(GOOGLE_SCRIPT_URL, {
+        // Throttle batch flushes through the same sliding window
+        await waitForSheetsSlot();
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
-            mode: 'no-cors',
+            mode: 'cors',
             cache: 'no-cache',
             keepalive: true,
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'SESSION_BATCH', events: buffer, sessionId: sessionId, token: GOOGLE_SCRIPT_TOKEN })
         });
-        console.log(`[Sheets] Flushed ${buffer.length} buffered events`);
-        clearSessionBuffer();
+        if (res.ok) {
+            console.log(`[Sheets] Flushed ${buffer.length} buffered events`);
+            clearSessionBuffer();
+        } else {
+            console.warn('[Sheets] Flush HTTP error:', res.status);
+        }
     } catch (e) {
         console.warn('[Sheets] Flush failed, will retry later:', e);
     }
@@ -141,15 +169,21 @@ window.addEventListener('beforeunload', () => {
     if (isValidTeam()) {
         const buffer = getSessionBuffer();
         if (buffer.length > 0) {
-            fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                cache: 'no-cache',
-                keepalive: true,
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'SESSION_BATCH', events: buffer, sessionId: sessionId, token: GOOGLE_SCRIPT_TOKEN })
-            }).catch(() => { });
-            clearSessionBuffer();
+            // Non-blocking slot check — never hold up page unload
+            if (sheetsRateLimiter.tryAcquire() !== null) {
+                fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    keepalive: true,
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'SESSION_BATCH', events: buffer, sessionId: sessionId, token: GOOGLE_SCRIPT_TOKEN })
+                }).catch(() => { });
+                clearSessionBuffer();
+            } else {
+                // Keep the buffer so the next session's 10s flush retries it
+                console.log('[Sheets] Unload flush skipped — rate limit reached');
+            }
         }
     }
 });

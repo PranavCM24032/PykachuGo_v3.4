@@ -247,6 +247,15 @@
                     </svg>
                     <span class="text-xs tracking-wider">NEW START</span>
                 </button>
+                <button onclick="resetEverything()"
+                    class="relative px-3 py-2 bg-red-600 hover:bg-red-500 transition-all rounded-lg flex items-center gap-2 text-white font-bold shadow-lg shadow-red-500/20 active:scale-95 border border-red-400/40"
+                    title="Wipe the Google Sheets DB + all players' saved progress (new game run)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span class="text-xs tracking-wider">RESET ALL</span>
+                </button>
             </div>
         </div>
     </header>
@@ -1026,7 +1035,7 @@
             }
         }
 
-        function wipeData() {
+function wipeData() {
             if (confirm('Start a new admin session? This will clear the displayed data and refresh the dashboard.')) {
                 const container = document.getElementById('logsContainer');
                 container.innerHTML = `
@@ -1050,6 +1059,74 @@
                         fetchData();
                     }
                 }, 2000);
+            }
+        }
+
+        async function resetEverything() {
+            // Two-step confirmation because this wipes the live DB + every player's device.
+            if (!confirm('RESET EVERYTHING? This wipes ALL rows from the Google Sheets DB (Registration + L1/L2/L3).')) return;
+            if (!confirm('Are you ABSOLUTELY sure? Every player\'s saved progress (queue, score, hints) will also be erased on their next app load. This CANNOT be undone.')) return;
+
+            const status = document.getElementById('systemStatus');
+            const lastUpdated = document.getElementById('lastUpdated');
+            stopPolling();
+
+            status.textContent = 'RESETTING...';
+            status.className = 'text-xs font-mono text-red-400 pulse-alert';
+            lastUpdated.textContent = 'WIPING GOOGLE SHEETS...';
+
+            try {
+                const resp = await fetch(CONFIG.SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        action: 'RESET_ALL',
+                        token: CONFIG.TOKEN,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+
+                // With no-cors we can't read the body; assume success unless it threw.
+                localStorage.removeItem('pykachuLogs');
+                state.logs = [];
+                state.usingCachedData = false;
+                document.getElementById('teamCount').textContent = '0';
+                document.getElementById('badgeCount').textContent = '0';
+                const container = document.getElementById('logsContainer');
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 fade-in">
+                        <svg class="w-12 h-12 mb-2 text-red-400/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M3 7v6a4 4 0 004 4h9M5 7a2 2 0 012-2h1l2.828 2.828A2 2 0 0012.656 9H19a2 2 0 012 2v3m-4 8l-3-3m0 0l3-3m-3 3H5m13-3l3-3"/>
+                        </svg>
+                        <span class="font-mono text-xs text-red-400">FULL RESET COMPLETE. ALL DATA WIPED.</span>
+                        <span class="text-[10px] text-slate-500 mt-1">Players will start fresh on next load.</span>
+                    </div>`;
+
+                status.textContent = 'RESET ✓';
+                status.className = 'text-xs font-mono text-red-400 pulse-alert';
+                lastUpdated.textContent = 'ALL DATA WIPED - EPOCH BUMPED';
+
+                setTimeout(() => {
+                    if (state.autoRefresh) {
+                        startPolling();
+                        fetchData();
+                    }
+                }, 3000);
+            } catch (e) {
+                console.error('Reset failed:', e);
+                status.textContent = 'RESET FAILED';
+                status.className = 'text-xs font-mono text-red-400 pulse-alert';
+                lastUpdated.textContent = 'CHECK NETWORK / SCRIPT';
+                if (state.autoRefresh) startPolling();
+            }
+        }
+
+        function stopPolling() {
+            if (state.refreshTimer) {
+                clearInterval(state.refreshTimer);
+                state.refreshTimer = null;
             }
         }
     </script>

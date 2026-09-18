@@ -41,7 +41,6 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     currentMissionLevel = missionLevel;
     currentLanguage = codeLanguage;
     resetHintForNewTeam();
-    resetTeamScoreState();
     loadTeamScoreState();
     gameStartTime = new Date();
 
@@ -73,8 +72,20 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
 
     setTimeout(() => {
         document.getElementById('screen')?.classList.remove('premium-glow');
-        // Universal link: skip QR scan and jump straight to that puzzle's unlock
-        showStep(urlLockedPuzzle ? 3 : 2);
+        // Universal link: skip QR scan and jump straight to that puzzle
+        if (urlLockedPuzzle) {
+            if (isStartingPuzzle(urlLockedPuzzle)) {
+                // Starting puzzle — ask for its start key
+                showStep('startcode');
+            } else {
+                // Non-start puzzle — unlock directly, no key entry needed
+                const via = currentPuzzle ? `Puzzle ${currentPuzzle.id}` : 'DIRECT';
+                activatePuzzle(urlLockedPuzzle, via);
+                showStep(3);
+            }
+        } else {
+            showStep(2);
+        }
     }, 500);
 });
 
@@ -86,92 +97,32 @@ document.getElementById('unlockForm').addEventListener('submit', function (e) {
     const code = standardizeString(document.getElementById('unlockCode').value);
 
     if (!code) {
-        showFeedback('unlockFeedback', 'Enter previous answer', 'error');
+        showFeedback('unlockFeedback', 'Enter start key', 'error');
         return;
     }
 
-    // NEW SYSTEM: Use previousPuzzleId array to link puzzles
+    // A code is only ever asked for starting puzzles (those with a startCode).
+    // All other puzzles unlock directly once their QR is scanned / deep-linked.
     let puzzle = null;
 
     if (urlLockedPuzzle) {
-        if (isTestTeam()) {
-            puzzle = urlLockedPuzzle;
-        } else {
-            // If we have a URL-locked puzzle, validate against its prerequisites
-            if (urlLockedPuzzle.previousPuzzleId.includes(0)) {
-                // Starting puzzle - check if it has a specific startCode
-                if (urlLockedPuzzle.startCode) {
-                    // Group-specific start code required
-                    if (standardizeString(urlLockedPuzzle.startCode) === code) {
-                        puzzle = urlLockedPuzzle;
-                    }
-                } else {
-                    // No startCode defined - accept any code (backward compatibility)
-                    puzzle = urlLockedPuzzle;
-                }
-            } else {
-                // Check if entered code matches ANY of the previous puzzles' answers
-                const isValid = urlLockedPuzzle.previousPuzzleId.some(prevId => {
-                    const prevPuzzle = PUZZLES.find(p => p.id === prevId);
-                    return prevPuzzle && standardizeString(prevPuzzle.answer) === code;
-                });
-
-                if (isValid) {
-                    puzzle = urlLockedPuzzle;
-                }
+        if (isStartingPuzzle(urlLockedPuzzle)) {
+            // Starting puzzle - require the startCode
+            if (standardizeString(urlLockedPuzzle.startCode) === code) {
+                puzzle = urlLockedPuzzle;
             }
+        } else if (isPuzzleAllowed(urlLockedPuzzle)) {
+            // Non-start puzzle reached via the unlock screen — no code needed
+            puzzle = urlLockedPuzzle;
         }
     } else {
-        // No URL lock - search all puzzles
-        puzzle = PUZZLES.find(p => {
-            if (p.previousPuzzleId.includes(0)) {
-                // Starting puzzle - check startCode
-                if (p.startCode) {
-                    return standardizeString(p.startCode) === code;
-                } else {
-                    // No startCode - accept any code
-                    return true;
-                }
-            } else {
-                // Check if entered code matches ANY of the previous puzzles' answers
-                return p.previousPuzzleId.some(prevId => {
-                    const prevPuzzle = PUZZLES.find(prev => prev.id === prevId);
-                    return prevPuzzle && standardizeString(prevPuzzle.answer) === code;
-                });
-            }
-        });
+        // No URL lock - only a starting puzzle's startCode makes sense here
+        puzzle = PUZZLES.find(p => isStartingPuzzle(p) && standardizeString(p.startCode) === code);
     }
 
     if (puzzle) {
-        currentPuzzle = puzzle;
-        gameStartTime = new Date(); // Reset timer for the specific puzzle 
-
-        const questionEl = document.getElementById('puzzleQuestion');
-        if (questionEl) questionEl.textContent = getPuzzleQuestion(puzzle);
-
-        // Safely update clue text (might be in Step 5 or 4)
-        const clueEl = document.getElementById('locationClue') || document.getElementById('locationClueText');
-        if (clueEl) clueEl.textContent = puzzle.locationClue;
-
-        // Show CSS Pokeball (Mystery State)
-        const pokeball = document.getElementById('step4Pokeball');
-        if (pokeball) {
-            pokeball.classList.remove('hidden');
-        }
-
-        // Determine which prerequisite was used
-        const unlockedVia = puzzle.previousPuzzleId.includes(0)
-            ? 'START'
-            : `Puzzle ${puzzle.previousPuzzleId.join(' OR ')}`;
-
-        submitToGoogleSheets('PUZZLE_UNLOCKED', {
-            puzzleId: puzzle.id,
-            puzzleLevel: puzzle.level,
-            puzzleLink: puzzle.linkid,
-            unlockedVia: unlockedVia
-        });
-
-        showStep(4);
+        activatePuzzle(puzzle, 'START');
+        showStep(3);
         playSound('success');
     } else {
         submitToGoogleSheets('UNLOCK_FAILED', {
@@ -185,6 +136,103 @@ document.getElementById('unlockForm').addEventListener('submit', function (e) {
         playSound('error');
     }
 });
+
+// ==============================
+// PUZZLE ACTIVATION
+// (shared by the start-code unlock form and direct QR/deep-link unlocks)
+// ==============================
+function activatePuzzle(puzzle, unlockedVia) {
+    currentPuzzle = puzzle;
+    gameStartTime = new Date(); // Reset timer for the specific puzzle
+
+    const questionEl = document.getElementById('puzzleQuestion');
+    if (questionEl) questionEl.textContent = getPuzzleQuestion(puzzle);
+
+    // Safely update clue text (might be in Step 5 or 4)
+    const clueEl = document.getElementById('locationClue') || document.getElementById('locationClueText');
+    if (clueEl) clueEl.textContent = puzzle.locationClue;
+
+    // Show CSS Pokeball (Mystery State)
+    const pokeball = document.getElementById('step4Pokeball');
+    if (pokeball) {
+        pokeball.classList.remove('hidden');
+    }
+
+    submitToGoogleSheets('PUZZLE_UNLOCKED', {
+        puzzleId: puzzle.id,
+        puzzleLevel: puzzle.level,
+        puzzleLink: puzzle.linkid,
+        unlockedVia: unlockedVia || (isStartingPuzzle(puzzle) ? 'START' : 'DIRECT')
+    });
+}
+
+// ==============================
+// STEP 5: NEXT LOCATIONS RENDER
+// (graph branching — multiple next puzzles can be shown at once)
+// ==============================
+function createNextLocationCard(puzzle) {
+    const card = document.createElement('div');
+    card.className = 'bg-gray-900/80 border border-yellow-500/40 rounded-xl p-2.5 sm:p-3 relative overflow-hidden backdrop-blur-sm location-card-glow shadow-2xl mx-auto w-full max-w-xs';
+
+    card.innerHTML = `
+        <div class="absolute inset-0 map-grid-bg opacity-20"></div>
+        <div class="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-yellow-400/50 rounded-tl-lg"></div>
+        <div class="absolute top-0 right-0 w-2.5 h-2.5 border-t-2 border-r-2 border-yellow-400/50 rounded-tr-lg"></div>
+        <div class="absolute bottom-0 left-0 w-2.5 h-2.5 border-b-2 border-l-2 border-yellow-400/50 rounded-bl-lg"></div>
+        <div class="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-yellow-400/50 rounded-br-lg"></div>
+
+        <div class="flex items-center gap-2.5 relative z-10">
+            <div class="flex-shrink-0">
+                <div class="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center border border-yellow-500/30">
+                    <span class="material-symbols-rounded text-yellow-400 text-base sm:text-lg">location_on</span>
+                </div>
+            </div>
+            <div class="flex-1 text-left min-w-0">
+                <span class="text-yellow-400/80 text-[8px] sm:text-[9px] uppercase tracking-widest font-black block">NEXT
+                    LOCATION · ${puzzle.linkid}</span>
+                <p class="font-pixel text-white leading-tight break-words mt-0.5 text-xs sm:text-sm">${(puzzle.locationClue || 'NO SIGNAL SOURCE').toUpperCase()}</p>
+            </div>
+        </div>
+    `;
+    return card;
+}
+
+function renderNextLocations(nextPuzzles) {
+    const list = document.getElementById('nextLocationList');
+    const clueText = document.getElementById('locationClueText');
+    const locationCard = document.getElementById('locationCard');
+
+    if (!Array.isArray(nextPuzzles) || nextPuzzles.length === 0) return;
+
+    const headerCount = document.getElementById('nextLocationCount');
+
+    // Multiple destinations: hide the single-card paragraph and render one
+    // full location card per destination (same style, no placeholder text).
+    if (nextPuzzles.length > 1) {
+        if (clueText) clueText.classList.add('hidden');
+        if (locationCard) locationCard.classList.add('hidden');
+
+        if (!list) return;
+        list.classList.remove('hidden');
+        list.innerHTML = '';
+        nextPuzzles.forEach((p) => list.appendChild(createNextLocationCard(p)));
+
+        if (headerCount) headerCount.textContent = '';
+        return;
+    }
+
+    // Single destination: keep the classic single-card layout.
+    if (locationCard) locationCard.classList.remove('hidden');
+    if (clueText) {
+        clueText.classList.remove('hidden');
+        clueText.textContent = (nextPuzzles[0].locationClue || 'NO SIGNAL SOURCE');
+    }
+    if (list) {
+        list.innerHTML = '';
+        list.classList.add('hidden');
+    }
+    if (headerCount) headerCount.textContent = '';
+}
 
 // ==============================
 // STEP 4: PUZZLE SOLVING - SUBMIT HANDLER
@@ -219,18 +267,16 @@ function submitPuzzleAnswer() {
             caughtImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${currentPuzzle.pokemonId}.png`;
         }
 
-        const clueText = document.getElementById('locationClue') || document.getElementById('locationClueText');
         const locationCard = document.getElementById('locationCard');
         const nextBtn = document.getElementById('nextSignalBtn');
 
-        if (clueText) {
-            clueText.textContent = currentPuzzle.locationClue || "NO SIGNAL SOURCE";
-        }
+        // Show ALL next puzzle locations (graph: nextPuzzleId may branch into many)
+        const nextPuzzles = getNextPuzzles(currentPuzzle);
 
         // Delay move for satisfaction
-        const isEnd = !currentPuzzle.locationClue || currentPuzzle.locationClue.toUpperCase() === 'END';
+        const isEnd = !Array.isArray(currentPuzzle.nextPuzzleId) || currentPuzzle.nextPuzzleId.length === 0;
         setTimeout(() => {
-            showStep(5);
+            showStep(4);
             playSound('hologram');
 
             if (isEnd) {
@@ -259,13 +305,9 @@ function submitPuzzleAnswer() {
             } else {
                 if (locationCard) locationCard.classList.remove('hidden');
                 if (nextBtn) nextBtn.classList.remove('hidden');
+                renderNextLocations(nextPuzzles);
             }
 
-            // 🔥 Play Pokemon Cry from PokeAPI assets
-            if (currentPuzzle.pokemonId) {
-                const cryUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/cries/latest/${currentPuzzle.pokemonId}.ogg`;
-                setTimeout(() => playSound(cryUrl, 0.4), 600);
-            }
         }, 500);
 
         const firstSolve = !hasSolvedPuzzle(currentPuzzle.id);
@@ -318,8 +360,8 @@ document.getElementById('answerForm').addEventListener('submit', (e) => {
 // STEP 5: CONTINUE
 // ==============================
 function continueToQRScan() {
-    // Check if current puzzle is the final one (locationClue is null or "END")
-    const isEnd = currentPuzzle && (!currentPuzzle.locationClue || currentPuzzle.locationClue.toUpperCase() === 'END');
+    // Check if current puzzle is the final one (empty nextPuzzleId = end of chain)
+    const isEnd = currentPuzzle && (!Array.isArray(currentPuzzle.nextPuzzleId) || currentPuzzle.nextPuzzleId.length === 0);
     if (isEnd) {
         showToast('🎉 CONGRATULATIONS! You have completed all puzzles!', 'success');
         playSound('victory');

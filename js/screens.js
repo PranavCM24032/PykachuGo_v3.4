@@ -5,7 +5,10 @@ function showStep(stepNumber) {
     console.log('Showing step:', stepNumber);
 
     const steps = document.querySelectorAll('.flow-step');
-    const targetStep = document.getElementById(`step${stepNumber}`);
+    // 'startcode' is the named start-key entry screen (was the old step 3).
+    const targetStep = stepNumber === 'startcode'
+        ? document.getElementById('startcode')
+        : (document.getElementById(`step${stepNumber}`) || (Number(stepNumber) === 4 ? document.getElementById('step5') : null));
 
     if (!targetStep) return;
 
@@ -13,16 +16,21 @@ function showStep(stepNumber) {
     const fadeOutMs = 120;
     const fadeInMs = 220;
 
+    // Fade out all currently-active steps (except the target, which may already
+    // be active on first paint — avoids the initial load flash).
     steps.forEach(step => {
-        if (step.classList.contains('active')) {
+        if (step !== targetStep && step.classList.contains('active')) {
+            step.style.transition = `all ${fadeOutMs}ms ease`;
             step.style.opacity = '0';
             step.style.transform = 'translateY(-10px)';
-            step.style.transition = `all ${fadeOutMs}ms ease`;
-            setTimeout(() => step.classList.remove('active'), fadeOutMs);
         }
     });
 
     setTimeout(() => {
+        // Hard-remove every active state, then activate ONLY the target.
+        // This guarantees exactly one step is ever rendered at a time.
+        steps.forEach(step => step.classList.remove('active'));
+
         targetStep.classList.add('active');
         targetStep.style.opacity = '0';
         targetStep.style.transform = 'translateY(10px)';
@@ -33,7 +41,7 @@ function showStep(stepNumber) {
 
         targetStep.style.opacity = '1';
         targetStep.style.transform = 'translateY(0)';
-    }, fadeOutMs + 20);
+    }, fadeOutMs);
 
     currentStep = stepNumber;
 
@@ -44,10 +52,9 @@ function showStep(stepNumber) {
         if (el) el.textContent = currentTeam || 'NO TEAM';
     });
 
-    if (stepNumber === 3) {
+    if (stepNumber === 'startcode') {
         const badgeContainer = document.getElementById('step3BadgeContainer');
         const badgeImg = document.getElementById('gymBadgeImg');
-        const nextPuzzleIdDisplay = document.getElementById('nextPuzzleIdDisplay');
         const unlockCodeInput = document.getElementById('unlockCode');
 
         if (urlLockedPuzzle) {
@@ -62,9 +69,6 @@ function showStep(stepNumber) {
                     badgeContainer.classList.remove('hidden');
                 }
             }
-            if (nextPuzzleIdDisplay) {
-                nextPuzzleIdDisplay.textContent = '';
-            }
         } else {
             if (badgeContainer) badgeContainer.classList.add('hidden');
         }
@@ -77,7 +81,7 @@ function showStep(stepNumber) {
         }
     }
 
-    if (stepNumber === 4) {
+    if (stepNumber === 3) {
         isPuzzleActive = true;
         startTabMonitoring();
 

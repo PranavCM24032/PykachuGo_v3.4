@@ -32,8 +32,13 @@ async function startQRScanner() {
 
         // Wait for video to be ready to check capabilities
         video.onloadedmetadata = () => {
-            video.play();
-            setupZoomControl(videoStream.getVideoTracks()[0]);
+            video.play().catch(e => console.warn('Video play prevented:', e));
+            try {
+                const track = videoStream ? videoStream.getVideoTracks()[0] : null;
+                if (track) setupZoomControl(track);
+            } catch (e) {
+                console.warn('[Scanner] Zoom setup safely skipped:', e);
+            }
         };
 
         qrScannerActive = true;
@@ -56,10 +61,16 @@ function setupZoomControl(track) {
 
     if (!zoomContainer || !zoomSlider || !track || !scannerOverlay) return;
 
-    // Check if the track supports zoom
-    const capabilities = track.getCapabilities();
+    // iOS Guard: iOS Safari / WebKit does not support getCapabilities on MediaStreamTrack
+    if (typeof track.getCapabilities !== 'function') {
+        console.log('[Scanner] getCapabilities not supported on this platform (iOS Safari)');
+        return;
+    }
 
-    if (capabilities.zoom) {
+    try {
+        const capabilities = track.getCapabilities();
+        if (!capabilities || !capabilities.zoom) return;
+
         zoomContainer.classList.remove('hidden');
 
         // Set slider range based on hardware capabilities
@@ -68,7 +79,7 @@ function setupZoomControl(track) {
         zoomSlider.step = capabilities.zoom.step || 0.1;
 
         // Get current zoom value
-        const settings = track.getSettings();
+        const settings = typeof track.getSettings === 'function' ? track.getSettings() : {};
         zoomSlider.value = settings.zoom || capabilities.zoom.min;
 
         // Function to apply zoom
@@ -95,7 +106,7 @@ function setupZoomControl(track) {
                     e.touches[0].pageX - e.touches[1].pageX,
                     e.touches[0].pageY - e.touches[1].pageY
                 );
-                const currentSettings = track.getSettings();
+                const currentSettings = typeof track.getSettings === 'function' ? track.getSettings() : {};
                 initialPinchZoom = currentSettings.zoom || 1;
             }
         };
@@ -120,9 +131,8 @@ function setupZoomControl(track) {
             initialPinchZoom = null;
         };
 
-    } else {
-        zoomContainer.classList.add('hidden');
-        console.log('Zoom not supported by this camera');
+    } catch (err) {
+        console.warn('[Scanner] setupZoomControl error:', err);
     }
 }
 
@@ -298,7 +308,7 @@ function handleQRScanResult(qrData) {
     // Allow direct start-code entry for the first puzzle
     if (!urlLockedPuzzle) {
         urlLockedPuzzle = PUZZLES.find(p =>
-            Array.isArray(p.previousPuzzleId) && p.previousPuzzleId.includes(0) && p.startCode &&
+            isStartingPuzzle(p) && p.startCode &&
             standardizeString(p.startCode) === normalizedInput
         );
     }
@@ -311,7 +321,7 @@ function handleQRScanResult(qrData) {
                 linkId: linkId,
                 puzzleId: urlLockedPuzzle.id,
                 puzzleLevel: urlLockedPuzzle.level,
-                requiredPuzzle: (urlLockedPuzzle.previousPuzzleId || []).join('/'),
+                requiredPuzzle: currentPuzzle ? currentPuzzle.linkid : 'XG01 (start)',
                 currentProgress: currentPuzzle ? currentPuzzle.id : 0
             });
             const msg = puzzleGateMessage(urlLockedPuzzle);
@@ -334,7 +344,15 @@ function handleQRScanResult(qrData) {
         showToast('✓ Signal Acquired - Redirecting...', 'success');
         setTimeout(() => {
             stopQRScanner();
-            showStep(3);
+            if (isStartingPuzzle(urlLockedPuzzle)) {
+                // Starting puzzle (XG01) — ask for the start key
+                showStep('startcode');
+            } else {
+                // Non-start puzzle — unlock directly, no previous answer asked
+                const via = currentPuzzle ? `Puzzle ${currentPuzzle.id}` : 'DIRECT';
+                activatePuzzle(urlLockedPuzzle, via);
+                showStep(3);
+            }
             processingQR = false;
         }, 1500);
     } else {

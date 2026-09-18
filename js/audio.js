@@ -24,7 +24,7 @@ function playSound(soundName, volume = 0.3) {
         try {
             const audio = new Audio(soundName);
             audio.volume = volume;
-            audio.play();
+            audio.play().catch((e) => console.warn('Cry audio failed to play:', e));
             return;
         } catch (e) {
             console.warn("External sound failed:", e);

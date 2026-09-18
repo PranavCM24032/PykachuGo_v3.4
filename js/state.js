@@ -19,6 +19,9 @@ let tabSwitchCount = 0;
 // Team score and solve tracking
 let currentTeamScore = 0;
 let currentTeamSolvedPuzzles = new Set();
+// Per-team ordered unlock queue (frontier): solving a puzzle pushes every id
+// in its nextPuzzleId here; only QUEUED puzzles are unlockable (no jumping).
+let teamUnlockQueue = [];
 
 // Tab switching penalty system
 let penaltyActive = false;
@@ -47,6 +50,7 @@ let hintRequestConfirmed = false;
 let hintRequestTimeout = null;
 let hintTabSwitchDuringPenalty = false;
 let hintTabSwitchCount = 0;
+let hintMalpracticePenaltyRunning = false;
 let hintDisplayed = false;
 let currentPuzzleHint = null;
 
@@ -81,6 +85,7 @@ function getTeamStorageKey() {
 function loadTeamScoreState() {
     currentTeamScore = 0;
     currentTeamSolvedPuzzles = new Set();
+    teamUnlockQueue = [];
 
     if (!currentTeam) return;
     try {
@@ -90,6 +95,14 @@ function loadTeamScoreState() {
             currentTeamScore = state[teamKey].score || 0;
             const solvedList = Array.isArray(state[teamKey].solved) ? state[teamKey].solved : [];
             currentTeamSolvedPuzzles = new Set(solvedList);
+            teamUnlockQueue = Array.isArray(state[teamKey].queue) ? state[teamKey].queue.map(Number) : [];
+
+            // Migration: teams saved before the queue existed rebuild it from their
+            // solved puzzles' outgoing edges (in solve order).
+            if (!Array.isArray(state[teamKey].queue)) {
+                rebuildUnlockQueue();
+                saveTeamScoreState();
+            }
         }
     } catch (e) {
         console.warn('Could not load team score state:', e);
@@ -103,7 +116,8 @@ function saveTeamScoreState() {
         const teamKey = getTeamStorageKey();
         state[teamKey] = {
             score: currentTeamScore,
-            solved: Array.from(currentTeamSolvedPuzzles)
+            solved: Array.from(currentTeamSolvedPuzzles),
+            queue: teamUnlockQueue
         };
         localStorage.setItem(CONFIG.STORAGE_KEYS.scoreState, JSON.stringify(state));
     } catch (e) {
@@ -114,6 +128,7 @@ function saveTeamScoreState() {
 function resetTeamScoreState() {
     currentTeamScore = 0;
     currentTeamSolvedPuzzles = new Set();
+    teamUnlockQueue = [];
     if (!currentTeam) return;
     try {
         const state = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.scoreState) || '{}');
@@ -127,6 +142,23 @@ function resetTeamScoreState() {
     }
 }
 
+// Rebuild the unlock queue from all solved puzzles' outgoing edges.
+// Used only to migrate pre-queue saves.
+function rebuildUnlockQueue() {
+    teamUnlockQueue = [];
+    const seen = new Set(currentTeamSolvedPuzzles);
+    for (const solvedId of currentTeamSolvedPuzzles) {
+        const p = PUZZLES.find(x => x.id === Number(solvedId));
+        if (!p) continue;
+        for (const nid of (p.nextPuzzleId || []).map(Number)) {
+            if (!seen.has(nid)) {
+                seen.add(nid);
+                teamUnlockQueue.push(nid);
+            }
+        }
+    }
+}
+
 function hasSolvedPuzzle(puzzleId) {
     return currentTeamSolvedPuzzles.has(puzzleId);
 }
@@ -134,6 +166,18 @@ function hasSolvedPuzzle(puzzleId) {
 function recordPuzzleSolve(puzzleId, pointsEarned) {
     currentTeamSolvedPuzzles.add(puzzleId);
     currentTeamScore += pointsEarned;
+
+    // Queue advance: solving a puzzle pushes its outgoing graph edges onto the
+    // team's unlock queue (no duplicates, solved puzzles are excluded).
+    const p = PUZZLES.find(x => x.id === Number(puzzleId));
+    if (p) {
+        for (const nid of (p.nextPuzzleId || []).map(Number)) {
+            if (!currentTeamSolvedPuzzles.has(nid) && !teamUnlockQueue.includes(nid)) {
+                teamUnlockQueue.push(nid);
+            }
+        }
+    }
+
     saveTeamScoreState();
 }
 
@@ -144,21 +188,36 @@ function standardizeString(str) {
 // ==============================
 // PUZZLE CHAIN GATE
 // ==============================
-// A puzzle is only allowed to be scanned/unlocked if it is the NEXT one in the
-// chain: its previousPuzzleId must match the player's current progress
-// (currentPuzzle.id, or 0 when the chain hasn't started = only XG01 is allowed).
-function isPuzzleAllowed(puzzle) {
-    if (!puzzle) return false;
-    if (isTestTeam()) return true;
-    const prevIds = (puzzle.previousPuzzleId || []).map(Number);
-    if (prevIds.includes(0)) return true;
-    if (hasSolvedPuzzle(puzzle.id)) return true;
-    const progressId = currentPuzzle ? currentPuzzle.id : 0;
-    return prevIds.includes(progressId);
+// A puzzle is only allowed to be scanned/unlocked if it is listed in the
+// NEXT puzzle chain of the player's current progress: the scanned puzzle must
+// appear in currentPuzzle.nextPuzzleId. Starting puzzles (marked by startCode)
+// are always allowed to begin the chain.
+function isStartingPuzzle(puzzle) {
+    return !!(puzzle && puzzle.startCode);
 }
 
-function isTestTeam() {
-    return typeof currentTeamTid === 'string' && currentTeamTid.toLowerCase() === 'test_id';
+function getNextPuzzle(puzzle) {
+    if (!puzzle) return null;
+    return getNextPuzzles(puzzle)[0] || null;
+}
+
+// Graph support: nextPuzzleId is an edge list, so a puzzle can branch into
+// MANY next puzzles. Returns every destination puzzle in edge order.
+function getNextPuzzles(puzzle) {
+    if (!puzzle) return [];
+    const nextIds = (puzzle.nextPuzzleId || []).map(Number);
+    return nextIds
+        .map(id => PUZZLES.find(p => p.id === id))
+        .filter(Boolean);
+}
+
+function isPuzzleAllowed(puzzle) {
+    if (!puzzle) return false;
+    if (isStartingPuzzle(puzzle)) return true;
+    if (hasSolvedPuzzle(puzzle.id)) return true;
+    // Queue gate: only puzzles sitting in the team's unlock queue are reachable.
+    // Anything else (e.g. puzzle 3 before 2 or 6 is solved) is a jump -> blocked.
+    return teamUnlockQueue.includes(Number(puzzle.id));
 }
 
 function puzzleGateMessage(puzzle) {
@@ -166,12 +225,10 @@ function puzzleGateMessage(puzzle) {
     if (puzzle && puzzle.id === progressId) {
         return `❌ Access Denied - ${puzzle.linkid} already completed`;
     }
-    const prevIds = (puzzle.previousPuzzleId || []).map(Number);
-    if (prevIds.includes(0)) {
+    if (isStartingPuzzle(puzzle)) {
         return '❌ Access Denied - Start from XG01 first';
     }
-    const required = PUZZLES.find(p => prevIds.includes(p.id));
-    return `❌ Access Denied - Complete ${required ? required.linkid : 'previous puzzle'} first`;
+    return '❌ Access Denied - Complete a connected location first';
 }
 
 async function sha256(text) {

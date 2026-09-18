@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-hunt-v19';
+const CACHE_NAME = 'pykachu-hunt-v30';
 const ASSETS = [
     'admin.html',
     'index.html',
@@ -32,10 +32,11 @@ const ASSETS = [
     'html/step0.html',
     'html/step1.html',
     'html/step2.html',
+    'html/startcode.html',
     'html/step3.html',
     'html/step4.html',
-    'html/step5.html',
-    'html/overlays.html',
+    'html/penalty.html',
+    'html/hint.html',
     'html/meme.html',
     'data/puzzle.json',
     'data/teams.json',

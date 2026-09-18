@@ -1,16 +1,5 @@
 [
     {
-        "team": "TESTER",
-        "passwordHash": "123",
-        "tid": "test_id",
-        "team_members": [
-            "A",
-            "B",
-            "C",
-            "D"
-        ]
-    },
-    {
         "team": "PRANAV",
         "passwordHash": "123",
         "tid": "T001",

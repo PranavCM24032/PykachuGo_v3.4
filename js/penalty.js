@@ -17,13 +17,13 @@ function stopTabMonitoring() {
 }
 
 function handleVisibilityChange() {
-    if (document.hidden && isPuzzleActive && currentStep === 4) {
+    if (document.hidden && isPuzzleActive && currentStep === 3) {
         triggerPenalty();
     }
 }
 
 function handleWindowBlur() {
-    if (!isPuzzleActive || currentStep !== 4) return;
+    if (!isPuzzleActive || currentStep !== 3) return;
     if (blurTimeout) clearTimeout(blurTimeout);
     blurTimeout = setTimeout(() => {
         if (!document.hasFocus()) triggerPenalty();
@@ -37,12 +37,23 @@ function handleWindowFocus() {
     }
 }
 
-function triggerPenalty() {
+function triggerPenalty(reason = 'TAB_SWITCH') {
     // Tab-switch penalty only applies while the code is being solved
-    // (step 4 until the correct answer is submitted), NOT during the hint penalty.
-    if (!isPuzzleActive || currentStep !== 4 || hintPenaltyActive) return;
+    // (step 3 until the correct answer is submitted), NOT during the hint penalty.
+    if (!isPuzzleActive || currentStep !== 3 || hintPenaltyActive) return;
 
     tabSwitchCount++;
+
+    const penaltyPayload = {
+        puzzleId: currentPuzzle?.id || 0,
+        tabSwitches: tabSwitchCount,
+        reason,
+        penaltyActive: penaltyActive,
+        timestamp: new Date().toISOString()
+    };
+
+    submitToGoogleSheets('PENALTY_TRIGGERED', penaltyPayload);
+
     if (penaltyActive) {
         penaltySeconds = 15;
         const timerElement = document.getElementById('penaltyTimer');
@@ -67,11 +78,6 @@ function triggerPenalty() {
     if (timerElement) timerElement.textContent = penaltySeconds;
 
     resetTimerRing();
-
-    submitToGoogleSheets('PENALTY_TRIGGERED', {
-        puzzleId: currentPuzzle?.id || 0,
-        tabSwitches: tabSwitchCount
-    });
 
     if (penaltyTimer) clearInterval(penaltyTimer);
     penaltyTimer = setInterval(() => {
@@ -125,4 +131,45 @@ function clearPenalty() {
     if (overlay) overlay.classList.add('hidden');
 
     playSound('success');
+}
+
+// Show the 15-second MALPRACTICE penalty overlay independently.
+// Used by the hint system when a tab switch happens during the hint countdown.
+// Calls onComplete when the penalty timer finishes.
+var _blockingPenaltyCallback = null;
+
+function runBlockingPenalty(onComplete) {
+    _blockingPenaltyCallback = typeof onComplete === 'function' ? onComplete : null;
+
+    playSound('error');
+
+    var overlay = document.getElementById('penaltyOverlay');
+    if (overlay) overlay.classList.remove('hidden');
+
+    penaltySeconds = 15;
+    var timerElement = document.getElementById('penaltyTimer');
+    if (timerElement) timerElement.textContent = penaltySeconds;
+
+    resetTimerRing();
+
+    if (penaltyTimer) clearInterval(penaltyTimer);
+    penaltyTimer = setInterval(function() {
+        penaltySeconds--;
+        if (timerElement) timerElement.textContent = Math.max(0, penaltySeconds);
+        if (penaltySeconds <= 0) {
+            clearInterval(penaltyTimer);
+            penaltyTimer = null;
+            penaltyActive = false;
+            if (overlay) overlay.classList.add('hidden');
+
+            submitToGoogleSheets('PENALTY', {
+                puzzleId: currentPuzzle ? currentPuzzle.id : 0,
+                reason: 'TAB_SWITCH_DURING_HINT'
+            });
+
+            var cb = _blockingPenaltyCallback;
+            _blockingPenaltyCallback = null;
+            if (cb) cb();
+        }
+    }, 1000);
 }

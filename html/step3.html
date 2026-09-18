@@ -1,53 +1,59 @@
-<div id="step3" class="flow-step h-full">
-    <div class="flex flex-col h-full justify-center items-center gap-4 p-3 sm:p-5">
-        <div class="w-full text-center shrink-0">
-            <!-- Gym Badge Display -->
-            <div id="step3BadgeContainer" class="gym-badge-container hidden animate-fade-in">
-                <div class="badge-sparkle"></div>
-                <img id="gymBadgeImg" src="" alt="Gym Badge" class="gym-badge-image">
+<div id="step3" class="flow-step h-full relative overflow-hidden">
+    <div class="flex flex-col h-full relative z-10 p-2 sm:p-3 overflow-hidden">
+        <!-- Header with timer -->
+        <div
+            class="flex justify-between items-center mb-2 px-2 shrink-0 border-b border-green-500/30 pb-1.5 font-mono">
+            <span class="text-green-500 text-xs sm:text-sm truncate pr-2"> >_ TERMINAL</span>
+            <span id="langBadge" class="text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-bold">PYTHON</span>
+            <div class="flex items-center gap-2">
+                <div id="tabWarning" class="hidden animate-pulse">
+                    <span class="material-symbols-rounded text-red-500 text-sm">warning</span>
+                </div>
+                <span id="puzzleTimer" class="text-green-500 text-xs sm:text-sm font-mono tabular-nums">
+                    00:00
+                </span>
             </div>
-
-            <h2
-                class="font-pixel text-yellow-500 mb-1 tracking-widest uppercase text-xs sm:text-sm">
-                Encryption Detected
-            </h2>
-            <p class="hidden text-gray-400 text-[10px] sm:text-xs">Input decryption key to proceed</p>
-            <p id="nextPuzzleIdDisplay" class="text-blue-500 font-pixel mt-0.5 text-[10px] sm:text-xs"></p>
         </div>
 
-        <form id="unlockForm" class="w-full max-w-xs sm:max-w-sm">
-            <div class="mb-3 sm:mb-4">
-                <label
-                    class="block text-gray-500 uppercase tracking-widest mb-1 font-bold text-[10px] sm:text-xs">
-                    Previous Key
-                </label>
-                <div class="relative group">
-                    <input type="text" id="unlockCode"
-                        class="w-full bg-black/40 border-2 border-gray-800 rounded-xl px-3 py-2.5 sm:py-3 text-white focus:border-yellow-500 focus:outline-none placeholder-gray-600 uppercase transition-all text-xs sm:text-sm"
-                        placeholder="ENCRYPTION KEY" autocomplete="off" required
-                        autocapitalize="characters">
-                    <span
-                        class="material-symbols-rounded absolute right-3 top-1/2 -translate-y-1/2 text-yellow-500/50 group-focus-within:text-yellow-500 transition-colors text-base sm:text-lg">
-                        key
-                    </span>
+        <!-- Code Terminal Area -->
+        <div class="code-terminal flex-1 p-2 sm:p-3 mb-3">
+            <!-- Cyber Pokéball Watermark -->
+            <div
+                class="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-40">
+                <div class="cyber-pokeball">
+                    <div class="cyber-orbit"></div>
+                    <div id="step4Pokeball" class="pixel-pokeball hidden">
+                        <div class="pokeball-btn"></div>
+                    </div>
                 </div>
             </div>
 
-            <div id="unlockFeedback"
-                class="hidden text-[10px] sm:text-xs p-2 rounded-xl mb-2 bg-red-900/20 border border-red-900/40 text-red-100 font-pixel">
-            </div>
+            <pre id="puzzleQuestion"
+                class="flex-1 overflow-y-auto scrollable text-green-300 text-xs sm:text-sm leading-relaxed font-mono whitespace-pre-wrap unselectable relative z-10 p-1">
+Loading puzzle data...</pre>
+        </div>
 
-            <div class="flex gap-2">
-                <button type="submit" onmousedown="playSound('click')"
-                    class="btn-pokedex flex-[2] flex items-center justify-center gap-1.5 py-2.5 sm:py-3 text-xs sm:text-sm"
-                    style="background: linear-gradient(145deg, #F59E0B, #D97706); border-bottom: 3px solid #92400E;">
-                    <span class="material-symbols-rounded text-base sm:text-lg">lock_open</span>
-                    VERIFY
+        <!-- Answer Form - FIXED LAYOUT -->
+        <form id="answerForm" class="shrink-0 w-full mt-auto">
+            <div class="flex flex-row sm:flex-row gap-2 sm:gap-3 items-stretch">
+                <!-- Hint Button - Always first -->
+                <button type="button" onclick="requestHint()" id="hintRequestBtn"
+                    class="hidden bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl flex items-center justify-center text-yellow-500 hover:bg-yellow-500/20 hover:text-yellow-400 active:bg-yellow-500/30 transition-colors relative z-20 cursor-pointer py-3 sm:py-0 min-h-[44px] min-w-[44px] order-1">
+                    <span class="material-symbols-rounded text-lg sm:text-xl">lightbulb</span>
                 </button>
 
-                <button type="button" onclick="backToStep2()" onmousedown="playSound('click')"
-                    class="flex-1 bg-gray-800/50 border-2 border-gray-700 rounded-xl flex items-center justify-center text-gray-400 hover:text-white transition-all py-2.5 sm:py-3">
-                    <span class="material-symbols-rounded text-base sm:text-lg">arrow_back</span>
+                <!-- Answer Input - Always second -->
+                <div class="flex-1 min-w-0 order-2">
+                    <input type="text" id="puzzleAnswer"
+                        class="w-full h-full bg-gray-900/50 border-2 border-gray-700 rounded-lg px-3 sm:px-4 py-3 text-white text-sm sm:text-base focus:border-green-500 outline-none uppercase min-h-[44px]"
+                        placeholder="ENTER SOLUTION" autocomplete="off" required
+                        autocapitalize="characters">
+                </div>
+
+                <!-- Submit Button - Always third -->
+                <button type="submit"
+                    class="btn-pokedex flex items-center justify-center min-h-[44px] min-w-[44px] order-3 py-3 sm:py-0">
+                    <span class="material-symbols-rounded text-lg sm:text-xl">send</span>
                 </button>
             </div>
         </form>

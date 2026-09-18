@@ -10,6 +10,7 @@
 
 var GAME_STEP_ACTIONS = [
   'QR_SCANNED',
+  'QR_BLOCKED',
   'PUZZLE_UNLOCKED',
   'UNLOCK_FAILED',
   'SOLVED',
@@ -17,7 +18,8 @@ var GAME_STEP_ACTIONS = [
   'HINT_REQUESTED',
   'HINT_USED',
   'PENALTY_TRIGGERED',
-  'PENALTY'
+  'PENALTY',
+  'MALPRACTICE_DETECTED'
 ];
 
 var ACCESS_TOKEN = 'pyk2026@secGX42';
@@ -30,9 +32,15 @@ var LEVEL_HEADERS = [
   "Total Scans", "Points Earned", "Points Lost"
 ];
 
+// Handle CORS preflight requests
+function doOptions(e) {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
 function doPost(e) {
   var lock = LockService.getScriptLock();
-  var lockAcquired = lock.tryLock(10000);
+  var lockAcquired = lock.tryLock(20000);
 
   try {
     if (!lockAcquired) {
@@ -50,12 +58,30 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // ── RESET ALL: wipe every sheet row (keep headers) + bump game epoch ──
+    if (data.action === 'RESET_ALL') {
+      var sheetsToWipe = ['Registration', 'L1', 'L2', 'L3'];
+      sheetsToWipe.forEach(function(name) {
+        var sheet = ss.getSheetByName(name);
+        if (sheet && sheet.getLastRow() > 1) {
+          sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+        }
+      });
+      var props = PropertiesService.getScriptProperties();
+      var epoch = parseInt(props.getProperty('gameEpoch') || '0', 10) + 1;
+      props.setProperty('gameEpoch', epoch.toString());
+      SpreadsheetApp.flush();
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", epoch: epoch }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (data.action === 'SESSION_BATCH' && Array.isArray(data.events)) {
       data.events.forEach(function(event) { processEvent(ss, event); });
     } else {
       processEvent(ss, data);
     }
 
+    SpreadsheetApp.flush();
     return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
       .setMimeType(ContentService.MimeType.JSON);
 
@@ -184,7 +210,11 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
     record.status = 'UNLOCKED';
   } else if (action === 'UNLOCK_FAILED') {
     record.status = 'LOCKED';
-  } else if (action === 'PENALTY_TRIGGERED' || action === 'PENALTY') {
+  } else if (action === 'QR_BLOCKED') {
+    record.status = 'BLOCKED';
+  } else if (action === 'PENALTY_TRIGGERED' || action === 'PENALTY' || action === 'MALPRACTICE_DETECTED') {
+    record.status = 'MALPRACTICE';
+    record.lastActive = timestamp;
     if (typeof data.penaltyCount === 'number') record.tabSwitches = data.penaltyCount;
     else if (typeof data.tabSwitches === 'number') record.tabSwitches = data.tabSwitches;
     else record.tabSwitches += 1;
@@ -260,6 +290,15 @@ function doGet(e) {
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureSheetsExist(ss);
+
+    // ── Clients check the epoch on load to wipe stale local progress ──
+    if (e.parameter.action === 'GET_EPOCH') {
+      var props = PropertiesService.getScriptProperties();
+      var epoch = parseInt(props.getProperty('gameEpoch') || '0', 10);
+      return ContentService.createTextOutput(JSON.stringify({ epoch: epoch }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     var list = [];
 
     // 1. Read Registration

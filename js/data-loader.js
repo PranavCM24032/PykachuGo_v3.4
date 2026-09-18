@@ -24,7 +24,7 @@ const AssetPreloader = {
             puzzles.forEach(p => {
                 if (p.pokemonId) {
                     this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.pokemonId}.png`);
-                    fetch(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/cries/latest/${p.pokemonId}.ogg`, { mode: 'no-cors' }).catch(() => { });
+                    fetch(`https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${p.pokemonId}.ogg`, { mode: 'no-cors' }).catch(() => { });
                 }
                 if (p.id) {
                     this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${p.id}.png`);

@@ -17,6 +17,7 @@ const CONFIG = {
         hintState: 'pykachuHintState',
         gameState: 'pykachuGameState',
         teamInfo: 'pykachuTeam',
-        scoreState: 'pykachuScoreState'
+        scoreState: 'pykachuScoreState',
+        gameEpoch: 'pykachuGameEpoch'
     }
 };

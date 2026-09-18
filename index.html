@@ -10,7 +10,6 @@
     <link rel="preconnect" href="https://i.ytimg.com">
     <link rel="preconnect" href="https://s.ytimg.com">
     <link rel="dns-prefetch" href="https://www.youtube.com">
-    <link rel="preload" as="script" href="https://www.youtube.com/iframe_api" crossorigin>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -34,6 +33,7 @@
     <link rel="stylesheet" href="css/meme.css">
     <link rel="stylesheet" href="css/tailwind.css">
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="assets/img/poketropy.png" type="image/png">
 
     <!-- iOS PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -96,7 +96,7 @@
         }
 
         @media (max-height: 700px) {
-            #step4 .code-terminal {
+            #step3 .code-terminal {
                 max-height: 40vh !important;
             }
         }
@@ -227,12 +227,13 @@
                 <div data-include="html/step0.html"></div>
                 <div data-include="html/step1.html"></div>
                 <div data-include="html/step2.html"></div>
+                <div data-include="html/startcode.html"></div>
                 <div data-include="html/step3.html"></div>
                 <div data-include="html/step4.html"></div>
-                <div data-include="html/step5.html"></div>
 
-                <!-- Overlays loaded from partial -->
-                <div data-include="html/overlays.html"></div>
+                <!-- Overlays loaded from partials -->
+                <div data-include="html/penalty.html"></div>
+                <div data-include="html/hint.html"></div>
 
                 <!-- Meme player loaded from partial -->
                 <div data-include="html/meme.html"></div>
@@ -271,6 +272,7 @@
     <script src="js/state.js"></script>
     <script src="js/audio.js"></script>
     <script src="js/data-loader.js"></script>
+    <script src="js/rate-limiter.js"></script>
     <script src="js/google-sheets.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/screens.js"></script>

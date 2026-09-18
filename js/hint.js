@@ -97,6 +97,13 @@ function requestHint() {
     console.log('Hint requested.');
     if (!currentPuzzle) return;
 
+    // Re-opening a hint already paid for is free — show it directly,
+    // no confirmation/penalty timer round-trip.
+    if (currentPuzzle.hintUsed) {
+        showHint();
+        return;
+    }
+
     if (!currentPuzzleHint && currentPuzzle.hint) {
         currentPuzzleHint = currentPuzzle.hint;
     }
@@ -152,6 +159,7 @@ function cancelHintRequest() {
         clearInterval(hintPenaltyTimer);
         hintPenaltyTimer = null;
         hintPenaltyActive = false;
+        hintMalpracticePenaltyRunning = false;
         stopHintTabMonitoring();
         const penaltyOverlay = document.getElementById('hintPenaltyOverlay');
         if (penaltyOverlay) penaltyOverlay.classList.add('hidden');
@@ -162,6 +170,10 @@ function cancelHintRequest() {
 
 function startHintPenalty() {
     if (hintPenaltyActive) return;
+    if (!currentPuzzle) {
+        showToast('No puzzle loaded for hint.', 'error');
+        return;
+    }
 
     hintPenaltyActive = true;
     hintTabSwitchDuringPenalty = false;
@@ -227,6 +239,11 @@ function completeHintPenalty() {
     hintPenaltyTimer = null;
     hintPenaltyActive = false;
 
+    if (!currentPuzzle) {
+        showToast('No puzzle loaded for hint.', 'error');
+        return;
+    }
+
     // Hide penalty overlay
     document.getElementById('hintPenaltyOverlay').classList.add('hidden');
 
@@ -265,7 +282,7 @@ function stopHintTabMonitoring() {
 
 function handleHintVisibilityChange() {
     if (document.hidden && hintPenaltyActive) {
-        resetHintPenaltyTimer();
+        handleHintTabSwitch();
     }
 }
 
@@ -274,13 +291,33 @@ function handleHintWindowBlur() {
         // Immediate check or small delay
         setTimeout(() => {
             if (document.hidden || !document.hasFocus()) {
-                resetHintPenaltyTimer();
+                handleHintTabSwitch();
             }
         }, 100);
     }
 }
 
-function resetHintPenaltyTimer() {
+function handleHintTabSwitch() {
+    if (!hintPenaltyActive || hintMalpracticePenaltyRunning) return;
+    hintMalpracticePenaltyRunning = true;
+
+    // Pause the hint countdown while the malpractice penalty runs.
+    if (hintPenaltyTimer) {
+        clearInterval(hintPenaltyTimer);
+        hintPenaltyTimer = null;
+    }
+
+    // FIRST: run the 15s MALPRACTICE penalty to completion...
+    runBlockingPenalty(function () {
+        // SECOND: once that's over, reset the hint countdown and run it to its finish.
+        if (hintPenaltyActive) {
+            resumeHintPenalty();
+        }
+        hintMalpracticePenaltyRunning = false;
+    });
+}
+
+function resumeHintPenalty() {
     if (!hintPenaltyActive) return;
 
     hintTabSwitchDuringPenalty = true;
@@ -292,6 +329,10 @@ function resetHintPenaltyTimer() {
 
     const timerDisplay = document.getElementById('hintTimerDisplay');
     if (timerDisplay) timerDisplay.textContent = hintPenaltySeconds;
+
+    // Re-show the hint penalty overlay (it may have been covered by the penalty overlay)
+    const hintPenaltyOverlay = document.getElementById('hintPenaltyOverlay');
+    if (hintPenaltyOverlay) hintPenaltyOverlay.classList.remove('hidden');
 
     // Show warning message
     const warningMessage = document.getElementById('hintWarningMessage');
@@ -309,11 +350,20 @@ function resetHintPenaltyTimer() {
         timerRing.style.animation = `hint-countdown ${hintPenaltySeconds}s linear forwards`;
     }
 
+    // Restart the countdown
+    if (hintPenaltyTimer) clearInterval(hintPenaltyTimer);
+    hintPenaltyTimer = setInterval(updateHintPenaltyTimer, 1000);
+
     playSound('penaltyReset');
-    console.log('Hint timer reset due to tab switch');
+    console.log('Hint timer restarted after malpractice penalty.');
 }
 
 function showHint() {
+    if (!currentPuzzle) {
+        showToast('No puzzle loaded for hint.', 'error');
+        return;
+    }
+
     if (!currentPuzzleHint && currentPuzzle && currentPuzzle.hint) {
         currentPuzzleHint = currentPuzzle.hint;
     }
@@ -408,6 +458,7 @@ function cleanupHintSystem() {
     stopHintTabMonitoring();
     hintPenaltyActive = false;
     hintRequestConfirmed = false;
+    hintMalpracticePenaltyRunning = false;
 }
 
 function resetHintForNewTeam() {
@@ -415,6 +466,7 @@ function resetHintForNewTeam() {
     hintPenaltyActive = false;
     hintRequestConfirmed = false;
     hintTabSwitchDuringPenalty = false;
+    hintMalpracticePenaltyRunning = false;
     currentPuzzleHint = null;
 
     if (currentPuzzle) {

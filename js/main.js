@@ -44,6 +44,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     await warmupMemePlayer();
     initAudio();
 
+    // A reset from the admin panel bumps the game epoch. If this device was
+    // last used before that reset, its saved queue/score/progress is stale —
+    // wipe it all so every player starts the new run clean.
+    try {
+        const epochResp = await fetch(`${GOOGLE_SCRIPT_URL}?action=GET_EPOCH&t=${Date.now()}&token=${encodeURIComponent(GOOGLE_SCRIPT_TOKEN)}`);
+        const epochData = await epochResp.json();
+        const serverEpoch = Number(epochData.epoch || 0);
+        const localEpoch = Number(localStorage.getItem(CONFIG.STORAGE_KEYS.gameEpoch) || 0);
+        if (serverEpoch > localEpoch) {
+            Object.values(CONFIG.STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+            if (typeof SESSION_BUFFER_KEY !== 'undefined') localStorage.removeItem(SESSION_BUFFER_KEY);
+            localStorage.setItem(CONFIG.STORAGE_KEYS.gameEpoch, String(serverEpoch));
+            console.log(`[Epoch] Reset detected (${localEpoch} -> ${serverEpoch}); local progress wiped.`);
+        }
+    } catch (e) {
+        console.warn('Epoch check failed (offline?). Keeping saved progress:', e);
+    }
+
     if (!sessionId) {
         sessionId = generateSessionId();
     }
@@ -61,7 +79,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const savedTeamInfo = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.teamInfo) || '{}');
         if (savedTeamInfo.language) currentLanguage = savedTeamInfo.language;
         if (savedTeamInfo.tid) currentTeamTid = savedTeamInfo.tid;
+        if (savedTeamInfo.name) currentTeam = savedTeamInfo.name;
     } catch (e) { }
+
+    // Load the returning team's saved queue/solved/score so the deep-link
+    // gate below can correctly allow puzzles they have legitimately unlocked.
+    loadTeamScoreState();
 
     // Restore puzzle progression so the chain gate works across page reloads
     try {
@@ -82,7 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (urlLockedPuzzle) {
-        if (urlLockedPuzzle.id === 1) {
+        if (isStartingPuzzle(urlLockedPuzzle)) {
             // Pre-fill the start key for the entry puzzle so deep links one-tap through
             const unlockCodeInput = document.getElementById('unlockCode');
             if (unlockCodeInput) unlockCodeInput.value = urlLockedPuzzle.startCode || "START";

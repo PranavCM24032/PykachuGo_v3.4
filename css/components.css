@@ -556,7 +556,7 @@ label {
     font-size: var(--fluid-font-label) !important;
 }
 
-#step4 .code-terminal pre {
+#step3 .code-terminal pre {
     font-size: clamp(11px, 1.8vmin, 13px);
     line-height: 1.5;
 }

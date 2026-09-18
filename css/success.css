@@ -1,7 +1,19 @@
-﻿.location-card-glow {
+.location-card-glow {
     animation: location-glow 3s ease-in-out infinite;
     background: rgba(245, 158, 11, 0.05) !important;
     border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+#nextLocationList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+@media (min-width: 640px) {
+    #nextLocationList {
+        gap: 12px;
+    }
 }
 
 @keyframes location-glow {

@@ -5,11 +5,12 @@
         "questionPython": "def func(n):\n    return n * 3 + 5\n\nx = func(4)\ny = func(2)\nz = x - y * 2\nprint(z)",
         "questionCpp": "#include <iostream>\nusing namespace std;\n\nint func(int n) {\n    return n * 3 + 5;\n}\n\nint main() {\n    int x = func(4);\n    int y = func(2);\n    int z = x - y * 2;\n    cout << z << endl;\n    return 0;\n}",
         "answer": "-5",
-        "previousPuzzleId": [
-            0
+        "nextPuzzleId": [
+            2,
+            6
         ],
         "startCode": "START",
-        "locationClue": "Cental Library",
+        "locationClue": "CSE entrance - openspace",
         "level": 1,
         "points": 10,
         "hint": "BODMAS",
@@ -22,10 +23,10 @@
         "questionPython": "def func(n):\n    return n * 2 + 3\n\nx = func(5)\ny = func(3)\nz = x - y\nprint(z)",
         "questionCpp": "#include <iostream>\nusing namespace std;\n\nint func(int n) {\n    return n * 2 + 3;\n}\n\nint main() {\n    int x = func(5);\n    int y = func(3);\n    int z = x - y;\n    cout << z << endl;\n    return 0;\n}",
         "answer": "4",
-        "previousPuzzleId": [
-            1
+        "nextPuzzleId": [
+            3
         ],
-        "locationClue": "Main entrance",
+        "locationClue": "Mechanical Workshop",
         "level": 1,
         "points": 10,
         "hint": "Simple arithmetic",
@@ -38,10 +39,10 @@
         "questionPython": "def func(n):\n    return n ** 2\n\nx = func(3)\ny = func(2)\nz = x + y\nprint(z)",
         "questionCpp": "#include <iostream>\nusing namespace std;\n\nint func(int n) {\n    return n * n;\n}\n\nint main() {\n    int x = func(3);\n    int y = func(2);\n    int z = x + y;\n    cout << z << endl;\n    return 0;\n}",
         "answer": "13",
-        "previousPuzzleId": [
-            2
+        "nextPuzzleId": [
+            4
         ],
-        "locationClue": "OOP Lab",
+        "locationClue": "Back Stage",
         "level": 1,
         "points": 10,
         "hint": "Power of 2",
@@ -54,10 +55,10 @@
         "questionPython": "def func(n):\n    return n * 4 - 1\n\nx = func(2)\ny = func(3)\nz = y - x\nprint(z)",
         "questionCpp": "#include <iostream>\nusing namespace std;\n\nint func(int n) {\n    return n * 4 - 1;\n}\n\nint main() {\n    int x = func(2);\n    int y = func(3);\n    int z = y - x;\n    cout << z << endl;\n    return 0;\n}",
         "answer": "4",
-        "previousPuzzleId": [
-            3
+        "nextPuzzleId": [
+            5
         ],
-        "locationClue": "Mechanical Workshop",
+        "locationClue": "M215 back door",
         "level": 1,
         "points": 10,
         "hint": "Linear function: work out func(2) and func(3) first, then subtract.",
@@ -70,10 +71,10 @@
         "questionPython": "def mystery(a, b):\n    if a > b:\n        return a * 2 - b\n    else:\n        return b * 2 - a\n\nx = mystery(5, 3)\ny = mystery(4, 7)\nz = x + y\nprint(z)",
         "questionCpp": "#include <iostream>\nusing namespace std;\n\nint mystery(int a, int b) {\n    if (a > b)\n        return a * 2 - b;\n    else\n        return b * 2 - a;\n}\n\nint main() {\n    int x = mystery(5, 3);\n    int y = mystery(4, 7);\n    int z = x + y;\n    cout << z << endl;\n    return 0;\n}",
         "answer": "17",
-        "previousPuzzleId": [
-            4
+        "nextPuzzleId": [
+            6
         ],
-        "locationClue": "MBA seminar hall",
+        "locationClue": "AIML Entrance",
         "level": 2,
         "points": 20,
         "hint": "Conditional logic",
@@ -86,10 +87,11 @@
         "questionPython": "def transform(n):\n    total = 0\n    for i in range(1, n+1):\n        total += i * 2\n    return total\n\nresult = transform(4) + transform(3)\nprint(result)",
         "questionCpp": "#include <iostream>\nusing namespace std;\n\nint transform(int n) {\n    int total = 0;\n    for (int i = 1; i <= n; i++)\n        total += i * 2;\n    return total;\n}\n\nint main() {\n    int result = transform(4) + transform(3);\n    cout << result << endl;\n    return 0;\n}",
         "answer": "32",
-        "previousPuzzleId": [
-            5
+        "nextPuzzleId": [
+            7,
+            3
         ],
-        "locationClue": "Cental Library",
+        "locationClue": "M308",
         "level": 2,
         "points": 20,
         "hint": "Sum of series",
@@ -102,10 +104,8 @@
         "questionPython": "def ultimate(x, y, z):\n    return (x + y) * z - (x * y)\n\nresult = ultimate(3, 4, 5)\nprint(result)",
         "questionCpp": "#include <iostream>\nusing namespace std;\n\nint ultimate(int x, int y, int z) {\n    return (x + y) * z - (x * y);\n}\n\nint main() {\n    int result = ultimate(3, 4, 5);\n    cout << result << endl;\n    return 0;\n}",
         "answer": "23",
-        "previousPuzzleId": [
-            6
-        ],
-        "locationClue": null,
+        "nextPuzzleId": [],
+        "locationClue": "G007",
         "level": 3,
         "points": 30,
         "hint": null,
