@@ -40,10 +40,11 @@ livetracks every team.
   in a per-puzzle notebook and ships as **one request** on solve/abandon. 27
   requests per team for the whole event — ~13% of the Apps Script daily quota at
   100 teams.
-- **Server-side team state** — no extra sheet: each team's **Current Puzzle ID**,
-  the **Unlocked Puzzle IDs queue** (the one queue updated on every solve) and
-  the **running score** live as columns right inside the team's L1/L2/L3 rows;
-  clients re-derive the frontier on every load via `GET_TEAM_STATE`.
+- **Server-side team state** — no extra sheet: every solve leaves its own
+  permanent L1/L2/L3 row carrying the **Puzzle ID**, the **Unlocked Puzzle IDs
+  queue** (the one queue updated on every solve) and the **running Total
+  Score**; `GET_TEAM_STATE` re-aggregates these across the level tabs so
+  clients re-derive the frontier on every load.
 - **Sliding-window rate limiter** — protects the Apps Script endpoint from quota
   busts (see [Rate limiting](#-rate-limiting)).
 - **GitHub Actions Auto-Deploy** — push to `main` → GitHub Pages.
@@ -403,29 +404,37 @@ A single Google Apps Script web app that owns one Google Sheets workbook.
 | Tab | Schema |
 |-----|--------|
 | `Registration` | Registration Time, TID, Team Name, Mission, Language, Password, Level, Session ID |
-| `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Wrong Attempts, Solve Time, Hint Used (1/0), Tab Switches, Solved Puzzle IDs, Current Puzzle ID, Unlocked Puzzle IDs, Status, Points Earned, Points Lost, Total Score |
+| `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Puzzle ID, Wrong Attempts, Solve Time, Hint Used (1/0), Tab Switches, Points Earned, Points Lost, Status, Total Score, Unlocked Puzzle IDs |
 
 ### Design decisions
 
-- **1 row per team per tab** — a team's row is created once, then updated
-  in place (no event log spam).
+- **1 append-log row per (team × puzzle)** — every puzzle gets its own
+  permanent row in the level tab. In-progress events (`WRONG_ATTEMPT`,
+  `HINT_*`, `PENALTY`/`MALPRACTICE`, `UNLOCK_*`) update only that puzzle's
+  row; a `SOLVED` finalizes it. Past records are **never overwritten** —
+  each team's history stays intact.
+- The row key is **Team Name + Puzzle ID** (`findPuzzleRow`); TID is stored
+  in every row for lookup but never used as the key (TIDs change across
+  sessions/devices).
 - Events are routed by puzzle **level** to `L1`/`L2`/`L3`
   (fallback: team's registered mission level).
 - `Registration` events only touch the Registration tab.
 - **Points Earned** = sum of positive `SOLVED` points; **Points Lost** = sum of
   |negative| repeat-solve deductions — the Admin leaderboard ranks on these.
-- **`SOLVED`** ships the full per-puzzle notebook in one call and
-  max-assigns `Wrong Attempts`, `Tab Switches`, `Hint Used`, and appends the
-  solved `puzzleId` to the **Solved Puzzle IDs** CSV for that level; abandoned
-  puzzles go through **`PUZZLE_ABANDONED`** (1 call) with the half-done
-  notebook intact.
+- **`SOLVED`** ships the full per-puzzle notebook in one call, finalizes the
+  puzzle's row (`Puzzle ID`, status `SOLVED`, solve time, max-assigned
+  `Wrong Attempts` / `Tab Switches` / `Hint Used`) and writes `Unlocked Puzzle
+  IDs` = THE single queue — every unlock from each SOLVED envelope merged in
+  uniquely — plus the running `Total Score`. Abandoned puzzles go through
+  **`PUZZLE_ABANDONED`** (1 call) with the half-done notebook intact.
 - `Registration` stores the security key (the owner's call) — it is **never**
   returned by the admin `doGet` endpoint.
-- Each team's L1/L2/L3 row also carries the **Current Puzzle ID** (last solved),
-  the **Unlocked Puzzle IDs queue** — THE single queue, every unlock from each
-  SOLVED envelope merged in uniquely — and the **Total Score**, so there is
+- Each L1/L2/L3 row carries the team's **Puzzle ID** (last/current puzzle),
+  the **Unlocked Puzzle IDs queue** and the **Total Score**, so there is
   **no separate TeamState tab**. `GET_TEAM_STATE` re-aggregates these columns
-  across L1/L2/L3; the client derives the frontier as
+  across L1/L2/L3: `solved` = union of solved puzzle rows, `currentPuzzle` =
+  most recent puzzle row, `unlocked` = union of queue snapshots, `score` = max
+  Total Score; the client derives the frontier as
   `unlocked − locally-solved` on refresh.
 - Uses `LockService` for concurrency safety on every POST.
 - Token auth: every request carries `{ token: GOOGLE_SCRIPT_TOKEN }`.
@@ -507,19 +516,19 @@ flowchart TD
     L2T --> UPD
     L3T --> UPD
 
-    subgraph ROW["D · updateLevelRow — 1 row per team per tab (15 cols)"]
-        UPD["updateLevelRow(sheet, …)"] --> FIND{"Row exists for<br/>this teamName?"}
-        FIND -- "Yes" --> LOAD["Load existing 15-col record"]
+    subgraph ROW["D · updateLevelRow — 1 append row per team × puzzle (14 cols)"]
+        UPD["updateLevelRow(sheet, …)"] --> FIND{"Row exists for<br/>teamName + puzzleId?"}
+        FIND -- "Yes" --> LOAD["Load that puzzle's 14-col record"]
         LOAD --> A{"action type?"}
         FIND -- "No" --> A
-        A -- "SOLVED" --> SLV["points >0 → Points Earned<br/>points <0 → Points Lost (repeat)<br/>status: SOLVED · solveTime · lastActive<br/>current puzzle id + unlock queue (ids)<br/>+ running score updated"]
+        A -- "SOLVED" --> SLV["points >0 → Points Earned<br/>points <0 → Points Lost (repeat)<br/>status: SOLVED · solveTime · lastActive<br/>Puzzle ID + unlock queue (ids)<br/>+ running score finalized"]
         A -- "WRONG_ATTEMPT" --> WA["wrongAttempts++<br/>status: RETRYING"]
         A -- "PUZZLE_UNLOCKED" --> PUN["status: UNLOCKED"]
         A -- "UNLOCK_FAILED" --> UFL["status: LOCKED"]
         A -- "QR_BLOCKED" --> QBL["status: BLOCKED"]
         A -- "PENALTY_TRIGGERED / PENALTY<br/>/ MALPRACTICE_DETECTED" --> PNL["status: MALPRACTICE<br/>tabSwitches update"]
         A -- "HINT_REQUESTED / HINT_USED" --> HUS["hintUsed: YES<br/>tabSwitches update"]
-        SLV --> WROW["Write 15-col row<br/>(update in place or append)"]
+        SLV --> WROW["Append finalized 14-col row<br/>(in-progress events update<br/>in place — old SOLVED rows<br/>never overwritten)"]
         WA --> WROW
         PUN --> WROW
         UFL --> WROW
