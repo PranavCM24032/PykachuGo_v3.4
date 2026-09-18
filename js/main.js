@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         const savedTeamInfo = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.teamInfo) || '{}');
         if (savedTeamInfo.language) currentLanguage = savedTeamInfo.language;
+        if (savedTeamInfo.missionLevel) currentMissionLevel = savedTeamInfo.missionLevel;
         if (savedTeamInfo.tid) currentTeamTid = savedTeamInfo.tid;
         if (savedTeamInfo.name) currentTeam = savedTeamInfo.name;
     } catch (e) { }
@@ -92,6 +93,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (savedState.currentPuzzleId) {
             const savedPuzzle = PUZZLES.find(p => p.id === Number(savedState.currentPuzzleId));
             if (savedPuzzle) currentPuzzle = savedPuzzle;
+        }
+        if (savedState.urlLockedPuzzleId) {
+            const savedLocked = PUZZLES.find(p => p.id === Number(savedState.urlLockedPuzzleId));
+            if (savedLocked && isPuzzleAllowed(savedLocked)) urlLockedPuzzle = savedLocked;
         }
     } catch (e) { }
 
@@ -113,7 +118,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     updateTeamStatus();
-    showStep(0);
+
+    // Refresh resume: returning teams skip rules/registration and pick up
+    // right where they left off (showStep → saveGameState persists the step).
+    if (currentTeam) {
+        resumeToLastStep();
+    } else {
+        showStep(0);
+    }
 
     // Auto-play memes for ?memid=M01 deep links (overlays the start screen)
     if (meme) {
@@ -136,6 +148,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     console.log('Professional Pokédex Initialized - Fresh Session ID:', sessionId);
 });
+
+// ==============================
+// REFRESH RESUME
+// Send a returning team back to the step they were on instead of step 0.
+// ==============================
+function resumeToLastStep() {
+    let savedStep = '0';
+    try {
+        const savedState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.gameState) || '{}');
+        if (typeof savedState.currentStep !== 'undefined') savedStep = savedState.currentStep;
+    } catch (e) { }
+
+    if (savedStep === 'startcode') {
+        // Only land on the key pad when there's still a locked puzzle to open
+        if (urlLockedPuzzle) {
+            showStep('startcode');
+            return;
+        }
+        savedStep = '2';
+    }
+
+    const stepNum = Number(savedStep);
+
+    // Resume is only meaningful from the scanner onward; 0/1 mean "not started".
+    if (stepNum === 3 && currentPuzzle) {
+        showStep(3); // straight back onto the riddle
+        return;
+    }
+    if (stepNum >= 2) {
+        showStep(2); // scanner / next-signal loop
+        return;
+    }
+    showStep(0);
+}
 
 // ==============================
 // CLEANUP

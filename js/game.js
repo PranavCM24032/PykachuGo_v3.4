@@ -202,36 +202,38 @@ function renderNextLocations(nextPuzzles) {
     const clueText = document.getElementById('locationClueText');
     const locationCard = document.getElementById('locationCard');
 
-    if (!Array.isArray(nextPuzzles) || nextPuzzles.length === 0) return;
+    if (!Array.isArray(nextPuzzles)) return;
 
-    const headerCount = document.getElementById('nextLocationCount');
+    const count = nextPuzzles.length;
+    if (list) list.innerHTML = '';
 
-    // Multiple destinations: hide the single-card paragraph and render one
-    // full location card per destination (same style, no placeholder text).
-    if (nextPuzzles.length > 1) {
-        if (clueText) clueText.classList.add('hidden');
+    if (count === 0) {
+        // NOTHING: no further signals to reveal — hide all location UI.
         if (locationCard) locationCard.classList.add('hidden');
-
-        if (!list) return;
-        list.classList.remove('hidden');
-        list.innerHTML = '';
-        nextPuzzles.forEach((p) => list.appendChild(createNextLocationCard(p)));
-
-        if (headerCount) headerCount.textContent = '';
+        if (clueText) clueText.classList.add('hidden');
+        if (list) list.classList.add('hidden');
         return;
     }
 
-    // Single destination: keep the classic single-card layout.
-    if (locationCard) locationCard.classList.remove('hidden');
-    if (clueText) {
-        clueText.classList.remove('hidden');
-        clueText.textContent = (nextPuzzles[0].locationClue || 'NO SIGNAL SOURCE');
+    if (count === 1) {
+        // SINGLE destination: classic single-card layout.
+        if (locationCard) locationCard.classList.remove('hidden');
+        if (clueText) {
+            clueText.classList.remove('hidden');
+            clueText.textContent = (nextPuzzles[0].locationClue || 'NO SIGNAL SOURCE');
+        }
+        if (list) list.classList.add('hidden');
+        return;
     }
+
+    // MULTIPLE destinations: hide the single-card paragraph and render one
+    // full location card per destination (same style, no placeholder text).
+    if (locationCard) locationCard.classList.add('hidden');
+    if (clueText) clueText.classList.add('hidden');
     if (list) {
-        list.innerHTML = '';
-        list.classList.add('hidden');
+        list.classList.remove('hidden');
+        nextPuzzles.forEach((p) => list.appendChild(createNextLocationCard(p)));
     }
-    if (headerCount) headerCount.textContent = '';
 }
 
 // ==============================
