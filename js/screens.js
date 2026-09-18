@@ -58,16 +58,17 @@ function showStep(stepNumber) {
         const unlockCodeInput = document.getElementById('unlockCode');
 
         if (urlLockedPuzzle) {
-            // Gym Badge Integration: Fetch from PokeAPI sprites via GitHub
-            // Note: github.com blob URLs don't work in <img> src, so we use raw.githubusercontent.com
-            const badgeId = urlLockedPuzzle.id;
-            const badgeUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${badgeId}.png`;
-
-            if (badgeImg) {
+            // Gym Badge Integration: show the badge ONLY when the puzzle declares
+            // a badgeId (startcode/badge display is optional per puzzle).
+            const badgeId = urlLockedPuzzle.badgeId;
+            if (badgeId && badgeImg) {
+                const badgeUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${badgeId}.png`;
                 badgeImg.src = badgeUrl;
                 if (badgeContainer) {
                     badgeContainer.classList.remove('hidden');
                 }
+            } else if (badgeContainer) {
+                badgeContainer.classList.add('hidden');
             }
         } else {
             if (badgeContainer) badgeContainer.classList.add('hidden');
@@ -283,6 +284,11 @@ function submitManualEntry() {
     const signalId = input.value.trim().toUpperCase();
     if (!signalId) {
         showToast('Enter a valid Signal ID', 'error');
+        return;
+    }
+
+    if (signalId.length > 50) {
+        showToast('Max 50 characters', 'error');
         return;
     }
 

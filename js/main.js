@@ -87,6 +87,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // gate below can correctly allow puzzles they have legitimately unlocked.
     loadTeamScoreState();
 
+    // Google Sheets is now the source of truth for the unlock frontier; pull
+    // the team's solved/queue ids down so the gate below matches the sheet even
+    // after the browser cache was cleared. Falls back to the local cache when
+    // the sheet is unreachable or has no record for this team yet.
+    if (currentTeamTid) {
+        const serverState = await fetchTeamState(currentTeamTid);
+        if (serverState) applyServerTeamState(serverState);
+    }
+
     // Restore puzzle progression so the chain gate works across page reloads
     try {
         const savedState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.gameState) || '{}');

@@ -2,6 +2,7 @@
     {
         "id": 1,
         "linkid": "XG01",
+        "badgeId": 1,
         "questionPython": "def func(n):\n    return n * 3 + 5\n\nx = func(4)\ny = func(2)\nz = x - y * 2\nprint(z)",
         "questionCpp": "#include <iostream>\nusing namespace std;\n\nint func(int n) {\n    return n * 3 + 5;\n}\n\nint main() {\n    int x = func(4);\n    int y = func(2);\n    int z = x - y * 2;\n    cout << z << endl;\n    return 0;\n}",
         "answer": "-5",

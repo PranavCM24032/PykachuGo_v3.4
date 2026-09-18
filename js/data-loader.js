@@ -26,8 +26,8 @@ const AssetPreloader = {
                     this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.pokemonId}.png`);
                     fetch(`https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${p.pokemonId}.ogg`, { mode: 'no-cors' }).catch(() => { });
                 }
-                if (p.id) {
-                    this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${p.id}.png`);
+                if (p.badgeId) {
+                    this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${p.badgeId}.png`);
                 }
             });
         });

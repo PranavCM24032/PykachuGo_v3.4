@@ -1,7 +1,7 @@
 {
-    "name": "Pykachu Hunt",
-    "short_name": "PykachuHunt",
-    "description": "Premium Pokémon Binary Signal Decryption Hunt",
+    "name": "Pykachu Go",
+    "short_name": "PykachuGo",
+    "description": "Premium Pokémon Binary Signal Decryption Game",
     "start_url": "index.html",
     "display": "standalone",
     "background_color": "#050810",

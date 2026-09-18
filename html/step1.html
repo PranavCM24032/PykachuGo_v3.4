@@ -28,7 +28,7 @@
                 <div class="relative">
                     <input type="text" id="teamName"
                         class="w-full bg-black/40 border border-slate-800 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-white focus:border-blue-500 focus:outline-none placeholder-gray-600 uppercase transition-all text-[11px] sm:text-xs"
-                        placeholder="TRAINER NAME" autocomplete="off" required
+                        placeholder="TRAINER NAME" autocomplete="off" required maxlength="50"
                         autocapitalize="characters">
                     <span
                         class="material-symbols-rounded absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm sm:text-base">
@@ -45,7 +45,7 @@
                 <div class="relative">
                     <input type="password" id="teamPassword"
                         class="w-full bg-black/40 border border-slate-800 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-white focus:border-blue-500 focus:outline-none placeholder-gray-600 transition-all font-mono text-[11px] sm:text-xs"
-                        placeholder="••••" autocomplete="off" required>
+                        placeholder="••••" autocomplete="off" required maxlength="50">
                     <button type="button" onclick="togglePasswordVisibility()"
                         onmousedown="playSound('click')"
                         class="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-400 transition-colors focus:outline-none">
@@ -100,7 +100,7 @@
                                 STRIKE</option>
                         </optgroup>
                         <optgroup label="LEVEL 3: ULTIMATE" class="bg-[#0a0f1d] text-red-500">
-                            <option value="L3_PIKACHU" class="bg-[#050810] text-gray-300">⚡ PIKACHU HUNT
+                            <option value="L3_PIKACHU" class="bg-[#050810] text-gray-300">⚡ PIKACHU GO
                             </option>
                         </optgroup>
                     </select>
@@ -118,7 +118,7 @@
             <button type="submit" onmousedown="playSound('powerUp')"
                 class="btn-pokedex w-full flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 text-[10px] sm:text-xs">
                 <span class="material-symbols-rounded text-sm sm:text-base">play_arrow</span>
-                START HUNT
+                START GO
             </button>
         </form>
     </div>

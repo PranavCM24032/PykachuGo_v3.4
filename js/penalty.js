@@ -44,15 +44,7 @@ function triggerPenalty(reason = 'TAB_SWITCH') {
 
     tabSwitchCount++;
 
-    const penaltyPayload = {
-        puzzleId: currentPuzzle?.id || 0,
-        tabSwitches: tabSwitchCount,
-        reason,
-        penaltyActive: penaltyActive,
-        timestamp: new Date().toISOString()
-    };
-
-    submitToGoogleSheets('PENALTY_TRIGGERED', penaltyPayload);
+    notepadBump('tabswitch');
 
     if (penaltyActive) {
         penaltySeconds = 15;
@@ -162,10 +154,7 @@ function runBlockingPenalty(onComplete) {
             penaltyActive = false;
             if (overlay) overlay.classList.add('hidden');
 
-            submitToGoogleSheets('PENALTY', {
-                puzzleId: currentPuzzle ? currentPuzzle.id : 0,
-                reason: 'TAB_SWITCH_DURING_HINT'
-            });
+            notepadBump('tabswitch');
 
             var cb = _blockingPenaltyCallback;
             _blockingPenaltyCallback = null;

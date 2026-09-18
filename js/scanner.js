@@ -334,12 +334,7 @@ function handleQRScanResult(qrData) {
             return;
         }
 
-        submitToGoogleSheets('QR_SCANNED', {
-            linkId: linkId,
-            puzzleId: urlLockedPuzzle.id,
-            puzzleLevel: urlLockedPuzzle.level,
-            location: urlLockedPuzzle.locationClue
-        });
+        notepadBump('scan');
 
         showToast('✓ Signal Acquired - Redirecting...', 'success');
         setTimeout(() => {

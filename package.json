@@ -1,8 +1,8 @@
 {
-  "name": "pykachu-hunt",
+  "name": "pykachu-go",
   "version": "3.0.0",
   "private": true,
-  "description": "Pykachu Hunt - decode the code. capture pikachu.",
+  "description": "Pykachu Go - decode the code. capture pikachu.",
   "scripts": {
     "build": "tailwindcss -i css/tailwind-input.css -o css/tailwind.css --minify",
     "serve": "npx serve -s ."

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>Pykachu Hunt - Admin</title>
+    <title>Pykachu Go - Admin</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -216,7 +216,7 @@
                 <div>
                     <h1
                         class="font-pixel text-responsive bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
-                        Pykachu<span class="text-white">Hunt</span></h1>
+                        Pykachu<span class="text-white">Go</span></h1>
                     <p class="text-[10px] text-slate-500 font-mono tracking-widest uppercase hidden sm:block">Admin
                         Command Node</p>
                     <p class="text-[8px] text-slate-500 font-mono tracking-widest uppercase sm:hidden">ADMIN</p>
@@ -642,7 +642,7 @@
             const typeFilter = document.getElementById('typeFilter').value;
             const levelFilterDropdown = document.getElementById('levelFilter').value;
 
-            const L_COLS = "30px 88px 55px 1.5fr 76px 68px 36px 36px 42px 70px 1fr 36px 62px";
+            const L_COLS = "30px 88px 55px 1.5fr 76px 34px 36px 36px 36px 70px 62px 46px 46px 1fr";
             const REG_COLS = "35px 140px 90px 180px 110px 130px";
             const LB_COLS = "40px 120px 1fr 150px 80px 110px";
             const ROSTER_COLS = "35px 1.4fr 100px 110px 2fr";
@@ -665,7 +665,7 @@
                     <div class="text-center font-mono text-blue-400">TID</div>
                     <div class="text-left font-bold pl-1">Team Name</div>
                     <div class="text-center font-mono text-slate-400">Last Active</div>
-                    <div class="text-center font-mono text-slate-400">Scans</div>
+                    <div class="text-center font-mono text-slate-400">Solved</div>
                     <div class="text-center font-mono text-emerald-300">Total Pts</div>
                 `;
                 header.className = "grid gap-1 px-3 py-2.5 bg-slate-950/90 border-b border-slate-800 text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono text-center";
@@ -687,14 +687,15 @@
                     <div class="text-center font-mono text-slate-400">TID</div>
                     <div class="text-left font-bold pl-1">Team Name</div>
                     <div class="text-center font-mono text-indigo-400">Mission</div>
-                    <div class="text-center font-mono">Status</div>
+                    <div class="text-center font-mono text-cyan-400" title="Puzzle this record belongs to">Puzzle</div>
                     <div class="text-center font-mono text-red-400">Wrong</div>
                     <div class="text-center font-mono text-pink-400">Tabs</div>
                     <div class="text-center font-mono text-amber-400">Hint</div>
                     <div class="text-center font-mono text-emerald-400">Solve Time</div>
-                    <div class="text-center font-mono text-cyan-400">Last Node</div>
-                    <div class="text-center font-mono text-slate-400">Scans</div>
-                    <div class="text-center font-mono text-amber-300" title="Points = Earned - Lost">Points</div>
+                    <div class="text-center font-mono">Status</div>
+                    <div class="text-center font-mono text-slate-400" title="Points = Earned - Lost (this puzzle)">Points</div>
+                    <div class="text-center font-mono text-amber-300" title="Running score">Score</div>
+                    <div class="text-center font-mono text-purple-400">Unlocked</div>
                 `;
                 header.className = "grid gap-1 px-3 py-2.5 bg-slate-950/90 border-b border-slate-800 text-[8px] font-bold text-slate-400 uppercase tracking-widest font-mono text-center";
             }
@@ -714,7 +715,7 @@
                         language: '',
                         sessionId: '',
                         mission: 'UNASSIGNED',
-                        levels: { L1: null, L2: null, L3: null }
+                        levels: { L1: [], L2: [], L3: [] }
                     };
                 });
             }
@@ -734,7 +735,7 @@
                         language: '',
                         sessionId: log.sessionId || '',
                         mission: log.mission || 'UNKNOWN',
-                        levels: { L1: null, L2: null, L3: null }
+                        levels: { L1: [], L2: [], L3: [] }
                     };
                 }
 
@@ -750,22 +751,25 @@
                     if (log.mission) t.mission = log.mission;
                 } else if (log.action === 'SUMMARY' && log.level) {
                     const lvl = log.level.toUpperCase();
-                    t.levels[lvl] = {
+                    if (!Array.isArray(t.levels[lvl])) t.levels[lvl] = [];
+                    // One row per (team, puzzle) — past records are preserved,
+                    // each summary log appends its own record below the last.
+                    t.levels[lvl].push({
                         lastActive: log.lastActive || '',
                         tid: log.tid || t.tid || '',
                         teamName: log.teamName || t.teamName,
                         mission: log.mission || t.mission,
+                        puzzleId: parseInt(log.puzzleId || 0, 10),
                         status: log.status || 'ACTIVE',
                         wrongAttempts: parseInt(log.wrongAttempts || 0, 10),
                         tabSwitches: parseInt(log.tabSwitches || 0, 10),
                         hintUsed: !!log.hintUsed,
                         solveTime: log.solveTime || '',
-                        nodesPath: log.nodesPath || log.l3Path || '',
-                        lastNode: log.lastNode || '-',
-                        totalScans: parseInt(log.totalScans || 0, 10),
                         pointsEarned: parseInt(log.pointsEarned || 0, 10),
-                        pointsLost: parseInt(log.pointsLost || 0, 10)
-                    };
+                        pointsLost: parseInt(log.pointsLost || 0, 10),
+                        totalScore: parseInt(log.totalScore || 0, 10),
+                        unlockedPuzzles: log.unlockedPuzzles || ''
+                    });
                 }
             });
 
@@ -786,11 +790,11 @@
             if (state.activeTab === 'REG') {
                 leaderboard = leaderboard.filter(t => t.registered);
             } else {
-                leaderboard = leaderboard.filter(t => (t.levels[state.activeTab] !== null) || matchesLevel(t.mission, state.activeTab));
+                leaderboard = leaderboard.filter(t => (Array.isArray(t.levels[state.activeTab]) && t.levels[state.activeTab].length) || matchesLevel(t.mission, state.activeTab));
             }
 
             if (levelFilterDropdown !== 'ALL') {
-                leaderboard = leaderboard.filter(t => (t.levels[levelFilterDropdown] !== null) || matchesLevel(t.mission, levelFilterDropdown));
+                leaderboard = leaderboard.filter(t => (Array.isArray(t.levels[levelFilterDropdown]) && t.levels[levelFilterDropdown].length) || matchesLevel(t.mission, levelFilterDropdown));
             }
 
             if (typeFilter !== 'ALL') {
@@ -800,23 +804,26 @@
             if (state.filter === 'HINT') {
                 leaderboard = leaderboard.filter(t => {
                     if (state.activeTab === 'REG') return false;
-                    const lvl = t.levels[state.activeTab];
-                    return lvl && lvl.hintUsed;
+                    const recs = t.levels[state.activeTab];
+                    return Array.isArray(recs) && recs.some(r => r.hintUsed);
                 });
             }
             if (state.filter === 'MALPRACTICE') {
                 leaderboard = leaderboard.filter(t => {
                     if (state.activeTab === 'REG') return false;
-                    const lvl = t.levels[state.activeTab];
-                    return lvl && lvl.tabSwitches > 0;
+                    const recs = t.levels[state.activeTab];
+                    return Array.isArray(recs) && recs.some(r => (r.tabSwitches || 0) > 0);
                 });
             }
 
             document.getElementById('teamCount').textContent = leaderboard.length;
             let totalSolved = 0;
             Object.values(teamMap).forEach(t => {
-                Object.values(t.levels).forEach(l => {
-                    if (l && l.status === 'SOLVED') totalSolved++;
+                ['L1', 'L2', 'L3'].forEach(l => {
+                    const recs = t.levels[l];
+                    if (Array.isArray(recs)) {
+                        recs.forEach(r => { if (r.status === 'SOLVED') totalSolved++; });
+                    }
                 });
             });
             document.getElementById('badgeCount').textContent = totalSolved;
@@ -829,18 +836,21 @@
 
             if (state.activeTab === 'LB') {
                 const lb = Object.values(teamMap).map(t => {
-                    let scans = 0;
+                    let solved = 0;
                     let pts = 0;
                     let lastActive = '';
                     ['L1', 'L2', 'L3'].forEach(l => {
-                        const d = t.levels[l];
-                        if (!d) return;
-                        scans += parseInt(d.totalScans || 0, 10);
-                        pts += (parseInt(d.pointsEarned || 0, 10) - parseInt(d.pointsLost || 0, 10));
-                        if (d.lastActive && (!lastActive || d.lastActive > lastActive)) lastActive = d.lastActive;
+                        const recs = t.levels[l];
+                        if (!Array.isArray(recs)) return;
+                        recs.forEach(r => {
+                            const diff = (parseInt(r.pointsEarned || 0, 10) - parseInt(r.pointsLost || 0, 10));
+                            if (r.status === 'SOLVED') solved++;
+                            pts += diff;
+                            if (r.lastActive && (!lastActive || r.lastActive > lastActive)) lastActive = r.lastActive;
+                        });
                     });
                     if (!lastActive) lastActive = t.regTime || '';
-                    return { name: t.name, teamName: t.teamName, tid: t.tid || '-', lastActive: lastActive, scans: scans, pts: pts, mission: t.mission };
+                    return { name: t.name, teamName: t.teamName, tid: t.tid || '-', lastActive: lastActive, solved: solved, pts: pts, mission: t.mission };
                 });
 
                 let lbRows = lb;
@@ -870,7 +880,7 @@
                         <div class="font-mono text-blue-400 font-bold truncate">${escapeHTML(r.tid)}</div>
                         <div class="text-left font-bold text-slate-200 uppercase tracking-tight truncate pl-1" title="${escapeHTML(r.name)}">${escapeHTML(r.name)}</div>
                         <div class="text-slate-400 font-mono text-[10px]">${escapeHTML(formatTime(r.lastActive))}</div>
-                        <div class="font-mono text-slate-300">${r.scans}</div>
+                        <div class="font-mono text-slate-300">${r.solved}</div>
                         <div class="font-mono font-bold ${r.pts > 0 ? 'text-emerald-300' : 'text-slate-500'}">${r.pts}</div>
                     </div>`;
                 }).join('');
@@ -911,18 +921,17 @@
                 return;
             }
 
-            if (leaderboard.length === 0) {
-                container.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 fade-in py-12">
-                        <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <span class="font-mono text-xs">NO DATA AVAILABLE FOR THIS TAB</span>
-                        ${state.usingCachedData ? '<span class="text-[10px] text-amber-500 mt-1">(Using cached data)</span>' : ''}
-                    </div>`;
-                return;
-            }
-
-            container.innerHTML = leaderboard.map((team, index) => {
-                if (state.activeTab === 'REG') {
+            if (state.activeTab === 'REG') {
+                if (leaderboard.length === 0) {
+                    container.innerHTML = `
+                        <div class="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 fade-in py-12">
+                            <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span class="font-mono text-xs">NO DATA AVAILABLE FOR THIS TAB</span>
+                            ${state.usingCachedData ? '<span class="text-[10px] text-amber-500 mt-1">(Using cached data)</span>' : ''}
+                        </div>`;
+                    return;
+                }
+                container.innerHTML = leaderboard.map((team, index) => {
                     const regTimeStr = formatTime(team.regTime);
                     return `
                     <div class="grid gap-1 px-3 py-2.5 border-b border-slate-800/50 hover:bg-white/5 transition-all items-center text-[10px] sm:text-xs text-center fade-in" style="grid-template-columns: ${REG_COLS}">
@@ -933,23 +942,48 @@
                         <div class="text-cyan-400 font-mono font-bold text-[10px]">${escapeHTML(team.language || 'PYTHON')}</div>
                         <div><span class="bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20 font-bold text-[10px]">${escapeHTML(team.mission)}</span></div>
                     </div>`;
-                }
+                }).join('');
+                return;
+            }
 
-                const lvlData = team.levels[state.activeTab] || {
+            // Build flat rows for the level board: one ROW PER PUZZLE RECORD so
+            // past solves stay visible (puzzle 1's row is never overwritten).
+            const assertRows = [];
+            leaderboard.forEach(team => {
+                const recs = Array.isArray(team.levels[state.activeTab]) ? team.levels[state.activeTab] : [];
+                if (recs.length) {
+                    recs.forEach(r => assertRows.push({ team, record: r }));
+                } else {
+                    assertRows.push({ team, record: null });
+                }
+            });
+
+            if (assertRows.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 fade-in py-12">
+                        <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span class="font-mono text-xs">NO DATA AVAILABLE FOR THIS TAB</span>
+                        ${state.usingCachedData ? '<span class="text-[10px] text-amber-500 mt-1">(Using cached data)</span>' : ''}
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = assertRows.map(({ team, record }, index) => {
+                const lvlData = record || {
                     lastActive: '',
                     tid: team.tid || '-',
                     teamName: team.name,
                     mission: team.mission,
+                    puzzleId: 0,
                     status: 'IDLE',
                     wrongAttempts: 0,
                     tabSwitches: 0,
                     hintUsed: false,
                     solveTime: '',
-                    nodesPath: '',
-                    lastNode: '-',
-                    totalScans: 0,
                     pointsEarned: 0,
-                    pointsLost: 0
+                    pointsLost: 0,
+                    totalScore: 0,
+                    unlockedPuzzles: ''
                 };
 
                 const lastActiveStr = formatTime(lvlData.lastActive);
@@ -960,6 +994,7 @@
                 else if (lvlData.status === 'RETRYING') statusBadge = '<span class="text-red-400 font-bold animate-pulse">RETRYING</span>';
                 else if (lvlData.status === 'UNLOCKED') statusBadge = '<span class="text-indigo-400">UNLOCKED</span>';
                 else if (lvlData.status === 'LOCKED') statusBadge = '<span class="text-amber-400">LOCKED</span>';
+                else if (lvlData.status === 'ABANDONED') statusBadge = '<span class="text-orange-400">ABANDONED</span>';
                 else if (lvlData.status === 'IDLE') statusBadge = '<span class="text-slate-500">IDLE</span>';
 
                 const hintBadge = lvlData.hintUsed ?
@@ -975,14 +1010,15 @@
                     <div class="font-mono text-slate-400 truncate">${escapeHTML(lvlData.tid || '-')}</div>
                     <div class="text-left font-bold text-slate-200 truncate pl-1" title="${escapeHTML(team.name)}">${escapeHTML(team.name)}</div>
                     <div class="font-mono text-indigo-400 truncate text-[9px]">${escapeHTML(lvlData.mission || team.mission)}</div>
-                    <div class="font-bold">${statusBadge}</div>
+                    <div class="font-mono text-cyan-400 font-bold text-[8px]">${lvlData.puzzleId ? 'P' + lvlData.puzzleId : '-'}</div>
                     <div class="font-bold font-mono ${lvlData.wrongAttempts > 0 ? 'text-red-400' : 'text-slate-600'}">${lvlData.wrongAttempts}</div>
                     <div class="font-bold font-mono ${lvlData.tabSwitches > 0 ? 'text-pink-400' : 'text-slate-600'}">${lvlData.tabSwitches}</div>
                     <div class="font-bold">${hintBadge}</div>
                     <div class="font-mono text-emerald-400 text-[8px]">${escapeHTML(solveTimeStr)}</div>
-                    <div class="font-mono text-cyan-400 truncate text-[8px]" title="${escapeHTML(lvlData.nodesPath)}">${escapeHTML(lvlData.lastNode)}</div>
-                    <div class="font-mono text-slate-400 text-[8px]">${lvlData.totalScans || 0}</div>
+                    <div class="font-bold">${statusBadge}</div>
                     <div class="font-mono text-[8px] font-bold ${netPts > 0 ? 'text-emerald-300' : netPts < 0 ? 'text-red-300' : 'text-slate-500'}" title="Earned ${lvlData.pointsEarned || 0} - Lost ${lvlData.pointsLost || 0}">${netPts}</div>
+                    <div class="font-mono text-amber-300 font-bold text-[8px]">${lvlData.totalScore || 0}</div>
+                    <div class="font-mono text-purple-400 truncate text-[8px]" title="Unlock queue after this puzzle">${escapeHTML(lvlData.unlockedPuzzles || '-')}</div>
                 </div>`;
             }).join('');
         }

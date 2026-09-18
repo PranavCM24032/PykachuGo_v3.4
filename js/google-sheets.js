@@ -43,6 +43,28 @@ function isValidTeam() {
     return name && name !== 'Unknown' && name !== 'NO TEAM' && name !== '';
 }
 
+// ── Per-puzzle event throttling (quota guard) ──
+// Spam-prone actions are sent a bounded number of times per puzzle/session.
+// Every occurrence still increments a cumulative counter in the payload, so
+// the sheet reflects true totals without one request per spam event.
+const EVENT_THROTTLE = {
+    'WRONG_ATTEMPT':     { interval: 5, countField: 'attemptCount' },
+    'QR_BLOCKED':        { interval: 5, countField: 'blockedCount' },
+    'QR_SCANNED':        { once: true },
+    'PENALTY_TRIGGERED': { interval: 5 } // already carries cumulative tabSwitches
+};
+const _throttleCounts = {};
+
+function shouldSendThrottled(action, puzzleId) {
+    const rule = EVENT_THROTTLE[action];
+    if (!rule) return { send: true, count: 1 };
+    const key = `${action}:${puzzleId || 0}`;
+    const n = (_throttleCounts[key] = (_throttleCounts[key] || 0) + 1);
+    if (rule.once) return { send: n === 1, count: n };
+    if (n === 1 || n % rule.interval === 0) return { send: true, count: n };
+    return { send: false, count: n };
+}
+
 async function submitToGoogleSheets(action, data = {}) {
     try {
         const payload = {
@@ -64,6 +86,14 @@ async function submitToGoogleSheets(action, data = {}) {
             payload.hintType = 'DECRYPTION_BASED';
             payload.hintPenaltyTime = currentPuzzle?.hintPenalty || 60;
             payload.hintDisplayed = typeof hintDisplayed !== 'undefined' ? hintDisplayed : false;
+        }
+
+        // Drop spam events over the per-puzzle budget (counts still accumulate).
+        const throttle = shouldSendThrottled(action, payload.puzzleId);
+        if (throttle.countField) payload[throttle.countField] = throttle.count;
+        if (!throttle.send) {
+            console.log(`[Sheets] Throttled ${action} (${throttle.count}th occurrence)`);
+            return;
         }
 
         // Skip entirely if no valid team (anonymous sessions)
@@ -157,6 +187,30 @@ async function flushSessionBuffer() {
     }
 }
 
+// Pull a team's stored frontier (solved/queue ids + score) back from Google Sheets
+async function fetchTeamState(tid) {
+    if (!tid) return null;
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) return null;
+    try {
+        await waitForSheetsSlot();
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'cors',
+            cache: 'no-cache',
+            keepalive: true,
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'GET_TEAM_STATE', tid, token: GOOGLE_SCRIPT_TOKEN })
+        });
+        if (!res.ok) return null;
+        const json = await res.json();
+        if (json.status !== 'success') return null;
+        return json;
+    } catch (e) {
+        console.warn('[Sheets] Could not fetch team state:', e);
+        return null;
+    }
+}
+
 // Auto-flush buffer every 10 seconds for extra reliability
 setInterval(() => {
     if (isValidTeam()) {
@@ -167,6 +221,10 @@ setInterval(() => {
 // Auto-flush on page unload (sends whatever is buffered)
 window.addEventListener('beforeunload', () => {
     if (isValidTeam()) {
+        // Send any half-done puzzle notebook first (rate-limit-safe)
+        if (typeof flushPuzzleNotebooksOnUnload === 'function') {
+            flushPuzzleNotebooksOnUnload();
+        }
         const buffer = getSessionBuffer();
         if (buffer.length > 0) {
             // Non-blocking slot check — never hold up page unload

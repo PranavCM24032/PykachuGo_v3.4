@@ -163,6 +163,27 @@ function hasSolvedPuzzle(puzzleId) {
     return currentTeamSolvedPuzzles.has(puzzleId);
 }
 
+// Merge the state fetched from Google Sheets into memory. The sheet stores the
+// team's current puzzle id + every unlocked puzzle id + score. The derived
+// frontier = unlocked − locally-solved, so refresh resume keeps working without
+// the server maintaining a queue. Empty server rows are ignored.
+function applyServerTeamState(serverState) {
+    if (!serverState || typeof serverState !== 'object') return;
+    const unlocked = (Array.isArray(serverState.unlocked) ? serverState.unlocked : [])
+        .map(Number).filter(n => Number.isFinite(n));
+    if (!Number(serverState.score) && unlocked.length === 0) return;
+
+    currentTeamScore = Math.max(currentTeamScore, Number(serverState.score || 0));
+    // Enrich the frontier: anything the sheet says was unlocked that this team
+    // hasn't solved locally yet becomes scannable (no duplicates).
+    for (const id of unlocked) {
+        if (!currentTeamSolvedPuzzles.has(id) && !teamUnlockQueue.includes(id)) {
+            teamUnlockQueue.push(id);
+        }
+    }
+    saveTeamScoreState();
+}
+
 function recordPuzzleSolve(puzzleId, pointsEarned) {
     currentTeamSolvedPuzzles.add(puzzleId);
     currentTeamScore += pointsEarned;
@@ -223,10 +244,10 @@ function isPuzzleAllowed(puzzle) {
 function puzzleGateMessage(puzzle) {
     const progressId = currentPuzzle ? currentPuzzle.id : 0;
     if (puzzle && puzzle.id === progressId) {
-        return `❌ Access Denied - ${puzzle.linkid} already completed`;
+        return '❌ Access Denied - This location is already completed';
     }
     if (isStartingPuzzle(puzzle)) {
-        return '❌ Access Denied - Start from XG01 first';
+        return '❌ Access Denied - Start from the first location';
     }
     return '❌ Access Denied - Complete a connected location first';
 }

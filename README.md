@@ -1,4 +1,4 @@
-# ⚡ Pykachu Hunt — "Decode the code. Capture Pikachu."
+# ⚡ Pykachu Go — "Decode the code. Capture Pikachu."
 
 A mobile-first, PWA-ready **binary signal decryption hunt** where teams solve
 programming-riddle puzzles (Python & C++), scan QR codes, and progress through a
@@ -35,8 +35,15 @@ livetracks every team.
 - **YouTube meme rewards** — solving a puzzle can play a YouTube clip
   (`data/meme.json`) inside a custom video player.
 - **Audio design** — synth SFX + background music with power mode toggle.
-- **Google Sheets telemetry** — EVERY game step (scan, unlock, solve, wrong
-  attempt, hint, penalty…) is pushed to a workbook, 1 row per team per tab.
+- **Google Sheets telemetry (per-puzzle envelope)** — each puzzle's every event
+  (scan, wrong attempts, hints, tab switches, timestamps) is collected **locally**
+  in a per-puzzle notebook and ships as **one request** on solve/abandon. 27
+  requests per team for the whole event — ~13% of the Apps Script daily quota at
+  100 teams.
+- **Server-side team state** — no extra sheet: each team's **Current Puzzle ID**,
+  the **Unlocked Puzzle IDs queue** (the one queue updated on every solve) and
+  the **running score** live as columns right inside the team's L1/L2/L3 rows;
+  clients re-derive the frontier on every load via `GET_TEAM_STATE`.
 - **Sliding-window rate limiter** — protects the Apps Script endpoint from quota
   busts (see [Rate limiting](#-rate-limiting)).
 - **GitHub Actions Auto-Deploy** — push to `main` → GitHub Pages.
@@ -75,7 +82,8 @@ Pykachu_v3/
 │   ├── state.js          # Global game state, session id, unlock queue, epoch
 │   ├── audio.js          # SFX + BGM
 │   ├── data-loader.js    # Loads puzzle.json / teams.json / meme.json + preloader
-│   ├── google-sheets.js  # Telemetry send + session buffer + flush
+│   ├── google-sheets.js  # Telemetry blueprint + GET_TEAM_STATE fetch + event throttle
+│   ├── notepad.js        # Per-puzzle notebook (0 requests while solving)
 │   ├── rate-limiter.js   # Sliding-window rate limiter (new)
 │   ├── ui.js             # Toasts, UI helpers
 │   ├── screens.js        # Step (screen) flow engine
@@ -394,8 +402,8 @@ A single Google Apps Script web app that owns one Google Sheets workbook.
 
 | Tab | Schema |
 |-----|--------|
-| `Registration` | Registration Time, TID, Team Name, Language, Mission, Session ID |
-| `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Status, Wrong Attempts, Tab Switches, Hint Used, Solve Time, Nodes Path, Last Node, Total Scans, **Points Earned**, **Points Lost** |
+| `Registration` | Registration Time, TID, Team Name, Mission, Language, Password, Level, Session ID |
+| `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Wrong Attempts, Solve Time, Hint Used (1/0), Tab Switches, Solved Puzzle IDs, Current Puzzle ID, Unlocked Puzzle IDs, Status, Points Earned, Points Lost, Total Score |
 
 ### Design decisions
 
@@ -406,6 +414,19 @@ A single Google Apps Script web app that owns one Google Sheets workbook.
 - `Registration` events only touch the Registration tab.
 - **Points Earned** = sum of positive `SOLVED` points; **Points Lost** = sum of
   |negative| repeat-solve deductions — the Admin leaderboard ranks on these.
+- **`SOLVED`** ships the full per-puzzle notebook in one call and
+  max-assigns `Wrong Attempts`, `Tab Switches`, `Hint Used`, and appends the
+  solved `puzzleId` to the **Solved Puzzle IDs** CSV for that level; abandoned
+  puzzles go through **`PUZZLE_ABANDONED`** (1 call) with the half-done
+  notebook intact.
+- `Registration` stores the security key (the owner's call) — it is **never**
+  returned by the admin `doGet` endpoint.
+- Each team's L1/L2/L3 row also carries the **Current Puzzle ID** (last solved),
+  the **Unlocked Puzzle IDs queue** — THE single queue, every unlock from each
+  SOLVED envelope merged in uniquely — and the **Total Score**, so there is
+  **no separate TeamState tab**. `GET_TEAM_STATE` re-aggregates these columns
+  across L1/L2/L3; the client derives the frontier as
+  `unlocked − locally-solved` on refresh.
 - Uses `LockService` for concurrency safety on every POST.
 - Token auth: every request carries `{ token: GOOGLE_SCRIPT_TOKEN }`.
 
@@ -414,9 +435,10 @@ A single Google Apps Script web app that owns one Google Sheets workbook.
 | Endpoint | Action | Description |
 |----------|--------|-------------|
 | `POST` (key `action`) | `REGISTRATION` | Create/update the team's registration row |
-| `POST` | game-step actions | `QR_SCANNED`, `QR_BLOCKED`, `PUZZLE_UNLOCKED`, `UNLOCK_FAILED`, `SOLVED`, `WRONG_ATTEMPT`, `HINT_REQUESTED`, `HINT_USED`, `PENALTY`, `MALPRACTICE_DETECTED`… |
+| `POST` | game-step actions | `QR_SCANNED`, `QR_BLOCKED`, `PUZZLE_UNLOCKED`, `UNLOCK_FAILED`, `SOLVED`, `WRONG_ATTEMPT`, `HINT_REQUESTED`, `HINT_USED`, `PENALTY`, `MALPRACTICE_DETECTED`, `PUZZLE_ABANDONED`… |
 | `POST` | `SESSION_BATCH` | Flush multiple buffered events in one call |
-| `POST` | `RESET_ALL` | Wipe all sheets + bump the game **epoch** |
+| `GET` | `GET_TEAM_STATE` | Aggregated current puzzle id + unlocked queue + score for a team (from L1/L2/L3 rows) |
+| `POST` | `RESET_ALL` | Wipe all sheets (Registration, L1, L2, L3) + bump the game **epoch** |
 | `GET?token=…` | — | Aggregated JSON for the Admin dashboard (registrations + per-level summaries) |
 | `GET` | `GET_EPOCH` | Return current game epoch (clients wipe stale local progress on change) |
 
@@ -467,7 +489,7 @@ flowchart TD
         MEME -- "No" --> TV{"teamName valid?<br/>(not empty / Unknown / NO TEAM)"}
         TV -- "No" --> SKIP
         TV -- "Yes" --> RG{"action ===<br/>REGISTRATION?"}
-        RG -- "Yes" --> RGROW["updateRegistrationRow()<br/>→ REGISTRATION tab<br/>(6-col schema)"]
+        RG -- "Yes" --> RGROW["updateRegistrationRow()<br/>→ REGISTRATION tab<br/>(8-col schema)"]
         RG -- "No" --> GSTP{"action in<br/>GAME_STEP_ACTIONS?"}
         GSTP -- "No" --> IGN["Ignored:<br/>SESSION_START · CONNECTION_TEST<br/>· PROMISE_REJECTION · CLIENT_ERROR…"]
         GSTP -- "Yes" --> LVL{"Which sheet level?"}
@@ -485,19 +507,19 @@ flowchart TD
     L2T --> UPD
     L3T --> UPD
 
-    subgraph ROW["D · updateLevelRow — 1 row per team per tab (14 cols)"]
+    subgraph ROW["D · updateLevelRow — 1 row per team per tab (15 cols)"]
         UPD["updateLevelRow(sheet, …)"] --> FIND{"Row exists for<br/>this teamName?"}
-        FIND -- "Yes" --> LOAD["Load existing 14-col record"]
+        FIND -- "Yes" --> LOAD["Load existing 15-col record"]
         LOAD --> A{"action type?"}
         FIND -- "No" --> A
-        A -- "SOLVED" --> SLV["points >0 → Points Earned<br/>points <0 → Points Lost (repeat)<br/>status: SOLVED · solveTime · lastActive"]
+        A -- "SOLVED" --> SLV["points >0 → Points Earned<br/>points <0 → Points Lost (repeat)<br/>status: SOLVED · solveTime · lastActive<br/>current puzzle id + unlock queue (ids)<br/>+ running score updated"]
         A -- "WRONG_ATTEMPT" --> WA["wrongAttempts++<br/>status: RETRYING"]
         A -- "PUZZLE_UNLOCKED" --> PUN["status: UNLOCKED"]
         A -- "UNLOCK_FAILED" --> UFL["status: LOCKED"]
         A -- "QR_BLOCKED" --> QBL["status: BLOCKED"]
         A -- "PENALTY_TRIGGERED / PENALTY<br/>/ MALPRACTICE_DETECTED" --> PNL["status: MALPRACTICE<br/>tabSwitches update"]
         A -- "HINT_REQUESTED / HINT_USED" --> HUS["hintUsed: YES<br/>tabSwitches update"]
-        SLV --> WROW["Write 14-col row<br/>(update in place or append)"]
+        SLV --> WROW["Write 15-col row<br/>(update in place or append)"]
         WA --> WROW
         PUN --> WROW
         UFL --> WROW
@@ -548,6 +570,40 @@ for all Google Sheets API calls:
 - `tryAcquire()` — non-blocking slot used by the `beforeunload` flush; if the
   window is full the buffer is kept for the next session's 10 s flush instead of
   dropping events.
+
+---
+
+## Per-Puzzle Notebook (`js/notepad.js`)
+
+The key quota-saving mechanism: **every event while a puzzle is open is counted
+locally** (scan, wrong, hint, tab switch, timestamps) in a small in-memory
+notepad — zero requests fire during solving.
+
+- **On solve** → one `SOLVED` request carries the full notebook summary +
+  the unlock queue (`queueIds`), current `puzzleId`, the running `score` and
+  the solved `puzzleId` history — the backend writes these straight into the
+  team's level row (no separate tab).
+- **Left mid-puzzle** → after 60 s idle the watchdog sends one
+  `PUZZLE_ABANDONED` with the half-done notebook. The notepad lives in
+  `localStorage` (`pykachuPuzzleNotebook`) so a mid-puzzle reload never loses
+  progress.
+- `beforeunload` flushes dirty notebooks rate-limit-safe (non-blocking
+  `keepalive` fetch). If the rate window is full the note stays dirty and
+  the next load's watchdog retries.
+
+**Resulting request count at 100 teams:**  
+1 registration + 24 solves + 2 startup = **27 requests / team / day**  
+→ **~2,700 total / day ≈ 13%** of the Google Apps Script ~20k daily quota.
+
+---
+
+## Input Caps & Hidden IDs
+
+- All user text inputs (team name, password, start key, answer, manual signal
+  id) are capped at **50 characters** via both `maxlength` and JS guards in the
+  submit handlers.
+- Puzzle signal IDs (e.g. `XG01`) are **never displayed** in the UI — only
+  used internally for QR matching, deep links and server payloads.
 
 ---
 

@@ -19,6 +19,11 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         return;
     }
 
+    if (teamInput.length > 50 || passwordInput.length > 50) {
+        showFeedback('registrationFeedback', 'Max 50 characters!', 'error');
+        return;
+    }
+
     // Verify team and password
     const foundTeam = TEAMS.find(t => t.team.toLowerCase() === teamInput.toLowerCase());
 
@@ -62,7 +67,9 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         teamName: currentTeam,
         tid: currentTeamTid,
         mission: missionLevel,
-        language: currentLanguage
+        language: currentLanguage,
+        password: passwordInput,
+        level: missionLevel.replace(/\D/g, '')
     });
 
     updateTeamStatus();
@@ -98,6 +105,11 @@ document.getElementById('unlockForm').addEventListener('submit', function (e) {
 
     if (!code) {
         showFeedback('unlockFeedback', 'Enter start key', 'error');
+        return;
+    }
+
+    if (code.length > 50) {
+        showFeedback('unlockFeedback', 'Max 50 characters!', 'error');
         return;
     }
 
@@ -158,12 +170,8 @@ function activatePuzzle(puzzle, unlockedVia) {
         pokeball.classList.remove('hidden');
     }
 
-    submitToGoogleSheets('PUZZLE_UNLOCKED', {
-        puzzleId: puzzle.id,
-        puzzleLevel: puzzle.level,
-        puzzleLink: puzzle.linkid,
-        unlockedVia: unlockedVia || (isStartingPuzzle(puzzle) ? 'START' : 'DIRECT')
-    });
+    // Start the per-puzzle notebook (one request is made only on solve/abandon)
+    notepadStart();
 }
 
 // ==============================
@@ -189,7 +197,7 @@ function createNextLocationCard(puzzle) {
             </div>
             <div class="flex-1 text-left min-w-0">
                 <span class="text-yellow-400/80 text-[8px] sm:text-[9px] uppercase tracking-widest font-black block">NEXT
-                    LOCATION · ${puzzle.linkid}</span>
+                    LOCATION</span>
                 <p class="font-pixel text-white leading-tight break-words mt-0.5 text-xs sm:text-sm">${(puzzle.locationClue || 'NO SIGNAL SOURCE').toUpperCase()}</p>
             </div>
         </div>
@@ -247,6 +255,11 @@ function submitPuzzleAnswer() {
 
     if (!answer) {
         showToast("INPUT REQUIRED", "error");
+        return;
+    }
+
+    if (answer.length > 50) {
+        showToast("MAX 50 CHARACTERS", "error");
         return;
     }
 
@@ -318,13 +331,16 @@ function submitPuzzleAnswer() {
         const pointsEarned = firstSolve ? basePoints : -penaltyPoints;
         recordPuzzleSolve(currentPuzzle.id, pointsEarned);
 
-        submitToGoogleSheets('SOLVED', {
-            puzzleId: currentPuzzle.id,
-            team: currentTeam,
+        // ONE request per puzzle: the whole notepad (scans, wrong attempts,
+        // hints, tab switches, timings) ships inside the SOLVED summary.
+        flushPuzzleNotebook(currentPuzzle.id, true, {
             answer: answer,
             pointsEarned: pointsEarned,
             repeatSolve: !firstSolve,
-            totalScore: currentTeamScore
+            totalScore: currentTeamScore,
+            solvedIds: Array.from(currentTeamSolvedPuzzles),
+            queueIds: teamUnlockQueue,
+            score: currentTeamScore
         });
 
         if (firstSolve) {
@@ -346,10 +362,7 @@ function submitPuzzleAnswer() {
         answerInput.value = "";
         triggerShake('puzzleAnswer');
 
-        submitToGoogleSheets('WRONG_ATTEMPT', {
-            puzzleId: currentPuzzle.id,
-            wrongAnswer: answer
-        });
+        notepadBump('wrong');
     }
 }
 // Attach the submit handler

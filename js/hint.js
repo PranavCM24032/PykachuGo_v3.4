@@ -210,10 +210,8 @@ function startHintPenalty() {
     // Start Monitoring
     startHintTabMonitoring();
 
-    submitToGoogleSheets('HINT_REQUESTED', {
-        puzzleId: currentPuzzle.id,
-        penaltyTime: hintPenaltySeconds
-    });
+    // One hint = one local bump (shipped with the puzzle's single summary)
+    notepadBump('hint');
 
     playSound('hintStart');
 }
@@ -250,18 +248,8 @@ function completeHintPenalty() {
     // Stop tab monitoring
     stopHintTabMonitoring();
 
-    // Show the hint
+    // Show the hint (usage already counted via the hint request bump)
     showHint();
-
-    // Log hint usage
-    submitToGoogleSheets('HINT_USED', {
-        puzzleId: currentPuzzle.id,
-        hintText: currentPuzzleHint,
-        penaltyServed: true,
-        hintTabSwitchesDuringPenalty: hintTabSwitchCount,
-        tabSwitchesDuringPenalty: hintTabSwitchDuringPenalty,
-        tabSwitches: tabSwitchCount
-    });
 
     playSound('hintReveal');
     showToast('Hint unlocked!', 'success');
