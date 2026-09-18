@@ -327,8 +327,11 @@ function submitPuzzleAnswer() {
 
         const firstSolve = !hasSolvedPuzzle(currentPuzzle.id);
         const basePoints = currentPuzzle.points || 0;
-        const penaltyPoints = Math.max(1, basePoints / 4);
-        const pointsEarned = firstSolve ? basePoints : -penaltyPoints;
+        // A puzzle can score only once. A repeat deducts its full value, but
+        // cannot push the team's total below zero.
+        const pointsEarned = firstSolve
+            ? basePoints
+            : -Math.min(basePoints, currentTeamScore);
         recordPuzzleSolve(currentPuzzle.id, pointsEarned);
 
         // ONE request per puzzle: the whole notepad (scans, wrong attempts,
@@ -346,7 +349,7 @@ function submitPuzzleAnswer() {
         if (firstSolve) {
             showToast(`SIGNAL DECRYPTED! +${pointsEarned} pts`, 'success');
         } else {
-            showToast(`REPEATED SOLVE: -${penaltyPoints} pts`, 'info');
+            showToast(`REPEATED SOLVE: ${pointsEarned} pts`, 'info');
         }
 
         // Flush buffered events to Google Sheets

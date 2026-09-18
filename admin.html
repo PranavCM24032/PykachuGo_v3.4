@@ -359,8 +359,7 @@
                 </div>
 
                 <div class="mt-6 pt-6 border-t border-slate-800">
-                    <a href="https://docs.google.com/spreadsheets/d/14lLeSd_nXdM8ZLr1Dlud6Z2r2Qp7pS3rJGjxIZDkhfY/edit?gid=1478523511#gid=1478523511"
-                        target="_blank"
+                    <a id="masterSheetLink" href="#" target="_blank"
                         class="flex items-center justify-center gap-2 w-full py-3 sm:py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/20 transition-all">
                         <span>OPEN MASTER GOOGLE SHEET</span>
                     </a>
@@ -445,16 +444,24 @@
         </div>
     </main>
 
+    <script src="js/runtime-config.js"></script>
     <script>
+        const RUNTIME_CONFIG = window.PYKACHU_RUNTIME_CONFIG || {};
         const CONFIG = {
-            SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz3RewVeLAubnJF7UDk8dLyTMfmJ9l8Gkq9WrZZ2suMVv2mH7QAWba2XNIBgH4Wd4k/exec',
-            TOKEN: 'pyk2026@secGX42',
+            SCRIPT_URL: RUNTIME_CONFIG.googleScriptUrl || '',
+            TOKEN: RUNTIME_CONFIG.googleScriptToken || '',
+            SHEET_URL: RUNTIME_CONFIG.googleSheetUrl || '',
             REFRESH_RATE: 5000,
             MAX_LOGS: 500,
             VERSION: '3.0.1',
             ADMIN_GATE_ENABLED: true,
             ADMIN_PASS: 'pykachu-admin-2026'
         };
+
+        const masterSheetLink = document.getElementById('masterSheetLink');
+        if (masterSheetLink && CONFIG.SHEET_URL) {
+            masterSheetLink.setAttribute('href', CONFIG.SHEET_URL);
+        }
 
         let state = {
             logs: [],
@@ -843,10 +850,13 @@
                         const recs = t.levels[l];
                         if (!Array.isArray(recs)) return;
                         recs.forEach(r => {
-                            const diff = (parseInt(r.pointsEarned || 0, 10) - parseInt(r.pointsLost || 0, 10));
                             if (r.status === 'SOLVED') solved++;
-                            pts += diff;
-                            if (r.lastActive && (!lastActive || r.lastActive > lastActive)) lastActive = r.lastActive;
+                            // Use the latest running total rather than adding
+                            // the earned/lost audit fields from every puzzle.
+                            if (r.lastActive && (!lastActive || r.lastActive > lastActive)) {
+                                lastActive = r.lastActive;
+                                pts = parseInt(r.totalScore || 0, 10);
+                            }
                         });
                     });
                     if (!lastActive) lastActive = t.regTime || '';

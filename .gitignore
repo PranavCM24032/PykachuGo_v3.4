@@ -2,3 +2,7 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+js/runtime-config.js
+.env
+.env.*
+!.env.example

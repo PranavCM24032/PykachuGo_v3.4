@@ -9,8 +9,20 @@ let memePlayerPreloaded = false;
 // ── Load YouTube IFrame API lazily, with a shared promise ─────────────────────
 function ensureYTApiLoaded() {
     if (ytApiReadyPromise) return ytApiReadyPromise;
-    ytApiReadyPromise = new Promise((resolve) => {
+    ytApiReadyPromise = new Promise((resolve, reject) => {
         if (window.YT && window.YT.Player) { resolve(); return; }
+
+        let settled = false;
+        const finish = (callback, value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            callback(value);
+        };
+        const timeout = setTimeout(() => {
+            finish(reject, new Error('YouTube player did not load in time'));
+        }, 10000);
+
         const tag = document.createElement('script');
         tag.id = 'yt-iframe-api-script';
         tag.src = 'https://www.youtube.com/iframe_api';
@@ -18,11 +30,12 @@ function ensureYTApiLoaded() {
         const prevReady = window.onYouTubeIframeAPIReady;
         window.onYouTubeIframeAPIReady = () => {
             if (typeof prevReady === 'function') prevReady();
-            if (window.YT && window.YT.Player) resolve();
+            if (window.YT && window.YT.Player) finish(resolve);
         };
         tag.onload = () => {
-            if (window.YT && window.YT.Player) resolve();
+            if (window.YT && window.YT.Player) finish(resolve);
         };
+        tag.onerror = () => finish(reject, new Error('Unable to load YouTube player'));
         document.head.appendChild(tag);
     });
     return ytApiReadyPromise;
@@ -99,8 +112,9 @@ function warmupMemePlayer() {
                 resolve();
             }, 3000);
         });
-    }).catch(() => {
+    }).catch((error) => {
         memePlayerReadyPromise = null;
+        throw error;
     });
 
     return memePlayerReadyPromise;
@@ -108,9 +122,9 @@ function warmupMemePlayer() {
 
 // Warm the API up immediately so memes open faster.
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    ensureYTApiLoaded();
+    ensureYTApiLoaded().catch(() => {});
 } else {
-    document.addEventListener('DOMContentLoaded', () => ensureYTApiLoaded());
+    document.addEventListener('DOMContentLoaded', () => ensureYTApiLoaded().catch(() => {}));
 }
 
 // ── URL helpers ───────────────────────────────────────────────────────────────
@@ -265,9 +279,19 @@ function showMemePlayer(meme) {
         buildPlayer();
     }
 
+    const unavailable = () => {
+        showToast('Unable to load the meme player. Please try again later.', 'error');
+        backToScanner();
+    };
+
     requestAnimationFrame(() => {
         fitMemePlayer();
-        warmupMemePlayer().then(playWithPlayer).catch(playWithPlayer);
+        warmupMemePlayer()
+            .then(() => {
+                if (!window.YT || !window.YT.Player) throw new Error('YouTube player unavailable');
+                playWithPlayer();
+            })
+            .catch(unavailable);
     });
 }
 

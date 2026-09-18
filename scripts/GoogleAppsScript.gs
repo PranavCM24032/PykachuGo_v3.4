@@ -7,7 +7,7 @@
 // level 2 -> L2, level 3 -> L3 (falls back to the team's registered mission
 // level when no puzzle level is known). Registration events go only to the
 // Registration tab. All 3 level tabs share one schema and carry the unlock
-// queue (Current Puzzle ID + Unlocked Puzzle IDs) + Total Score, so there is
+// queues (Solved Puzzle IDs + Unlocked Puzzle IDs) + Total Score, so there is
 // no separate TeamState sheet.
 
 var GAME_STEP_ACTIONS = [
@@ -46,7 +46,7 @@ var LEVEL_HEADERS = [
   "Last Active", "TID", "Team Name", "Mission", "Puzzle ID",
   "Wrong Attempts", "Solve Time", "Hint Used", "Tab Switches",
   "Points Earned", "Points Lost", "Status", "Total Score",
-  "Unlocked Puzzle IDs"
+  "Unlocked Puzzle IDs", "Solved Puzzle IDs"
 ];
 
 // Handle CORS preflight requests
@@ -82,6 +82,7 @@ function doPost(e) {
       var currentPuzzle = null;
       var unlocked = [];
       var score = 0;
+      var latestScoreTimestamp = -1;
       ['L1', 'L2', 'L3'].forEach(function(name) {
         var sheet = ss.getSheetByName(name);
         if (!sheet) return;
@@ -90,11 +91,17 @@ function doPost(e) {
           if (rows[i][1] && String(rows[i][1]).trim().toUpperCase() === qTid.toUpperCase()) {
             var pid = Number(rows[i][4] || 0);
             if (pid > 0) {
-              solved.push(pid);
+              if (rows[i][11] === 'SOLVED') solved.push(pid);
               currentPuzzle = pid; // rows appended chronologically → last wins
             }
             unlocked = unlocked.concat(parseIdList(rows[i][13]));
-            score = Math.max(score, Number(rows[i][12] || 0));
+            solved = solved.concat(parseIdList(rows[i][14]));
+            var rowTimestamp = new Date(rows[i][0]).getTime();
+            if (isNaN(rowTimestamp)) rowTimestamp = 0;
+            if (rowTimestamp >= latestScoreTimestamp) {
+              latestScoreTimestamp = rowTimestamp;
+              score = Number(rows[i][12] || 0);
+            }
           }
         }
       });
@@ -253,11 +260,12 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
     pointsLost: 0,
     status: 'ACTIVE',
     totalScore: 0,
-    unlockedPuzzles: ''
+    unlockedPuzzles: '',
+    solvedPuzzles: ''
   };
 
   if (!isNewPuzzle) {
-    var vals = sheet.getRange(rowIdx, 1, 1, 14).getValues()[0];
+    var vals = sheet.getRange(rowIdx, 1, 1, 15).getValues()[0];
     record.tid = tid || vals[1];
     record.teamName = vals[2] || teamName;
     record.mission = mission || vals[3] || '';
@@ -271,6 +279,7 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
     record.status = vals[11] || 'ACTIVE';
     record.totalScore = Number(vals[12] || 0);
     record.unlockedPuzzles = vals[13] || '';
+    record.solvedPuzzles = vals[14] || '';
   } else {
     record.tid = tid || '';
     record.puzzleId = puzzleId;
@@ -299,7 +308,13 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
       if (!isNaN(n) && n > 0 && queue.indexOf(n) === -1) queue.push(n);
     });
     record.unlockedPuzzles = queue.join(',');
-    record.totalScore = Math.max(record.totalScore, Number(data.score || 0));
+    var solvedQueue = record.solvedPuzzles ? record.solvedPuzzles.split(',').map(Number) : [];
+    (Array.isArray(data.solvedIds) ? data.solvedIds : []).concat([puzzleId]).forEach(function(id) {
+      var n = Number(id);
+      if (!isNaN(n) && n > 0 && solvedQueue.indexOf(n) === -1) solvedQueue.push(n);
+    });
+    record.solvedPuzzles = solvedQueue.join(',');
+    record.totalScore = Math.max(0, Number(data.score || 0));
   } else if (action === 'PUZZLE_ABANDONED') {
     // Half-solved puzzle left open: sync its counters, award no points.
     if (typeof data.wrongAttempts === 'number') record.wrongAttempts = Math.max(record.wrongAttempts, data.wrongAttempts);
@@ -352,11 +367,12 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
     record.pointsLost,
     record.status,
     record.totalScore,
-    record.unlockedPuzzles
+    record.unlockedPuzzles,
+    record.solvedPuzzles
   ];
 
   if (rowIdx <= sheet.getLastRow()) {
-    sheet.getRange(rowIdx, 1, 1, 14).setValues([rowArray]);
+    sheet.getRange(rowIdx, 1, 1, 15).setValues([rowArray]);
   } else {
     sheet.appendRow(rowArray);
   }
@@ -489,7 +505,8 @@ function doGet(e) {
           pointsLost: parseInt(rows[j][10] || 0),
           status: rows[j][11],
           totalScore: parseInt(rows[j][12] || 0),
-          unlockedPuzzles: rows[j][13]
+          unlockedPuzzles: rows[j][13],
+          solvedPuzzles: rows[j][14]
         });
       }
     });

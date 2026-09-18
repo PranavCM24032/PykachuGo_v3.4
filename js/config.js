@@ -1,8 +1,9 @@
 // ==============================
 // GAME CONFIGURATION
 // ==============================
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz3RewVeLAubnJF7UDk8dLyTMfmJ9l8Gkq9WrZZ2suMVv2mH7QAWba2XNIBgH4Wd4k/exec';
-const GOOGLE_SCRIPT_TOKEN = 'pyk2026@secGX42';
+const RUNTIME_CONFIG = window.PYKACHU_RUNTIME_CONFIG || {};
+const GOOGLE_SCRIPT_URL = RUNTIME_CONFIG.googleScriptUrl || '';
+const GOOGLE_SCRIPT_TOKEN = RUNTIME_CONFIG.googleScriptToken || '';
 
 const CONFIG = {
     HINT_SETTINGS: {

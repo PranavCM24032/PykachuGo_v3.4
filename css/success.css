@@ -14,6 +14,43 @@
     display: none;
 }
 
+/* Keep the revealed destination clear of the success heading and CTA. */
+#step4 .step4-success-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(8px, 1.5vh, 12px);
+}
+
+#step4 #locationCard:not(.hidden),
+#step4 #nextLocationList:not(.hidden) {
+    margin-top: clamp(2px, 0.6vh, 6px);
+    flex-shrink: 0;
+}
+
+/* The location card is added after a solve, so reserve room for it on short screens. */
+@media (max-height: 640px) {
+    #step4 .step4-success-layout {
+        gap: 8px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+
+    #step4 .step4-pokemon-stage {
+        height: clamp(110px, 24vh, 160px) !important;
+        padding-bottom: 4px !important;
+    }
+
+    #step4 .step4-success-content {
+        gap: 6px;
+    }
+
+    #step4 #locationCard:not(.hidden),
+    #step4 #nextLocationList:not(.hidden) {
+        margin-top: 0;
+    }
+}
+
 @media (min-width: 640px) {
     #nextLocationList {
         gap: 12px;

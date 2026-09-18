@@ -5,7 +5,8 @@
   "description": "Pykachu Go - decode the code. capture pikachu.",
   "scripts": {
     "build": "tailwindcss -i css/tailwind-input.css -o css/tailwind.css --minify",
-    "serve": "npx serve -s ."
+    "config:runtime": "node scripts/generate-runtime-config.cjs",
+    "serve": "npm run config:runtime && npx serve -s ."
   },
   "devDependencies": {
     "esbuild": "^0.21.0",

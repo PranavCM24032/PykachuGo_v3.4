@@ -15,6 +15,7 @@ const ASSETS = [
     'css/meme.css',
     'css/tailwind.css',
     'js/config.js',
+    'js/runtime-config.js',
     'js/state.js',
     'js/audio.js',
     'js/data-loader.js',

@@ -31,6 +31,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Create client runtime config
+        env:
+          GOOGLE_SCRIPT_URL: ${{ secrets.GOOGLE_SCRIPT_URL }}
+          GOOGLE_SCRIPT_TOKEN: ${{ secrets.GOOGLE_SCRIPT_TOKEN }}
+          GOOGLE_SHEET_URL: ${{ secrets.GOOGLE_SHEET_URL }}
+        run: >-
+          node -e "const fs=require('fs');const config={googleScriptUrl:process.env.GOOGLE_SCRIPT_URL||'',googleScriptToken:process.env.GOOGLE_SCRIPT_TOKEN||'',googleSheetUrl:process.env.GOOGLE_SHEET_URL||''};fs.writeFileSync('js/runtime-config.js','window.PYKACHU_RUNTIME_CONFIG = '+JSON.stringify(config,null,4)+';\\n');"
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

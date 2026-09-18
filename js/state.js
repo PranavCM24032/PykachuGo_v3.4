@@ -169,11 +169,17 @@ function hasSolvedPuzzle(puzzleId) {
 // the server maintaining a queue. Empty server rows are ignored.
 function applyServerTeamState(serverState) {
     if (!serverState || typeof serverState !== 'object') return;
+    const solved = (Array.isArray(serverState.solved) ? serverState.solved : [])
+        .map(Number).filter(n => Number.isFinite(n));
     const unlocked = (Array.isArray(serverState.unlocked) ? serverState.unlocked : [])
         .map(Number).filter(n => Number.isFinite(n));
-    if (!Number(serverState.score) && unlocked.length === 0) return;
+    if (!Number.isFinite(Number(serverState.score)) && unlocked.length === 0 && solved.length === 0) return;
 
-    currentTeamScore = Math.max(currentTeamScore, Number(serverState.score || 0));
+    // The server score is the latest total, not a historical high-water mark.
+    currentTeamScore = Math.max(0, Number(serverState.score || 0));
+    // Solved IDs decide whether a puzzle awards points again. Unlocked IDs are
+    // deliberately kept separate because they only control valid QR jumps.
+    solved.forEach(id => currentTeamSolvedPuzzles.add(id));
     // Enrich the frontier: anything the sheet says was unlocked that this team
     // hasn't solved locally yet becomes scannable (no duplicates).
     for (const id of unlocked) {

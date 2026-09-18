@@ -41,7 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // localStorage.removeItem(CONFIG.STORAGE_KEYS.teamInfo); 
 
     await Promise.all([loadPuzzles(), loadTeams(), loadMemes()]);
-    await warmupMemePlayer();
+    // Preload the player without delaying the rest of the game if YouTube is
+    // unavailable or slow on the current network.
+    warmupMemePlayer().catch(() => {});
     initAudio();
 
     // A reset from the admin panel bumps the game epoch. If this device was
