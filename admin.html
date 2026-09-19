@@ -453,7 +453,7 @@
             SHEET_URL: RUNTIME_CONFIG.googleSheetUrl || '',
             REFRESH_RATE: 5000,
             MAX_LOGS: 500,
-            VERSION: '3.0.1',
+            VERSION: '3.1.0',
             ADMIN_GATE_ENABLED: true,
             ADMIN_PASS: 'pykachu-admin-2026'
         };
@@ -479,6 +479,16 @@
             const d = document.createElement('div');
             d.textContent = s;
             return d.innerHTML;
+        }
+
+        // Safe integer coercion: only accepts plain integers. A bare parseInt would
+        // turn a timestamp like "2026-09-19T…" into 2026, so anything that is not
+        // a clean integer string returns the fallback (0) instead.
+        function toInt(v, fallback = 0) {
+            if (v === undefined || v === null) return fallback;
+            const s = String(v).trim();
+            if (!/^-?\d+$/.test(s)) return fallback;
+            return parseInt(s, 10);
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -766,15 +776,15 @@
                         tid: log.tid || t.tid || '',
                         teamName: log.teamName || t.teamName,
                         mission: log.mission || t.mission,
-                        puzzleId: parseInt(log.puzzleId || 0, 10),
+                        puzzleId: toInt(log.puzzleId, 0),
                         status: log.status || 'ACTIVE',
-                        wrongAttempts: parseInt(log.wrongAttempts || 0, 10),
-                        tabSwitches: parseInt(log.tabSwitches || 0, 10),
+                        wrongAttempts: toInt(log.wrongAttempts, 0),
+                        tabSwitches: toInt(log.tabSwitches, 0),
                         hintUsed: !!log.hintUsed,
                         solveTime: log.solveTime || '',
-                        pointsEarned: parseInt(log.pointsEarned || 0, 10),
-                        pointsLost: parseInt(log.pointsLost || 0, 10),
-                        totalScore: parseInt(log.totalScore || 0, 10),
+                        pointsEarned: toInt(log.pointsEarned, 0),
+                        pointsLost: toInt(log.pointsLost, 0),
+                        totalScore: toInt(log.totalScore, 0),
                         unlockedPuzzles: log.unlockedPuzzles || ''
                     });
                 }
