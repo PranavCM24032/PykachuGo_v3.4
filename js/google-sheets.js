@@ -176,11 +176,15 @@ async function flushSessionBuffer() {
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'SESSION_BATCH', events: buffer, sessionId: sessionId, token: GOOGLE_SCRIPT_TOKEN })
         });
-        if (res.ok) {
+        // The Apps Script always returns HTTP 200 even on failures, so clearing
+        // the buffer on res.ok alone would DROP events that never reached the
+        // sheet. Only clear once the script confirms success.
+        const json = await res.json().catch(() => null);
+        if (res.ok && json && (json.status === 'success' || json.status === 'OK')) {
             console.log(`[Sheets] Flushed ${buffer.length} buffered events`);
             clearSessionBuffer();
         } else {
-            console.warn('[Sheets] Flush HTTP error:', res.status);
+            console.warn('[Sheets] Flush rejected by server, keeping buffer for retry:', (json && json.message) || res.status);
         }
     } catch (e) {
         console.warn('[Sheets] Flush failed, will retry later:', e);
@@ -236,8 +240,12 @@ window.addEventListener('beforeunload', () => {
                     keepalive: true,
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ action: 'SESSION_BATCH', events: buffer, sessionId: sessionId, token: GOOGLE_SCRIPT_TOKEN })
-                }).catch(() => { });
-                clearSessionBuffer();
+                })
+                    .then(r => r.json())
+                    .then(json => {
+                        if (json && (json.status === 'success' || json.status === 'OK')) clearSessionBuffer();
+                    })
+                    .catch(() => { });
             } else {
                 // Keep the buffer so the next session's 10s flush retries it
                 console.log('[Sheets] Unload flush skipped — rate limit reached');
