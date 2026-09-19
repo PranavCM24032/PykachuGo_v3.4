@@ -175,8 +175,9 @@ function applyServerTeamState(serverState) {
         .map(Number).filter(n => Number.isFinite(n));
     if (!Number.isFinite(Number(serverState.score)) && unlocked.length === 0 && solved.length === 0) return;
 
-    // The server score is the latest total, not a historical high-water mark.
-    currentTeamScore = Math.max(0, Number(serverState.score || 0));
+    // Repeat-solve deductions are allowed to push the running total below zero,
+    // so no lower clamp here — the signed score is restored as-is.
+    currentTeamScore = Number(serverState.score || 0);
     // Solved IDs decide whether a puzzle awards points again. Unlocked IDs are
     // deliberately kept separate because they only control valid QR jumps.
     solved.forEach(id => currentTeamSolvedPuzzles.add(id));

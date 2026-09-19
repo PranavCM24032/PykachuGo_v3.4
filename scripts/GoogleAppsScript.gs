@@ -314,7 +314,7 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
       if (!isNaN(n) && n > 0 && solvedQueue.indexOf(n) === -1) solvedQueue.push(n);
     });
     record.solvedPuzzles = solvedQueue.join(',');
-    record.totalScore = Math.max(0, Number(data.score || 0));
+    record.totalScore = Number(data.score || 0);
   } else if (action === 'PUZZLE_ABANDONED') {
     // Half-solved puzzle left open: sync its counters, award no points.
     if (typeof data.wrongAttempts === 'number') record.wrongAttempts = Math.max(record.wrongAttempts, data.wrongAttempts);
