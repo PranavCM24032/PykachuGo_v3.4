@@ -5,8 +5,11 @@ const RUNTIME_CONFIG = window.PYKACHU_RUNTIME_CONFIG || {};
 const GOOGLE_SCRIPT_URL = RUNTIME_CONFIG.googleScriptUrl || '';
 const GOOGLE_SCRIPT_TOKEN = RUNTIME_CONFIG.googleScriptToken || '';
 
+const GOOGLE_SHEET_URL = RUNTIME_CONFIG.googleSheetUrl || '';
+
 if (!GOOGLE_SCRIPT_URL || !GOOGLE_SCRIPT_TOKEN) {
-    console.warn('[Config] Google Sheets backend is NOT configured (empty googleScriptUrl/token). Scoring and telemetry will be disabled.');
+    console.warn('[Config] Google Sheets backend is NOT configured. Scoring and telemetry will be disabled.');
+    console.warn('[Config] Expected googleScriptUrl/token in js/runtime-config.js (set repo Actions secrets, then redeploy).');
 }
 
 const CONFIG = {
