@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (serverEpoch > localEpoch) {
             Object.values(CONFIG.STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
             if (typeof SESSION_BUFFER_KEY !== 'undefined') localStorage.removeItem(SESSION_BUFFER_KEY);
+            localStorage.removeItem('pykachuSheetsRateLimit');
             localStorage.setItem(CONFIG.STORAGE_KEYS.gameEpoch, String(serverEpoch));
             console.log(`[Epoch] Reset detected (${localEpoch} -> ${serverEpoch}); local progress wiped.`);
         }
@@ -150,12 +151,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Security is now managed by security.js
     // setTimeout(setupAntiCheat, 500); 
-
-    // Log session start once we have a session ID
-    submitToGoogleSheets('SESSION_START', {
-        userAgent: navigator.userAgent,
-        screenSize: `${window.innerWidth}x${window.innerHeight}`
-    });
 
     console.log('Professional Pokédex Initialized - Fresh Session ID:', sessionId);
 });
@@ -314,20 +309,6 @@ window.testConnection = async function () {
     showToast('Testing Uplink...', 'info');
 
     try {
-        const testPayload = {
-            action: 'CONNECTION_TEST',
-            timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent
-        };
-
-        // Add to queue manually to use the robust sender
-        submitToGoogleSheets('CONNECTION_TEST', { note: 'Manual Test Triggered' });
-
-        // Also try a direct ping for console feedback
-        if (!GOOGLE_SCRIPT_URL) {
-            throw new Error('Google Script URL is not defined');
-        }
-
         console.log('Packet queued. Monitor network tab for "exec" request.');
         setTimeout(() => {
             // We can't know for sure if it worked due to no-cors, but we can assume if no error thrown
@@ -354,25 +335,6 @@ window.onerror = function (msg, url, lineNo, columnNo, error) {
     };
 
     console.error('Global Error Caught:', errorData);
-
-    // Attempt to report critical errors to server
-    // Use a lightweight fire-and-forget approach
-    const payload = {
-        action: 'CLIENT_ERROR',
-        teamName: typeof currentTeam !== 'undefined' ? currentTeam : 'Unknown',
-        errorDetails: JSON.stringify(errorData)
-    };
-
-    // Direct robust fetch for errors
-    if (typeof GOOGLE_SCRIPT_URL !== 'undefined' && GOOGLE_SCRIPT_URL) {
-        fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            keepalive: true,
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ ...payload, token: GOOGLE_SCRIPT_TOKEN })
-        }).catch(e => console.warn('Failed to report error', e));
-    }
 
     return false; // Let default handler run
 };
@@ -477,11 +439,4 @@ function runCelebration(canvas, screen) {
 
 window.onunhandledrejection = function (event) {
     console.error('Unhandled Promise Rejection:', event.reason);
-
-    // Optional: Log promise rejections if they differ significantly from errors
-    if (typeof submitToGoogleSheets === 'function') {
-        submitToGoogleSheets('PROMISE_REJECTION', {
-            reason: event.reason ? event.reason.toString() : 'Unknown Reason'
-        });
-    }
 };

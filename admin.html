@@ -453,9 +453,7 @@
             SHEET_URL: RUNTIME_CONFIG.googleSheetUrl || '',
             REFRESH_RATE: 5000,
             MAX_LOGS: 500,
-            VERSION: '3.1.0',
-            ADMIN_GATE_ENABLED: true,
-            ADMIN_PASS: 'pykachu-admin-2026'
+            VERSION: '3.1.0'
         };
 
         const masterSheetLink = document.getElementById('masterSheetLink');
@@ -492,15 +490,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            if (CONFIG.ADMIN_GATE_ENABLED && sessionStorage.getItem('pykachuAdminAuth') !== '1') {
-                const attempt = prompt('Enter admin passphrase:');
-                if (attempt !== CONFIG.ADMIN_PASS) {
-                    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:monospace;color:#94a3b8;">ACCESS DENIED</div>';
-                    return;
-                }
-                sessionStorage.setItem('pykachuAdminAuth', '1');
-            }
-
             const storedVersion = localStorage.getItem('pykachuVersion');
             if (storedVersion !== CONFIG.VERSION) {
                 localStorage.removeItem('pykachuLogs');
@@ -550,7 +539,6 @@
 
         // id → linkid map straight from the authoritative puzzle catalogue, so the
         // Puzzle column deep-links with the real deep-link id (not a derived one).
-        const state = state || {};
         state.puzzleLinkById = state.puzzleLinkById || {};
         (async function loadPuzzleLinks() {
             try {
@@ -558,7 +546,7 @@
                 if (res.ok) {
                     const puzzles = await res.json();
                     puzzles.forEach(p => {
-                        const id = standardizeNumber(p.id);
+                        const id = toInt(p.id, 0);
                         if (id > 0 && p.linkid) state.puzzleLinkById[id] = p.linkid;
                     });
                 }
@@ -952,7 +940,7 @@
                         <div class="text-slate-500 font-mono">${i + 1}</div>
                         <div class="text-left font-bold text-slate-200 truncate pl-1" title="${escapeHTML(t.team)}">${escapeHTML(t.team)}</div>
                         <div class="font-mono text-blue-400 truncate" title="${escapeHTML(t.tid || '')}">${escapeHTML(t.tid || '-')}</div>
-                        <div class="font-mono text-slate-400 truncate" title="${escapeHTML(t.passwordHash || '')}">${escapeHTML(t.passwordHash || '-')}</div>
+                        <div class="font-mono text-slate-400 truncate" title="${escapeHTML(t.securityKey || '')}">${escapeHTML(t.securityKey || '-')}</div>
                         <div class="text-left font-mono text-emerald-300 truncate pl-1" title="${escapeHTML(members)}">${escapeHTML(members)}</div>
                     </div>`;
                 }).join('');

@@ -176,6 +176,7 @@ function flushPuzzleNotebooksOnUnload() {
             tid: currentTeamTid,
             mission: currentMissionLevel || '',
             timestamp: new Date().toISOString(),
+            eventId: (typeof generateEventId === 'function' ? generateEventId() : undefined),
             ...summary
         };
         fetch(GOOGLE_SCRIPT_URL, {

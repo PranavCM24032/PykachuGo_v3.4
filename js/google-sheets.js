@@ -3,6 +3,12 @@
 // ==============================
 const SESSION_BUFFER_KEY = 'pykachuSessionBuffer';
 
+// Stable id per event so a buffered retry is recognised and ignored by the
+// backend (prevents duplicate point awards when a response was lost).
+function generateEventId() {
+    return 'EV_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+}
+
 // Sliding window rate limit for Google Sheets API calls (protects Apps Script quota).
 const sheetsRateLimiter = new SlidingWindowRateLimiter({
     limit: 30,               // max requests per window
@@ -50,7 +56,6 @@ function isValidTeam() {
 const EVENT_THROTTLE = {
     'WRONG_ATTEMPT':     { interval: 5, countField: 'attemptCount' },
     'QR_BLOCKED':        { interval: 5, countField: 'blockedCount' },
-    'QR_SCANNED':        { once: true },
     'PENALTY_TRIGGERED': { interval: 5 } // already carries cumulative tabSwitches
 };
 const _throttleCounts = {};
@@ -78,6 +83,8 @@ async function submitToGoogleSheets(action, data = {}) {
             timestamp: new Date().toISOString(),
             ...data
         };
+        // One id per logical event; preserved across buffer retries.
+        if (!payload.eventId) payload.eventId = generateEventId();
         if (action === 'REGISTRATION') {
             payload.language = currentLanguage || 'PYTHON';
         }
@@ -119,7 +126,7 @@ async function sendToGoogleSheets(payload) {
     const team = (payload.teamName || '').trim();
     if (!team || team === 'Unknown' || team === 'NO TEAM') {
         console.log('[Sheets] Blocked — invalid team:', team);
-        return;
+        return false;
     }
     if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
         console.warn("[Sheets] URL missing. Cannot send.");

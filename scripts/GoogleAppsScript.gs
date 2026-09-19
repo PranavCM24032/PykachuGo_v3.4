@@ -27,12 +27,38 @@ var GAME_STEP_ACTIONS = [
 
 var ACCESS_TOKEN = 'pyk2026@secGX42';
 
+// Server-side per-team request budget. The client already spaces calls through
+// its own sliding-window limiter, but this guard caps any single team even if a
+// client is modified/buggy (protects the shared concurrent-execution quota).
+var TEAM_RATE_LIMIT = 90;         // max script entries per team per window
+var TEAM_RATE_WINDOW_SECS = 60;   // sliding window length
+
+// Sliding-window per-team budget, kept in CacheService so every concurrent
+// execution shares the same counter without extra locking. Returns true when
+// the team still has budget. Anonymous/admin calls (no team key) are unlimited.
+function checkTeamRate(teamKey) {
+  var key = String(teamKey || '').trim();
+  if (!key || key === 'Unknown' || key === 'NO TEAM') return true;
+  var cache = CacheService.getScriptCache();
+  var bucketKey = 'rate_' + key.replace(/[^A-Za-z0-9_]/g, '_');
+  var now = Math.floor(Date.now() / 1000);
+  var bucket = [0, now];
+  var raw = cache.get(bucketKey);
+  if (raw) {
+    try { bucket = JSON.parse(raw); } catch (e) { bucket = [0, now]; }
+  }
+  if (now - Number(bucket[1]) >= TEAM_RATE_WINDOW_SECS) bucket = [0, now];
+  bucket[0] = Number(bucket[0] || 0) + 1;
+  cache.put(bucketKey, JSON.stringify(bucket), TEAM_RATE_WINDOW_SECS + 1);
+  return bucket[0] <= TEAM_RATE_LIMIT;
+}
+
 // Registration tab schema (8 cols). Level = numeric mission level (1/2/3).
-// Password is stored only because the event owner asked for it — never exposed
-// through doGet (see doGet, password column is skipped).
+// Security Key is stored only because the event owner asked for it — never
+// exposed through doGet (see doGet, security key column is skipped).
 var REG_HEADERS = [
   "Registration Time", "TID", "Team Name", "Mission", "Language",
-  "Password", "Level", "Session ID"
+  "Security Key", "Level", "Session ID"
 ];
 
 // L1/L2/L3 share one schema. This is a per-PUZZLE log: each solved puzzle owns
@@ -48,6 +74,32 @@ var LEVEL_HEADERS = [
   "Points Earned", "Points Lost", "Status", "Total Score",
   "Unlocked Puzzle IDs", "Solved Puzzle IDs"
 ];
+
+// ── Event idempotency ──
+// Every client event carries a unique eventId. A send whose response is lost
+// may be retried from the client's buffer, so we remember processed ids for a
+// while and skip a second application (prevents duplicated point awards etc.).
+var EVENT_DEDUPE_TTL_SECS = 21600; // 6h (CacheService max)
+
+function eventCacheKey(eventId) {
+  return 'evt_' + String(eventId).replace(/[^A-Za-z0-9_]/g, '_').substring(0, 200);
+}
+
+function isDuplicateEvent(eventId) {
+  if (!eventId) return false;
+  try {
+    return CacheService.getScriptCache().get(eventCacheKey(eventId)) !== null;
+  } catch (e) {
+    return false;
+  }
+}
+
+function markEventProcessed(eventId) {
+  if (!eventId) return;
+  try {
+    CacheService.getScriptCache().put(eventCacheKey(eventId), '1', EVENT_DEDUPE_TTL_SECS);
+  } catch (e) { }
+}
 
 // Handle CORS preflight requests
 function doOptions(e) {
@@ -133,8 +185,46 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // ── Per-team budget: even a modified client can't flood the script ──
+    if (!checkTeamRate(data.tid || data.teamName || '')) {
+      // Acknowledge so the client clears its immediate buffer — no retry storm —
+      // but do not process the request.
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", rateLimited: true }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (data.action === 'SESSION_BATCH' && Array.isArray(data.events)) {
-      data.events.forEach(function(event) { processEvent(ss, event); });
+      // Group buffered events by their target tab so each sheet is read ONCE,
+      // then write back only the rows each event actually touched.
+      var groups = {};
+      data.events.forEach(function(event) {
+        var label = eventSheetLabel(event);
+        if (!label) return;
+        (groups[label] = groups[label] || []).push(event);
+      });
+      Object.keys(groups).forEach(function(label) {
+        var sheet = ss.getSheetByName(label);
+        if (!sheet) return;
+        var rows = sheet.getDataRange().getValues();
+        var touched = {};
+        var applied = [];
+        var seen = {};
+        groups[label].forEach(function(event) {
+          var eid = event.eventId;
+          if (eid && seen[eid]) return;
+          if (isDuplicateEvent(eid)) return;
+          if (eid) seen[eid] = true;
+          var rowIdx = applyEvent(rows, event);
+          if (rowIdx > 0) {
+            touched[rowIdx] = true;
+            applied.push(eid);
+          }
+        });
+        Object.keys(touched).forEach(function(idx) {
+          writeRow(sheet, rows, Number(idx));
+        });
+        applied.forEach(markEventProcessed);
+      });
     } else {
       processEvent(ss, data);
     }
@@ -153,30 +243,20 @@ function doPost(e) {
   }
 }
 
-function processEvent(ss, data) {
+// Route an event to the tab it belongs to; returns '' when it should be skipped
+// entirely (MEMEs, unknown/no team, non-game-step telemetry).
+function eventSheetLabel(data) {
   var action = data.action || '';
-  if (action.indexOf('MEME') !== -1) return;
+  if (action.indexOf('MEME') !== -1) return '';
 
-  var timestamp = data.timestamp || new Date().toISOString();
   var teamName = (data.teamName || data.team || '').toString().trim();
-  if (!teamName || teamName === 'Unknown' || teamName === 'NO TEAM') return;
-
-  var tid = (data.tid || '').toString().trim();
-  var mission = (data.mission || '').toString();
+  if (!teamName || teamName === 'Unknown' || teamName === 'NO TEAM') return '';
 
   // 1. REGISTRATION TAB only (never a level tab)
-  if (action === 'REGISTRATION') {
-    var regSheet = ss.getSheetByName("Registration");
-    updateRegistrationRow(regSheet, teamName, tid, data, timestamp);
-    return;
-  }
-
-  // 2. TEAM STATE: no separate tab — current puzzle id, the unlock queue and
-  //    the running score are all written straight into the team's L1/L2/L3 row
-  //    inside updateLevelRow (SOLVED branch).
+  if (action === 'REGISTRATION') return 'Registration';
 
   // Ignore non-game-step telemetry (SESSION_START, CONNECTION_TEST, PROMISE_REJECTION, ...)
-  if (GAME_STEP_ACTIONS.indexOf(action) === -1) return;
+  if (GAME_STEP_ACTIONS.indexOf(action) === -1) return '';
 
   // 2. Route by the PUZZLE's level (L1/L2/L3) so each puzzle's data lands in
   //    the sheet matching its level. Falls back to the team's registered
@@ -185,42 +265,71 @@ function processEvent(ss, data) {
   if (data.puzzleLevel == 1 || data.puzzleLevel === '1') level = 'L1';
   else if (data.puzzleLevel == 2 || data.puzzleLevel === '2') level = 'L2';
   else if (data.puzzleLevel == 3 || data.puzzleLevel === '3') level = 'L3';
-
   if (!level) {
-    var m = mission.split('_')[0].toUpperCase();
+    var m = (data.mission || '').split('_')[0].toUpperCase();
     if (m === 'L1' || m === 'L2' || m === 'L3') level = m;
   }
-  if (!level) return;
-
-  var sheet = ss.getSheetByName(level);
-  updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp);
+  return level;
 }
 
-// Update Registration Sheet Row (8 cols: REG_HEADERS order)
-function updateRegistrationRow(sheet, teamName, tid, data, timestamp) {
-  var rowIdx = findTeamRow(sheet, teamName);
+// Single-event path: read the target tab once, apply one event, write back the
+// one row it touched.
+function processEvent(ss, data) {
+  var label = eventSheetLabel(data);
+  if (!label) return;
+  if (isDuplicateEvent(data.eventId)) return;
+  var sheet = ss.getSheetByName(label);
+  if (!sheet) return;
+  var rows = sheet.getDataRange().getValues();
+  var rowIdx = applyEvent(rows, data);
+  if (rowIdx > 0) {
+    writeRow(sheet, rows, rowIdx);
+    markEventProcessed(data.eventId);
+  }
+}
+
+// Apply one event against a cached rows snapshot (header in rows[0]); returns
+// the 1-based index of the row that changed (0 when nothing changed).
+function applyEvent(rows, data) {
+  var action = data.action || '';
+  var timestamp = data.timestamp || new Date().toISOString();
+  var teamName = (data.teamName || data.team || '').toString().trim();
+  var tid = (data.tid || '').toString().trim();
+  var mission = (data.mission || '').toString();
+
+  if (action === 'REGISTRATION') {
+    return applyRegistrationRow(rows, teamName, tid, data, timestamp);
+  }
+  return applyLevelRow(rows, teamName, tid, mission, action, data, timestamp);
+}
+
+// Update Registration Sheet Row (8 cols: REG_HEADERS order). Returns row index.
+function applyRegistrationRow(rows, teamName, tid, data, timestamp) {
+  var rowIdx = findTeamRow(rows, teamName);
   var rowArray = [
     timestamp,
     tid,
     teamName,
     data.mission || '',
     data.language || '',
-    data.password || '',
+    data.securityKey || '',
     data.level || '',
     data.sessionId || ''
   ];
   if (rowIdx > 0) {
-    sheet.getRange(rowIdx, 1, 1, 8).setValues([rowArray]);
+    rows[rowIdx - 1] = rowArray;
   } else {
-    sheet.appendRow(rowArray);
+    rows.push(rowArray);
+    rowIdx = rows.length;
   }
+  return rowIdx;
 }
 
 // Per-PUZZLE row updater for L1/L2/L3 tabs. One row per (team, puzzle):
 // a fresh row is appended for each new puzzle, and only THAT row is updated
 // while the puzzle is in progress. Past records are frozen once a puzzle is
 // solved or abandoned.
-function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) {
+function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
   // LEVEL_HEADERS:
   //  0 Last Active · 1 TID · 2 Team Name · 3 Mission · 4 Puzzle ID
   //  5 Wrong Attempts · 6 Solve Time · 7 Hint Used · 8 Tab Switches
@@ -230,18 +339,17 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
   if (isNaN(puzzleId) || puzzleId < 0) puzzleId = 0;
 
   // Locate this team's row for THIS puzzle; if unknown id, fall back to the
-  // team's open (empty-id) row, else append a new one.
-  var rowIdx = findPuzzleRow(sheet, teamName, puzzleId);
+  // team's open (empty-id) row, else append a new one. rowIdx is 1-based
+  // (rows[0] = header row).
+  var rowIdx = findPuzzleRow(rows, teamName, puzzleId);
   var isNewPuzzle = false;
   if (rowIdx === -1) {
     if (puzzleId > 0) {
-      rowIdx = findPuzzleRow(sheet, teamName, 0, true);
+      rowIdx = findPuzzleRow(rows, teamName, 0, true);
       if (rowIdx === -1) {
-        rowIdx = sheet.getLastRow() + 1;
         isNewPuzzle = true;
       }
     } else {
-      rowIdx = sheet.getLastRow() + 1;
       isNewPuzzle = true;
     }
   }
@@ -265,7 +373,7 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
   };
 
   if (!isNewPuzzle) {
-    var vals = sheet.getRange(rowIdx, 1, 1, 15).getValues()[0];
+    var vals = rows[rowIdx - 1];
     record.tid = tid || vals[1];
     record.teamName = vals[2] || teamName;
     record.mission = mission || vals[3] || '';
@@ -316,6 +424,9 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
     record.solvedPuzzles = solvedQueue.join(',');
     record.totalScore = Number(data.score || 0);
   } else if (action === 'PUZZLE_ABANDONED') {
+    // A puzzle already SOLVED must never be downgraded by a late/retried
+    // ABANDONED (buffered SOLVED + unload race).
+    if (record.status === 'SOLVED') return 0;
     // Half-solved puzzle left open: sync its counters, award no points.
     if (typeof data.wrongAttempts === 'number') record.wrongAttempts = Math.max(record.wrongAttempts, data.wrongAttempts);
     if (typeof data.tabSwitches === 'number') record.tabSwitches = Math.max(record.tabSwitches, data.tabSwitches);
@@ -371,17 +482,18 @@ function updateLevelRow(sheet, teamName, tid, mission, action, data, timestamp) 
     record.solvedPuzzles
   ];
 
-  if (rowIdx <= sheet.getLastRow()) {
-    sheet.getRange(rowIdx, 1, 1, 15).setValues([rowArray]);
+  if (isNewPuzzle) {
+    rows.push(rowArray);
+    rowIdx = rows.length;
   } else {
-    sheet.appendRow(rowArray);
+    rows[rowIdx - 1] = rowArray;
   }
+  return rowIdx;
 }
 
-function findTeamRow(sheet, teamName) {
-  var data = sheet.getDataRange().getValues();
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][2] && data[i][2].toString().trim().toUpperCase() === teamName.toUpperCase()) {
+function findTeamRow(rows, teamName) {
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][2] && rows[i][2].toString().trim().toUpperCase() === teamName.toUpperCase()) {
       return i + 1;
     }
   }
@@ -390,11 +502,10 @@ function findTeamRow(sheet, teamName) {
 
 // One row per (team, puzzle). Row key = Team Name (col 2) + Puzzle ID (col 4).
 // nullPuzzleMatch = also allow rows whose Puzzle ID is empty (unknown id).
-function findPuzzleRow(sheet, teamName, puzzleId, nullPuzzleMatch) {
-  var data = sheet.getDataRange().getValues();
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][2] && data[i][2].toString().trim().toUpperCase() === teamName.toUpperCase()) {
-      var rowPid = data[i][4];
+function findPuzzleRow(rows, teamName, puzzleId, nullPuzzleMatch) {
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][2] && rows[i][2].toString().trim().toUpperCase() === teamName.toUpperCase()) {
+      var rowPid = rows[i][4];
       var rowHasPid = rowPid && String(rowPid).trim() !== '';
       if (puzzleId) {
         if (rowHasPid && Number(rowPid) === Number(puzzleId)) return i + 1;
@@ -404,6 +515,12 @@ function findPuzzleRow(sheet, teamName, puzzleId, nullPuzzleMatch) {
     }
   }
   return -1;
+}
+
+// Write one mutated row back to its sheet (minimal write — no full-sheet flush).
+function writeRow(sheet, rows, rowIdx) {
+  if (rowIdx <= 0 || !rows[rowIdx - 1]) return;
+  sheet.getRange(rowIdx, 1, 1, rows[0].length).setValues([rows[rowIdx - 1]]);
 }
 
 // Parse a CSV of puzzle ids ("2,6" or "2|6") into a number array.
@@ -426,6 +543,9 @@ function uniqueNumbers(list) {
   return out;
 }
 
+// Lazy tab setup: create a missing sheet, and write/styles the header row ONLY
+// when a tab has no rows at all. Existing tabs are untouched, so the 8+ header
+// writes that used to happen on every request are now a one-time cost.
 function ensureSheetsExist(ss) {
   var tabs = [
     { name: "Registration", headers: REG_HEADERS },
@@ -439,9 +559,11 @@ function ensureSheetsExist(ss) {
     if (!sheet) {
       sheet = ss.insertSheet(t.name);
     }
-    var headerRange = sheet.getRange(1, 1, 1, t.headers.length);
-    headerRange.setValues([t.headers]);
-    headerRange.setFontWeight("bold").setBackground("#1e293b").setFontColor("#ffffff");
+    if (sheet.getLastRow() <= 0) {
+      var headerRange = sheet.getRange(1, 1, 1, t.headers.length);
+      headerRange.setValues([t.headers]);
+      headerRange.setFontWeight("bold").setBackground("#1e293b").setFontColor("#ffffff");
+    }
   });
 }
 
@@ -453,10 +575,8 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    ensureSheetsExist(ss);
-
     // ── Clients check the epoch on load to wipe stale local progress ──
+    //    (checked BEFORE any Sheets access so a lightweight epoch ping costs nothing)
     if (e.parameter.action === 'GET_EPOCH') {
       var props = PropertiesService.getScriptProperties();
       var epoch = parseInt(props.getProperty('gameEpoch') || '0', 10);
@@ -464,9 +584,12 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureSheetsExist(ss);
+
     var list = [];
 
-    // 1. Read Registration (password column is intentionally NOT exposed)
+    // 1. Read Registration (security key column is intentionally NOT exposed)
     var regSheet = ss.getSheetByName("Registration");
     var regData = regSheet ? regSheet.getDataRange().getValues() : [];
     for (var i = 1; i < regData.length; i++) {

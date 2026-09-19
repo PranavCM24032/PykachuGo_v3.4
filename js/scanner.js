@@ -226,10 +226,17 @@ function startQRCodeDetection() {
                     if (!blob || !qrScannerActive) return;
                     ocrWorker.recognize(blob).then(({ data: { text } }) => {
                         if (!qrScannerActive) return;
-                        const detectedText = text.toUpperCase().replace(/\s+/g, '');
+                        const rawUpper = text.toUpperCase();
+                        const compact = rawUpper.replace(/\s+/g, '');
                         const matchedPuzzle = PUZZLES.find(p => {
-                            const linkId = p.linkid.toUpperCase().replace(/\s+/g, '');
-                            return detectedText.includes(linkId);
+                            const linkId = (p.linkid || '').toUpperCase().replace(/\s+/g, '');
+                            if (!linkId) return false;
+                            // Exact token only: an exact match, or the ID delimited
+                            // by non-alphanumerics. Prevents substring false positives
+                            // (e.g. "M01" inside unrelated text) from unlocking.
+                            if (compact === linkId) return true;
+                            const esc = linkId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            return new RegExp(`(^|[^A-Z0-9])${esc}($|[^A-Z0-9])`).test(rawUpper);
                         });
                         if (matchedPuzzle) handleQRScanResult(matchedPuzzle.linkid);
                     }).catch(err => console.warn('[Scanner] OCR skip:', err));

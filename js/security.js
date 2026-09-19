@@ -100,18 +100,7 @@ const SecuritySystem = {
             }
         }, { passive: true });
 
-        // 5. LOGIC FREEZE DETECTION - check every 2s instead of 100ms
-        let lastHeartbeat = Date.now();
-        setInterval(() => {
-            const now = Date.now();
-            if (now - lastHeartbeat > 3000) {
-                this.activateLockdown();
-                this.scheduleRelease(1500);
-            }
-            lastHeartbeat = now;
-        }, 2000);
-
-        // 6. HARDWARE PRINT SCREEN / RECORDING SHORTCUTS
+        // 5. HARDWARE PRINT SCREEN / RECORDING SHORTCUTS
         document.addEventListener('keydown', (e) => {
             const forbiddenMatch =
                 e.key === 'PrintScreen' ||

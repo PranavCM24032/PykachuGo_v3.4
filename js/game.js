@@ -10,21 +10,21 @@ function getPuzzleQuestion(puzzle) {
 document.getElementById('registrationForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const teamInput = document.getElementById('teamName').value.trim();
-    const passwordInput = document.getElementById('teamPassword').value.trim();
+    const securityKeyInput = document.getElementById('teamSecurityKey').value.trim();
     const missionLevel = document.getElementById('missionLevel').value;
     const codeLanguage = document.getElementById('codeLanguage').value;
 
-    if (!teamInput || !passwordInput) {
-        showFeedback('registrationFeedback', 'Team name and password are required!', 'error');
+    if (!teamInput || !securityKeyInput) {
+        showFeedback('registrationFeedback', 'Team name and security key are required!', 'error');
         return;
     }
 
-    if (teamInput.length > 50 || passwordInput.length > 50) {
+    if (teamInput.length > 50 || securityKeyInput.length > 50) {
         showFeedback('registrationFeedback', 'Max 50 characters!', 'error');
         return;
     }
 
-    // Verify team and password
+    // Verify team and security key
     const foundTeam = TEAMS.find(t => t.team.toLowerCase() === teamInput.toLowerCase());
 
     if (!foundTeam) {
@@ -34,9 +34,9 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         return;
     }
 
-    if (foundTeam.passwordHash !== passwordInput) {
+    if (foundTeam.securityKey !== securityKeyInput) {
         showFeedback('registrationFeedback', 'Incorrect security key!', 'error');
-        triggerShake('teamPassword');
+        triggerShake('teamSecurityKey');
         playSound('error');
         return;
     }
@@ -68,7 +68,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         tid: currentTeamTid,
         mission: missionLevel,
         language: currentLanguage,
-        password: passwordInput,
+        securityKey: securityKeyInput,
         level: missionLevel.replace(/\D/g, '')
     });
 
@@ -412,13 +412,14 @@ function showAntiCopyToast() {
     // Managed by security.js
 }
 
-function togglePasswordVisibility() {
-    const pwdInput = document.getElementById('teamPassword');
-    const icon = document.getElementById('passwordToggleIcon');
-    if (pwdInput && icon) {
-        const isPassword = pwdInput.type === 'password';
-        pwdInput.type = isPassword ? 'text' : 'password';
-        icon.textContent = isPassword ? 'visibility' : 'visibility_off';
+function toggleSecurityKeyVisibility() {
+    const keyInput = document.getElementById('teamSecurityKey');
+    const icon = document.getElementById('securityKeyToggleIcon');
+    if (keyInput && icon) {
+        const isMasked = keyInput.type === 'password';
+        keyInput.type = isMasked ? 'text' : 'password';
+        icon.textContent = isMasked ? 'visibility' : 'visibility_off';
     }
 }
-window.togglePasswordVisibility = togglePasswordVisibility;
+
+window.toggleSecurityKeyVisibility = toggleSecurityKeyVisibility;

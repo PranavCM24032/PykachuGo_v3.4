@@ -132,6 +132,7 @@ var _blockingPenaltyCallback = null;
 
 function runBlockingPenalty(onComplete) {
     _blockingPenaltyCallback = typeof onComplete === 'function' ? onComplete : null;
+    penaltyActive = true;
 
     playSound('error');
 

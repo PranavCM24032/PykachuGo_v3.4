@@ -12,7 +12,7 @@ dashboard** livetracks every team.
 
 ## What players do
 
-1. Register with a team name and password (mission level + language).
+1. Register with a team name and security key (mission level + language).
 2. Scan the starting QR code or enter its start key.
 3. Solve the displayed coding riddle (Python or C++ variant).
 4. View the revealed next location and scan its QR code.
@@ -136,7 +136,7 @@ Player screens:
 | Screen | Purpose |
 |--------|---------|
 | `step0` | Rules and introduction (Professor Oak briefing) |
-| `step1` | Team login: name + password, mission level, language |
+| `step1` | Team login: name + security key, mission level, language |
 | `step2` | QR camera scanner OR manual code / deep-link entry |
 | `startcode` | Enter the puzzle's start key (e.g. `START`) to begin the chain |
 | `step3` | Riddle, answer form, hint request, anti-switch monitoring |
@@ -172,13 +172,13 @@ flowchart TD
     RULES["STEP 0 — Rules briefing"] -->|"acceptRules()"| REG["STEP 1 — Registration"]
 
     subgraph REGS["2 · REGISTRATION"]
-        REG --> EMPTYREQ{"Team or password<br/>empty?"}
+        REG --> EMPTYREQ{"Team or security key<br/>empty?"}
         EMPTYREQ -- "Yes" --> REGERR["Toast: fields required"]
         REGERR --> REG
         EMPTYREQ -- "No" --> TEXIST{"Team in<br/>teams.json?"}
         TEXIST -- "No" --> TNOTF["'Trainer not found'<br/>+ shake"]
         TNOTF --> REG
-        TEXIST -- "Yes" --> PWOK{"password ===<br/>passwordHash?"}
+        TEXIST -- "Yes" --> PWOK{"securityKey ===<br/>securityKey?"}
         PWOK -- "No" --> PWBAD["'Incorrect security key'<br/>+ shake"]
         PWBAD --> REG
         PWOK -- "Yes" --> TEAMSET["Set team / tid / mission / language<br/>create sessionId · REGISTRATION log"]
@@ -398,16 +398,16 @@ returns. The latest Total Score snapshot is used by the leaderboard.
 [
   {
     "team": "PRANAV",
-    "passwordHash": "123",
+    "securityKey": "123",
     "tid": "T001",
     "team_members": ["A", "B", "C", "D"]
   }
 ]
 ```
 
-- Inline JSON roster (no server). Team logs in with `team` + `passwordHash`.
+- Inline JSON roster (no server). Team logs in with `team` + `securityKey`.
 - `tid` is the stable team id used inside the backend spreadsheet.
-- (Note: `passwordHash` is currently plain text — fine for an event tournament,
+- (Note: `securityKey` is currently plain text — fine for an event tournament,
   but do not use for anything sensitive.)
 
 ---
@@ -466,7 +466,7 @@ A single Google Apps Script web app that owns one Google Sheets workbook.
 
 | Tab | Schema |
 |-----|--------|
-| `Registration` | Registration Time, TID, Team Name, Mission, Language, Password, Level, Session ID |
+| `Registration` | Registration Time, TID, Team Name, Mission, Language, Security Key, Level, Session ID |
 | `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Puzzle ID, Wrong Attempts, Solve Time, Hint Used, Tab Switches, Points Earned, Points Lost, Status, Total Score, Unlocked Puzzle IDs, Solved Puzzle IDs |
 
 The backend creates these tabs automatically on first use.
@@ -483,7 +483,7 @@ The backend creates these tabs automatically on first use.
   sessions/devices).
 - Events are routed by puzzle **level** to `L1`/`L2`/`L3` (fallback: team's
   registered mission level).
-- `Registration` events only touch the Registration tab; the password column is
+- `Registration` events only touch the Registration tab; the security key column is
   stored but **never** returned by the admin `doGet` endpoint.
 - **`SOLVED`** ships the full per-puzzle notebook in one call, finalizes the
   puzzle's row and writes **`Unlocked Puzzle IDs`** + **`Solved Puzzle IDs`** +
@@ -662,7 +662,7 @@ notepad — zero requests fire during solving.
 
 ## ⌨ Input caps & hidden IDs
 
-- All user text inputs (team name, password, start key, answer, manual signal
+- All user text inputs (team name, security key, start key, answer, manual signal
   id) are capped at **50 characters** via both `maxlength` and JS guards in the
   submit handlers.
 - Puzzle signal IDs (e.g. `XG01`) are **never displayed** in the UI — only used
@@ -781,7 +781,7 @@ pushing is a live content update.
 | Task | How |
 |------|-----|
 | **Add a puzzle** | Add an object to `data/puzzle.json`; link it via `nextPuzzleId`; set points/hints/pokemonId. |
-| **Add / edit teams** | Edit `data/teams.json` (team, passwordHash, tid, team_members). |
+| **Add / edit teams** | Edit `data/teams.json` (team, securityKey, tid, team_members). |
 | **Add a meme reward** | Push a `{ memeid, ytlink, starttime, endtime }` object to `data/meme.json`. |
 | **Reset the whole event** | Call the backend `RESET_ALL` (wipes all 4 tabs + bumps epoch; clients auto-wipe stale progress). |
 | **Tune sheet quota** | Adjust `limit`/`windowMs` on `sheetsRateLimiter` in `js/google-sheets.js`. |

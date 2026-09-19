@@ -61,11 +61,6 @@ class SlidingWindowRateLimiter {
         return now;
     }
 
-    get availableSlots() {
-        this._prune();
-        return Math.max(0, this.limit - this.timestamps.length);
-    }
-
     /**
      * Resolves with a timestamp token once a slot is free.
      * Serializes callers and spaces them out evenly.
@@ -91,17 +86,6 @@ class SlidingWindowRateLimiter {
         this._lastGrant = grantAt;
         this._saveTimestamps();
         return grantAt;
-    }
-
-    /**
-     * Undo the last acquired slot (use if a slot was reserved but the call
-     * was ultimately not made, e.g. beforeunload bail-out).
-     */
-    release() {
-        if (this.timestamps.length > 0) {
-            this.timestamps.pop();
-            this._saveTimestamps();
-        }
     }
 
     _pump() {
