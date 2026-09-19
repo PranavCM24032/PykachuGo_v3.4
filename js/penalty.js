@@ -18,6 +18,12 @@ function stopTabMonitoring() {
 
 function handleVisibilityChange() {
     if (document.hidden && isPuzzleActive && currentStep === 3) {
+        // A tab switch fires BOTH visibilitychange and window blur; drop the
+        // pending 1.5s blur timer so a single switch is counted exactly once.
+        if (blurTimeout) {
+            clearTimeout(blurTimeout);
+            blurTimeout = null;
+        }
         triggerPenalty();
     }
 }
@@ -39,8 +45,12 @@ function handleWindowFocus() {
 
 function triggerPenalty(reason = 'TAB_SWITCH') {
     // Tab-switch penalty only applies while the code is being solved
-    // (step 3 until the correct answer is submitted), NOT during the hint penalty.
-    if (!isPuzzleActive || currentStep !== 3 || hintPenaltyActive) return;
+    // (step 3 until the correct answer is submitted).
+    if (!isPuzzleActive || currentStep !== 3) return;
+    // During the hint countdown the hint system owns tab-switch handling and
+    // starts the malpractice penalty itself. But once a blocking penalty is
+    // already running, another switch must still count and reset the timer.
+    if (hintPenaltyActive && !penaltyActive) return;
 
     tabSwitchCount++;
 

@@ -386,8 +386,15 @@ function showHint() {
 
     // Mark hint as used for this team
     if (currentPuzzle) {
+        const firstUse = !currentPuzzle.hintUsed;
         currentPuzzle.hintUsed = true;
         saveHintState();
+        // Flag the hint on the sheet right away. The notepad summary carries it
+        // again on SOLVED/ABANDONED, but that only lands when the puzzle closes;
+        // this makes the flag show up immediately (backend is idempotent).
+        if (firstUse && typeof submitToGoogleSheets === 'function') {
+            submitToGoogleSheets('HINT_USED', {});
+        }
     }
 }
 

@@ -380,7 +380,8 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     record.puzzleId = Number(vals[4] || puzzleId || 0);
     record.wrongAttempts = parseInt(vals[5] || 0);
     record.solveTime = vals[6] || '';
-    record.hintUsed = vals[7] || '0';
+    // Sheets may coerce the text "1" to a numeric 1 on write, so normalise.
+    record.hintUsed = (String(vals[7]).trim() === '1' || vals[7] === 1 || vals[7] === true) ? '1' : '0';
     record.tabSwitches = parseInt(vals[8] || 0);
     record.pointsEarned = Number(vals[9] || 0);
     record.pointsLost = Number(vals[10] || 0);
@@ -622,7 +623,7 @@ function doGet(e) {
           puzzleId: parseInt(rows[j][4] || 0),
           wrongAttempts: parseInt(rows[j][5] || 0),
           solveTime: rows[j][6],
-          hintUsed: rows[j][7] === '1',
+          hintUsed: String(rows[j][7]).trim() === '1' || rows[j][7] === 1 || rows[j][7] === true,
           tabSwitches: parseInt(rows[j][8] || 0),
           pointsEarned: parseInt(rows[j][9] || 0),
           pointsLost: parseInt(rows[j][10] || 0),
