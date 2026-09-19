@@ -548,6 +548,25 @@
             }
         }
 
+        // id → linkid map straight from the authoritative puzzle catalogue, so the
+        // Puzzle column deep-links with the real deep-link id (not a derived one).
+        const state = state || {};
+        state.puzzleLinkById = state.puzzleLinkById || {};
+        (async function loadPuzzleLinks() {
+            try {
+                const res = await fetch('data/puzzle.json');
+                if (res.ok) {
+                    const puzzles = await res.json();
+                    puzzles.forEach(p => {
+                        const id = standardizeNumber(p.id);
+                        if (id > 0 && p.linkid) state.puzzleLinkById[id] = p.linkid;
+                    });
+                }
+            } catch (e) {
+                console.warn('Failed to load puzzle.json:', e);
+            }
+        })();
+
         function updateDataSourceIndicator() {
             const indicator = document.getElementById('dataSourceIndicator');
             if (state.usingCachedData) {
@@ -700,7 +719,6 @@
                 header.style.gridTemplateColumns = L_COLS;
                 header.innerHTML = `
                     <div class="text-center font-mono">#</div>
-                    <div class="text-center font-mono text-blue-400" title="Answer Submission Timestamp">Last Active</div>
                     <div class="text-center font-mono text-slate-400">TID</div>
                     <div class="text-left font-bold pl-1">Team Name</div>
                     <div class="text-center font-mono text-indigo-400">Mission</div>
@@ -1026,11 +1044,15 @@
                 return `
                 <div class="grid gap-1 px-3 py-2 border-b border-slate-800/50 transition-all items-center hover:bg-white/5 text-[9px] text-center fade-in" style="grid-template-columns: ${L_COLS}">
                     <div class="text-slate-500 font-mono">${index + 1}</div>
-                    <div class="text-blue-300 font-mono text-[8px]" title="Answer Submission Timestamp">${escapeHTML(lastActiveStr)}</div>
                     <div class="font-mono text-slate-400 truncate">${escapeHTML(lvlData.tid || '-')}</div>
                     <div class="text-left font-bold text-slate-200 truncate pl-1" title="${escapeHTML(team.name)}">${escapeHTML(team.name)}</div>
                     <div class="font-mono text-indigo-400 truncate text-[9px]">${escapeHTML(lvlData.mission || team.mission)}</div>
-                    <div class="font-mono text-cyan-400 font-bold text-[8px]">${lvlData.puzzleId ? 'P' + lvlData.puzzleId : '-'}</div>
+                    <div class="font-mono text-cyan-400 font-bold text-[8px]">${(() => {
+                        const lid = state.puzzleLinkById && state.puzzleLinkById[lvlData.puzzleId];
+                        return lvlData.puzzleId && lid
+                            ? `<a href="index.html?linkid=${encodeURIComponent(lid)}" target="_blank" rel="noopener" class="hover:text-cyan-200 hover:underline underline-offset-2 transition-colors" title="Puzzle ${lvlData.puzzleId} — open deep link (linkid ${lid})">P${lvlData.puzzleId}</a>`
+                            : (lvlData.puzzleId ? 'P' + lvlData.puzzleId : '-');
+                    })()}</div>
                     <div class="font-bold font-mono ${lvlData.wrongAttempts > 0 ? 'text-red-400' : 'text-slate-600'}">${lvlData.wrongAttempts}</div>
                     <div class="font-bold font-mono ${lvlData.tabSwitches > 0 ? 'text-pink-400' : 'text-slate-600'}">${lvlData.tabSwitches}</div>
                     <div class="font-bold">${hintBadge}</div>

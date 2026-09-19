@@ -327,11 +327,11 @@ function submitPuzzleAnswer() {
 
         const firstSolve = !hasSolvedPuzzle(currentPuzzle.id);
         const basePoints = currentPuzzle.points || 0;
-        // A puzzle can score only once. A repeat deducts its full value, but
-        // cannot push the team's total below zero.
+        // A puzzle can score only once. A repeat deducts its full value (100%)
+        // and is allowed to push the team's total below zero.
         const pointsEarned = firstSolve
             ? basePoints
-            : -Math.min(basePoints, currentTeamScore);
+            : -basePoints;
         recordPuzzleSolve(currentPuzzle.id, pointsEarned);
 
         // ONE request per puzzle: the whole notepad (scans, wrong attempts,
