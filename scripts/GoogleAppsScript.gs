@@ -325,6 +325,16 @@ function applyRegistrationRow(rows, teamName, tid, data, timestamp) {
   return rowIdx;
 }
 
+// Normalise a truthy value coming from a sheet cell. The script writes '1'/'0',
+// but a cell may be hand-edited to 'TRUE'/'true'/'TRUE ' /'YES'/'Y' or a boolean
+// TRUE, so accept any positive marker case-insensitively instead of only '1'.
+function isHintFlag(val) {
+  if (val === true || val === 1 || val === '1') return true;
+  if (typeof val !== 'string') return false;
+  var v = val.trim().toLowerCase();
+  return v === 'true' || v === 'yes' || v === 'y' || v === '1';
+}
+
 // Per-PUZZLE row updater for L1/L2/L3 tabs. One row per (team, puzzle):
 // a fresh row is appended for each new puzzle, and only THAT row is updated
 // while the puzzle is in progress. Past records are frozen once a puzzle is
@@ -381,7 +391,7 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     record.wrongAttempts = parseInt(vals[5] || 0);
     record.solveTime = vals[6] || '';
     // Sheets may coerce the text "1" to a numeric 1 on write, so normalise.
-    record.hintUsed = (String(vals[7]).trim() === '1' || vals[7] === 1 || vals[7] === true) ? '1' : '0';
+    record.hintUsed = isHintFlag(vals[7]) ? '1' : '0';
     record.tabSwitches = parseInt(vals[8] || 0);
     record.pointsEarned = Number(vals[9] || 0);
     record.pointsLost = Number(vals[10] || 0);
@@ -623,7 +633,7 @@ function doGet(e) {
           puzzleId: parseInt(rows[j][4] || 0),
           wrongAttempts: parseInt(rows[j][5] || 0),
           solveTime: rows[j][6],
-          hintUsed: String(rows[j][7]).trim() === '1' || rows[j][7] === 1 || rows[j][7] === true,
+          hintUsed: isHintFlag(rows[j][7]),
           tabSwitches: parseInt(rows[j][8] || 0),
           pointsEarned: parseInt(rows[j][9] || 0),
           pointsLost: parseInt(rows[j][10] || 0),
