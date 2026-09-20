@@ -136,28 +136,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateTeamStatus();
 
-    // A returning team should not be forced back through the Oak rules screen on
-    // every reload. If we already know their identity/session, keep them in the
-    // login/last-step flow instead of reopening the welcome screen.
-    if (typeof applyStoredLoginState === 'function') {
-        applyStoredLoginState();
-    }
-    prefillLoginIfReturning();
-
-    const savedLogin = typeof readStoredLoginState === 'function' ? readStoredLoginState() : null;
-    const hasSavedLogin = Boolean(savedLogin && savedLogin.name && savedLogin.securityKey);
-
-    if (hasSavedLogin) {
-        const savedState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.gameState) || '{}');
-        const savedStep = Number(savedState.currentStep || 0);
-        if (savedStep > 0 && savedStep !== 0) {
-            resumeToLastStep();
-        } else {
-            showStep(1);
-        }
-    } else {
-        showStep(0);
-    }
+    // Always require a fresh manual login after a reload. Gameplay progress is
+    // still restored after the team submits the login form.
+    showStep(0);
 
     // Auto-play memes for ?memid=M01 deep links (overlays the start screen)
     if (meme) {
@@ -207,48 +188,6 @@ function resumeToLastStep() {
         return;
     }
     showStep(2); // safe default for a returning logged-in team
-}
-
-// ==============================
-// PRE-FILL LOGIN
-// When a returning team has data saved, populate the team name so they only
-// need to enter their security key. This is UX-only — they must still submit.
-// ==============================
-function prefillLoginIfReturning() {
-    if (!currentTeam) {
-        try {
-            const saved = readStoredLoginState ? readStoredLoginState() : null;
-            if (saved && saved.name) {
-                currentTeam = saved.name;
-            }
-        } catch (e) { }
-    }
-
-    try {
-        const teamNameInput = document.getElementById('teamName');
-        if (teamNameInput && !teamNameInput.value && currentTeam) {
-            teamNameInput.value = currentTeam;
-        }
-        const langSelect = document.getElementById('codeLanguage');
-        if (langSelect && currentLanguage) {
-            langSelect.value = currentLanguage;
-        }
-        const missionSelect = document.getElementById('missionLevel');
-        const savedTeamInfo = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.teamInfo) || '{}');
-        if (missionSelect && savedTeamInfo.missionLevel) {
-            missionSelect.value = savedTeamInfo.missionLevel;
-        }
-
-        const savedLogin = readStoredLoginState ? readStoredLoginState() : null;
-        if (savedLogin) {
-            if (missionSelect && savedLogin.missionLevel) {
-                missionSelect.value = savedLogin.missionLevel;
-            }
-            if (langSelect && savedLogin.language) {
-                langSelect.value = savedLogin.language;
-            }
-        }
-    } catch (e) { }
 }
 
 // ==============================
