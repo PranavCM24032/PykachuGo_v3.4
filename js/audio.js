@@ -9,6 +9,15 @@ function initAudio() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         console.log('Audio system initialized');
+
+        const unlockAudio = () => {
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().catch(() => {});
+            }
+        };
+
+        document.addEventListener('pointerdown', unlockAudio, { passive: true, once: true });
+        document.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
     } catch (e) {
         console.warn('Web Audio API not supported:', e);
         soundEnabled = false;
@@ -19,8 +28,10 @@ function initAudio() {
 function playSound(soundName, volume = 0.3) {
     if (!soundEnabled || isMuted || !audioContext) return;
 
+    const safeSoundName = String(soundName || 'click');
+
     // Handle External URL / Pokemon Cries
-    if (soundName.startsWith('http') || soundName.endsWith('.mp3') || soundName.endsWith('.ogg')) {
+    if (safeSoundName.startsWith('http') || safeSoundName.endsWith('.mp3') || safeSoundName.endsWith('.ogg')) {
         try {
             const audio = new Audio(soundName);
             audio.volume = volume;
@@ -51,7 +62,7 @@ function playSound(soundName, volume = 0.3) {
 
         const now = audioContext.currentTime;
 
-        switch (soundName) {
+        switch (safeSoundName) {
             case 'click':
                 createOsc(440, 'triangle', now, 0.1, 0.1);
                 createOsc(880, 'sine', now, 0.05, 0.05);
@@ -155,8 +166,8 @@ function playSound(soundName, volume = 0.3) {
 
         // Add Haptic Feedback
         if ('vibrate' in navigator) {
-            if (['success', 'victory', 'powerUp'].includes(soundName)) navigator.vibrate(50);
-            if (soundName === 'error') navigator.vibrate([50, 50, 50]);
+            if (['success', 'victory', 'powerUp'].includes(safeSoundName)) navigator.vibrate(50);
+            if (safeSoundName === 'error') navigator.vibrate([50, 50, 50]);
         }
     } catch (e) {
         console.warn('Sound error:', e);

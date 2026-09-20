@@ -10,12 +10,12 @@
             <p class="text-gray-400 text-xs sm:text-sm mb-4">Requires <span id="hintPenaltyTime"
                     class="font-bold">60</span>s processing time. Stay on screen.</p>
             <div class="flex gap-2 sm:gap-3">
-                <button onclick="confirmHintRequest()" onmousedown="playSound('click')"
+                <button type="button" onclick="confirmHintRequest()" onmousedown="playSound('click')"
                     class="bg-yellow-600 text-black font-bold flex-1 py-3 sm:py-4 rounded-lg text-sm sm:text-base hover:bg-yellow-700 transition-colors min-h-[44px]">
                     PROCEED
                 </button>
-                <button onclick="cancelHintRequest()" onmousedown="playSound('click')"
-                    class="hidden \\bg-gray-800 text-white flex-1 py-3 sm:py-4 rounded-lg text-sm sm:text-base hover:bg-gray-700 transition-colors min-h-[44px]">
+                <button type="button" onclick="cancelHintRequest()" onmousedown="playSound('click')"
+                    class="bg-gray-800 text-white flex-1 py-3 sm:py-4 rounded-lg text-sm sm:text-base hover:bg-gray-700 transition-colors min-h-[44px]">
                     CANCEL
                 </button>
             </div>

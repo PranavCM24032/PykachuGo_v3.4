@@ -1027,17 +1027,14 @@
                 const lastActiveStr = formatTime(lvlData.lastActive);
                 const solveTimeStr = formatTime(lvlData.solveTime);
 
-                let statusBadge = '<span class="text-blue-400">ACTIVE</span>';
-                if (lvlData.status === 'SOLVED') statusBadge = '<span class="text-emerald-400 font-bold">SOLVED</span>';
-                else if (lvlData.status === 'RETRYING') statusBadge = '<span class="text-red-400 font-bold animate-pulse">RETRYING</span>';
-                else if (lvlData.status === 'UNLOCKED') statusBadge = '<span class="text-indigo-400">UNLOCKED</span>';
-                else if (lvlData.status === 'LOCKED') statusBadge = '<span class="text-amber-400">LOCKED</span>';
-                else if (lvlData.status === 'ABANDONED') statusBadge = '<span class="text-orange-400">ABANDONED</span>';
-                else if (lvlData.status === 'IDLE') statusBadge = '<span class="text-slate-500">IDLE</span>';
-
                 const hintBadge = lvlData.hintUsed ?
                     '<span class="text-yellow-400 font-bold">YES</span>' :
                     '<span class="text-slate-600">NO</span>';
+
+                const adminStatus = lvlData.status === 'SOLVED' ? 'SOLVED' : 'UNSOLVED';
+                const statusBadge = adminStatus === 'SOLVED'
+                    ? '<span class="text-emerald-400 font-bold">SOLVED</span>'
+                    : '<span class="text-red-400 font-bold">UNSOLVED</span>';
 
                 const netPts = (parseInt(lvlData.pointsEarned || 0, 10) - parseInt(lvlData.pointsLost || 0, 10));
 

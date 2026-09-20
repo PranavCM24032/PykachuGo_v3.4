@@ -61,6 +61,12 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     currentTeamTid = nextTeamTid;
     currentMissionLevel = missionLevel;
     currentLanguage = codeLanguage;
+    saveLoginState({
+        name: foundTeam.team,
+        securityKey: securityKeyInput,
+        missionLevel,
+        language: codeLanguage
+    });
     resetHintForNewTeam();
     loadTeamScoreState();
     gameStartTime = new Date();

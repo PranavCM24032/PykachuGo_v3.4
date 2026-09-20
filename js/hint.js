@@ -210,9 +210,6 @@ function startHintPenalty() {
     // Start Monitoring
     startHintTabMonitoring();
 
-    // One hint = one local bump (shipped with the puzzle's single summary)
-    notepadBump('hint');
-
     playSound('hintStart');
 }
 
@@ -384,9 +381,12 @@ function showHint() {
 
     hintDisplayed = true;
 
-    // Mark hint as used for this team
+    // Mark hint as used only when the actual hint is revealed after the penalty.
     if (currentPuzzle) {
         const firstUse = !currentPuzzle.hintUsed;
+        if (firstUse) {
+            notepadBump('hint');
+        }
         currentPuzzle.hintUsed = true;
         saveHintState();
         // Flag the hint on the sheet right away. The notepad summary carries it
