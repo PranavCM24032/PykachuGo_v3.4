@@ -1,26 +1,28 @@
-(function () {
-    var includes = document.querySelectorAll('[data-include]');
-    var count = includes.length;
-    var loaded = 0;
+(async function () {
+    const includes = Array.from(document.querySelectorAll('[data-include]'));
 
-    function loadNext() {
-        if (loaded >= count) return;
-        var el = includes[loaded];
-        var url = el.getAttribute('data-include');
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, false);
-        try {
-            xhr.send();
-            if (xhr.status === 200 || xhr.status === 0) {
-                el.insertAdjacentHTML('afterend', xhr.responseText);
-            }
-        } catch (e) {
-            console.error('Include failed:', url, e);
-        }
-        el.remove();
-        loaded++;
-        loadNext();
+    if (includes.length > 0) {
+        // Fetch all remaining partials in parallel if any are present
+        const results = await Promise.all(
+            includes.map(async (el) => {
+                const url = el.getAttribute('data-include');
+                try {
+                    const response = await fetch(url);
+                    return response.ok ? await response.text() : '';
+                } catch (e) {
+                    console.error('Include failed:', url, e);
+                    return '';
+                }
+            })
+        );
+
+        includes.forEach((el, i) => {
+            if (results[i]) el.insertAdjacentHTML('afterend', results[i]);
+            el.remove();
+        });
     }
 
-    loadNext();
+    // Signal to all scripts that the DOM partials are ready
+    window._includesReady = true;
+    document.dispatchEvent(new Event('includes:ready'));
 })();

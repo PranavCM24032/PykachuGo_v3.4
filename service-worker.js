@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v2';
+const CACHE_NAME = 'pykachu-go-v3.1';
 const ASSETS = [
     'admin.html',
     'index.html',
@@ -30,6 +30,8 @@ const ASSETS = [
     'js/main.js',
     'js/security.js',
     'js/include.js',
+    'js/rate-limiter.js',
+    'js/notepad.js',
     'html/step0.html',
     'html/step1.html',
     'html/step2.html',
@@ -77,17 +79,38 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Network-first: always try the server (so fixes propagate immediately),
-    // refresh the cache on success, and fall back to cache when offline.
+    const url = new URL(event.request.url);
+
+    // External APIs and CDNs — never intercept, let browser handle natively.
+    const networkOnlyHosts = [
+        'script.google.com', 'googleapis.com', 'jsdelivr.net',
+        'youtube.com', 'ytimg.com', 's.ytimg.com',
+        'raw.githubusercontent.com', 'fonts.googleapis.com', 'fonts.gstatic.com'
+    ];
+    if (networkOnlyHosts.some(h => url.hostname.includes(h))) return;
+
+    // Cache-first for all local static assets: instant serve + background refresh.
     event.respondWith(
-        fetch(event.request)
-            .then((response) => {
+        caches.match(event.request).then((cached) => {
+            if (cached) {
+                // Serve from cache immediately; refresh in background so next visit is current.
+                fetch(event.request)
+                    .then((response) => {
+                        if (response && response.status === 200 && response.type === 'basic') {
+                            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
+                        }
+                    })
+                    .catch(() => {});
+                return cached;
+            }
+            // Not in cache yet: fetch, cache, and return.
+            return fetch(event.request).then((response) => {
                 if (response && response.status === 200 && response.type === 'basic') {
                     const copy = response.clone();
                     caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
                 }
                 return response;
-            })
-            .catch(() => caches.match(event.request))
+            }).catch(() => caches.match(event.request));
+        })
     );
 });

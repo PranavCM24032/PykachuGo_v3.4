@@ -110,7 +110,11 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
                 activatePuzzle(urlLockedPuzzle, via);
                 showStep(3);
             }
+        } else if (!isDifferentTeam) {
+            // Same team re-logging in: resume exactly where they left off
+            resumeToLastStep();
         } else {
+            // New/different team: start fresh at the scanner screen
             showStep(2);
         }
     }, 500);

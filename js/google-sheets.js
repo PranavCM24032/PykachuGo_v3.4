@@ -3,6 +3,11 @@
 // ==============================
 const SESSION_BUFFER_KEY = 'pykachuSessionBuffer';
 
+// In-memory dirty flag: avoids a localStorage read every 10s when buffer is empty.
+let _bufferDirty = (() => {
+    try { return JSON.parse(localStorage.getItem(SESSION_BUFFER_KEY) || '[]').length > 0; } catch { return false; }
+})();
+
 // Stable id per event so a buffered retry is recognised and ignored by the
 // backend (prevents duplicate point awards when a response was lost).
 function generateEventId() {
@@ -33,6 +38,7 @@ function addToSessionBuffer(payload) {
     buffer.push(payload);
     try {
         localStorage.setItem(SESSION_BUFFER_KEY, JSON.stringify(buffer));
+        _bufferDirty = true;
     } catch (e) {
         console.warn('[Buffer] Could not save to localStorage:', e);
     }
@@ -41,6 +47,7 @@ function addToSessionBuffer(payload) {
 function clearSessionBuffer() {
     try {
         localStorage.removeItem(SESSION_BUFFER_KEY);
+        _bufferDirty = false;
     } catch (e) { }
 }
 
@@ -224,7 +231,7 @@ async function fetchTeamState(tid) {
 
 // Auto-flush buffer every 10 seconds for extra reliability
 setInterval(() => {
-    if (isValidTeam()) {
+    if (_bufferDirty && isValidTeam()) {
         flushSessionBuffer();
     }
 }, 10000);

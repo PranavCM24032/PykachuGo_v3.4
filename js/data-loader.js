@@ -24,7 +24,7 @@ const AssetPreloader = {
             puzzles.forEach(p => {
                 if (p.pokemonId) {
                     this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.pokemonId}.png`);
-                    fetch(`https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${p.pokemonId}.ogg`, { mode: 'no-cors' }).catch(() => { });
+                    // Cries load on-demand at solve time — no bulk prefetch needed
                 }
                 if (p.badgeId) {
                     this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${p.badgeId}.png`);

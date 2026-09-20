@@ -14,14 +14,18 @@ const SecuritySystem = {
         overlayMessage: 'ENCRYPTION LOCK: SIGNAL LOST'
     },
 
+    // Cached element reference — avoids querySelector on every blur/focus event
+    _screen: null,
+
     init() {
         console.log("🛡️ [Security] Extreme Blackout Mode Active");
+        this._screen = document.querySelector(this.config.mainContainer);
         this.createGlobalOverlay();
         this.bindHardenedEvents();
     },
 
     createGlobalOverlay() {
-        const screen = document.querySelector(this.config.mainContainer);
+        const screen = this._screen;
         if (!screen) return;
 
         // Create the full-screen blackout barrier
@@ -38,7 +42,7 @@ const SecuritySystem = {
     },
 
     activateLockdown() {
-        const screen = document.querySelector(this.config.mainContainer);
+        const screen = this._screen;
         document.body.classList.add(this.config.stealthClass);
         if (screen) {
             screen.classList.add(this.config.stealthClass);
@@ -49,7 +53,7 @@ const SecuritySystem = {
     },
 
     releaseLockdown() {
-        const screen = document.querySelector(this.config.mainContainer);
+        const screen = this._screen;
         document.body.classList.remove(this.config.stealthClass);
         if (screen) {
             // Check if we are actually allowed to release (not still hidden)

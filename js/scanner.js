@@ -18,8 +18,8 @@ async function startQRScanner() {
         videoStream = await navigator.mediaDevices.getUserMedia({
             video: {
                 facingMode: 'environment',
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
                 frameRate: { ideal: 30 }
             }
         });
@@ -245,7 +245,7 @@ function startQRCodeDetection() {
         } catch (error) {
             console.error('[Scanner] Critical Error:', error);
         }
-    }, 250);
+    }, 300);
 
     window.cleanupOCR = () => {
         if (ocrWorker) ocrWorker.terminate();

@@ -1,4 +1,4 @@
-﻿@keyframes shake {
+@keyframes shake {
 
     0%,
     100% {
@@ -59,8 +59,35 @@
         transform: scale(1.2);
     }
 }
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .animate-spin-slow {
     animation: spin 10s linear infinite;
+}
+
+.animate-scanline {
+    animation: qr-scanline 2s ease-in-out infinite;
+    position: absolute;
+    will-change: top, opacity;
+}
+
+@keyframes qr-scanline {
+    0% {
+        top: 0%;
+        opacity: 0.3;
+    }
+    50% {
+        top: 98%;
+        opacity: 1;
+    }
+    100% {
+        top: 0%;
+        opacity: 0.3;
+    }
 }
 
 .premium-glow {

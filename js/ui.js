@@ -47,6 +47,9 @@ function showToast(message, type = 'info') {
 
 function triggerShake(elementId) {
     const el = document.getElementById(elementId);
+    if (!el) return;
+    el.classList.remove('animate-shake');
+    void el.offsetWidth; // Force reflow to reliably restart the animation
     el.classList.add('animate-shake');
     setTimeout(() => el.classList.remove('animate-shake'), 500);
 }

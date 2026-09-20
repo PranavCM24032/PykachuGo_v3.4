@@ -12,6 +12,8 @@
 // Mutable in-memory mirror of the notebook so every mutation targets the same
 // object that gets persisted (fresh parses are read-only snapshots).
 let _notebookMirror = null;
+// Skip the 20s flush iteration when nothing has changed since the last check.
+let _notebookDirty = false;
 
 function getPuzzleNotebook() {
     _notebookMirror = _notebookMirror || (() => {
@@ -72,6 +74,7 @@ function notepadStart() {
     n.unlockedAt = n.unlockedAt || Date.now();
     n.lastActivityAt = Date.now();
     n.dirty = true;
+    _notebookDirty = true;
     savePuzzleNotebook(notebook);
 }
 
@@ -88,6 +91,7 @@ function notepadBump(field) {
     else if (field === 'tabswitch') n.tabSwitches += 1;
     n.lastActivityAt = Date.now();
     n.dirty = true;
+    _notebookDirty = true;
     savePuzzleNotebook(notebook);
 }
 
@@ -151,7 +155,7 @@ function flushDirtyPuzzleNotebooks() {
 }
 
 setInterval(() => {
-    if (typeof currentTeam !== 'undefined' && currentTeam) {
+    if (_notebookDirty && typeof currentTeam !== 'undefined' && currentTeam) {
         flushDirtyPuzzleNotebooks();
     }
 }, 20000);

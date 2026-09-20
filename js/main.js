@@ -136,13 +136,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateTeamStatus();
 
-    // Refresh resume: returning teams skip rules/registration and pick up
-    // right where they left off (showStep → saveGameState persists the step).
-    if (currentTeam) {
-        resumeToLastStep();
-    } else {
-        showStep(0);
-    }
+    // Always start at step 0 (rules) so every new team sees the welcome screen.
+    // If a returning team's name is saved in localStorage, pre-fill the login
+    // form so they only need to enter their security key and hit Submit.
+    // This prevents a previous team's active session from bleeding into a fresh
+    // login attempt on a shared device.
+    prefillLoginIfReturning();
+    showStep(0);
 
     // Auto-play memes for ?memid=M01 deep links (overlays the start screen)
     if (meme) {
@@ -191,7 +191,31 @@ function resumeToLastStep() {
         showStep(2); // scanner / next-signal loop
         return;
     }
-    showStep(0);
+    showStep(2); // safe default for a returning logged-in team
+}
+
+// ==============================
+// PRE-FILL LOGIN
+// When a returning team has data saved, populate the team name so they only
+// need to enter their security key. This is UX-only — they must still submit.
+// ==============================
+function prefillLoginIfReturning() {
+    if (!currentTeam) return;
+    try {
+        const teamNameInput = document.getElementById('teamName');
+        if (teamNameInput && !teamNameInput.value) {
+            teamNameInput.value = currentTeam;
+        }
+        const langSelect = document.getElementById('codeLanguage');
+        if (langSelect && currentLanguage) {
+            langSelect.value = currentLanguage;
+        }
+        const missionSelect = document.getElementById('missionLevel');
+        const savedTeamInfo = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.teamInfo) || '{}');
+        if (missionSelect && savedTeamInfo.missionLevel) {
+            missionSelect.value = savedTeamInfo.missionLevel;
+        }
+    } catch (e) { }
 }
 
 // ==============================
