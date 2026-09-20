@@ -41,8 +41,24 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         return;
     }
 
+    const previousTeamKey = getTeamStorageKey();
+    const nextTeamTid = foundTeam.tid || '';
+    const nextTeamKey = nextTeamTid || foundTeam.team;
+    const isDifferentTeam = Boolean(previousTeamKey && previousTeamKey !== nextTeamKey);
+
+    // A browser can be shared by multiple teams. Do not carry the previous
+    // team's active puzzle, screen, or session into a new team's login.
+    if (isDifferentTeam) {
+        currentPuzzle = null;
+        urlLockedPuzzle = null;
+        currentStep = 1;
+        tabSwitchCount = 0;
+        sessionId = generateSessionId();
+        localStorage.removeItem(CONFIG.STORAGE_KEYS.gameState);
+    }
+
     currentTeam = foundTeam.team;
-    currentTeamTid = foundTeam.tid || '';
+    currentTeamTid = nextTeamTid;
     currentMissionLevel = missionLevel;
     currentLanguage = codeLanguage;
     resetHintForNewTeam();
@@ -52,6 +68,10 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     if (!sessionId) {
         sessionId = generateSessionId();
     }
+
+    // Sync progress for a team signing in on a different device as well.
+    const serverState = await fetchTeamState(currentTeamTid);
+    if (serverState) applyServerTeamState(serverState);
 
     localStorage.setItem(CONFIG.STORAGE_KEYS.teamInfo, JSON.stringify({
         name: currentTeam,
@@ -201,7 +221,7 @@ function createNextLocationCard(puzzle) {
             <div class="flex-1 text-left min-w-0">
                 <span class="text-yellow-400/80 text-[8px] sm:text-[9px] uppercase tracking-widest font-black block">NEXT
                     LOCATION</span>
-                <p class="font-pixel text-white leading-tight break-words mt-0.5 text-xs sm:text-sm">${(puzzle.locationClue || 'NO SIGNAL SOURCE').toUpperCase()}</p>
+                <p class="font-pixel text-white leading-tight break-words mt-0.5 text-xs sm:text-sm">${escapeHTML((puzzle.locationClue || 'NO SIGNAL SOURCE').toUpperCase())}</p>
             </div>
         </div>
     `;

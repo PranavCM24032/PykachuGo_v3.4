@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v1';
+const CACHE_NAME = 'pykachu-go-v2';
 const ASSETS = [
     'admin.html',
     'index.html',
@@ -27,7 +27,6 @@ const ASSETS = [
     'js/penalty.js',
     'js/hint.js',
     'js/game.js',
-    'js/fireworks.js',
     'js/main.js',
     'js/security.js',
     'js/include.js',

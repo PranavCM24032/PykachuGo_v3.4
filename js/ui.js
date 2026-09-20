@@ -1,6 +1,12 @@
 // ==============================
 // UTILITY FUNCTIONS
 // ==============================
+function escapeHTML(value) {
+    const element = document.createElement('div');
+    element.textContent = value == null ? '' : String(value);
+    return element.innerHTML;
+}
+
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     const screen = document.querySelector('.crt-screen');

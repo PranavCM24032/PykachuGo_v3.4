@@ -490,6 +490,18 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
+            const adminPassword = window.prompt('Enter the admin panel password:');
+            if (adminPassword !== 'pykachugo-26') {
+                document.body.innerHTML = `
+                    <main class="min-h-screen grid place-items-center bg-slate-950 p-6 text-center text-slate-100">
+                        <div>
+                            <p class="font-mono text-lg font-bold text-red-400">ACCESS DENIED</p>
+                            <p class="mt-2 text-sm text-slate-400">Incorrect administrator password.</p>
+                        </div>
+                    </main>`;
+                return;
+            }
+
             const storedVersion = localStorage.getItem('pykachuVersion');
             if (storedVersion !== CONFIG.VERSION) {
                 localStorage.removeItem('pykachuLogs');
@@ -1133,6 +1145,9 @@ function wipeData() {
             if (!confirm('RESET EVERYTHING? This wipes ALL rows from the Google Sheets DB (Registration + L1/L2/L3).')) return;
             if (!confirm('Are you ABSOLUTELY sure? Every player\'s saved progress (queue, score, hints) will also be erased on their next app load. This CANNOT be undone.')) return;
 
+            const adminToken = prompt('Enter the administrator reset token:');
+            if (!adminToken) return;
+
             const status = document.getElementById('systemStatus');
             const lastUpdated = document.getElementById('lastUpdated');
             stopPolling();
@@ -1148,7 +1163,7 @@ function wipeData() {
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({
                         action: 'RESET_ALL',
-                        token: CONFIG.TOKEN,
+                        adminToken,
                         timestamp: new Date().toISOString()
                     })
                 });

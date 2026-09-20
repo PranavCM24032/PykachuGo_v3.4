@@ -82,15 +82,6 @@ function showStep(stepNumber) {
         }
     }
 
-    if (stepNumber === 4) {
-        // Fireworks celebrate the solve once the step has faded in.
-        setTimeout(() => {
-            if (typeof startPointBlastSequence === 'function') {
-                startPointBlastSequence();
-            }
-        }, 350);
-    }
-
     if (stepNumber === 3) {
         isPuzzleActive = true;
         startTabMonitoring();

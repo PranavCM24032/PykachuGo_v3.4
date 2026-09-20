@@ -25,7 +25,16 @@ var GAME_STEP_ACTIONS = [
   'PUZZLE_ABANDONED'
 ];
 
-var ACCESS_TOKEN = 'pyk2026@secGX42';
+// Configure these in Apps Script → Project Settings → Script properties.
+// PLAYER_TOKEN is used by player telemetry; ADMIN_TOKEN is used only for
+// destructive admin actions and must never be shipped in runtime-config.js.
+function getPlayerToken() {
+  return PropertiesService.getScriptProperties().getProperty('PLAYER_TOKEN') || '';
+}
+
+function getAdminToken() {
+  return PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN') || '';
+}
 
 // Server-side per-team request budget. The client already spaces calls through
 // its own sliding-window limiter, but this guard caps any single team even if a
@@ -122,7 +131,32 @@ function doPost(e) {
 
     var data = JSON.parse(e.postData.contents);
 
-    if (!data.token || data.token !== ACCESS_TOKEN) {
+    // RESET_ALL has a separate credential: the player-facing telemetry token
+    // must never be enough to wipe every team record.
+    if (data.action === 'RESET_ALL') {
+      var adminToken = getAdminToken();
+      if (!adminToken || data.adminToken !== adminToken) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "unauthorized" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      var sheetsToWipe = ['Registration', 'L1', 'L2', 'L3'];
+      sheetsToWipe.forEach(function(name) {
+        var sheet = ss.getSheetByName(name);
+        if (sheet && sheet.getLastRow() > 1) {
+          sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+        }
+      });
+      var resetProps = PropertiesService.getScriptProperties();
+      var resetEpoch = parseInt(resetProps.getProperty('gameEpoch') || '0', 10) + 1;
+      resetProps.setProperty('gameEpoch', resetEpoch.toString());
+      SpreadsheetApp.flush();
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", epoch: resetEpoch }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var playerToken = getPlayerToken();
+    if (!playerToken || data.token !== playerToken) {
       return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "unauthorized" }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -169,22 +203,6 @@ function doPost(e) {
     }
 
     // ── RESET ALL: wipe every sheet row (keep headers) + bump game epoch ──
-    if (data.action === 'RESET_ALL') {
-      var sheetsToWipe = ['Registration', 'L1', 'L2', 'L3'];
-      sheetsToWipe.forEach(function(name) {
-        var sheet = ss.getSheetByName(name);
-        if (sheet && sheet.getLastRow() > 1) {
-          sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
-        }
-      });
-      var props = PropertiesService.getScriptProperties();
-      var epoch = parseInt(props.getProperty('gameEpoch') || '0', 10) + 1;
-      props.setProperty('gameEpoch', epoch.toString());
-      SpreadsheetApp.flush();
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", epoch: epoch }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-
     // ── Per-team budget: even a modified client can't flood the script ──
     if (!checkTeamRate(data.tid || data.teamName || '')) {
       // Acknowledge so the client clears its immediate buffer — no retry storm —
@@ -581,7 +599,8 @@ function ensureSheetsExist(ss) {
 // Serves clean aggregated JSON data to the Admin Dashboard
 function doGet(e) {
   try {
-    if (!e.parameter.token || e.parameter.token !== ACCESS_TOKEN) {
+    var playerToken = getPlayerToken();
+    if (!playerToken || !e.parameter.token || e.parameter.token !== playerToken) {
       return ContentService.createTextOutput(JSON.stringify({ error: true, message: "unauthorized" }))
         .setMimeType(ContentService.MimeType.JSON);
     }

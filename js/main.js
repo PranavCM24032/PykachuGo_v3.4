@@ -65,10 +65,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn('Epoch check failed (offline?). Keeping saved progress:', e);
     }
 
-    if (!sessionId) {
-        sessionId = generateSessionId();
-    }
-
     // Initialize with empty state for a fresh start
     currentTeam = "";
     currentTeamTid = "";
@@ -77,14 +73,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     urlLockedPuzzle = null;
     currentLanguage = "PYTHON";
 
-    // Restore language from saved session
+    // Restore the returning team's identity and session.
     try {
         const savedTeamInfo = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.teamInfo) || '{}');
         if (savedTeamInfo.language) currentLanguage = savedTeamInfo.language;
         if (savedTeamInfo.missionLevel) currentMissionLevel = savedTeamInfo.missionLevel;
         if (savedTeamInfo.tid) currentTeamTid = savedTeamInfo.tid;
         if (savedTeamInfo.name) currentTeam = savedTeamInfo.name;
+        if (savedTeamInfo.sessionId) sessionId = savedTeamInfo.sessionId;
     } catch (e) { }
+
+    if (!sessionId) {
+        sessionId = generateSessionId();
+    }
 
     // Load the returning team's saved queue/solved/score so the deep-link
     // gate below can correctly allow puzzles they have legitimately unlocked.
@@ -102,11 +103,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Restore puzzle progression so the chain gate works across page reloads
     try {
         const savedState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.gameState) || '{}');
-        if (savedState.currentPuzzleId) {
+        const savedStateMatchesTeam = savedState.currentTeamTid
+            ? savedState.currentTeamTid === currentTeamTid
+            : savedState.currentTeam === currentTeam;
+
+        if (savedStateMatchesTeam && savedState.currentPuzzleId) {
             const savedPuzzle = PUZZLES.find(p => p.id === Number(savedState.currentPuzzleId));
             if (savedPuzzle) currentPuzzle = savedPuzzle;
         }
-        if (savedState.urlLockedPuzzleId) {
+        if (savedStateMatchesTeam && savedState.urlLockedPuzzleId) {
             const savedLocked = PUZZLES.find(p => p.id === Number(savedState.urlLockedPuzzleId));
             if (savedLocked && isPuzzleAllowed(savedLocked)) urlLockedPuzzle = savedLocked;
         }

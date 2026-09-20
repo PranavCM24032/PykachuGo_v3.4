@@ -732,6 +732,11 @@ GOOGLE_SCRIPT_TOKEN=YOUR_GOOGLE_SCRIPT_TOKEN
 GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit
 ```
 
+In the Apps Script project's **Script properties**, set `PLAYER_TOKEN` to the
+same value as `GOOGLE_SCRIPT_TOKEN`, then set a separate `ADMIN_TOKEN`. The
+admin token is prompted for only during a full reset and must not be placed in
+`.env`, GitHub Actions secrets, or `runtime-config.js`.
+
 `npm run serve` generates the ignored `js/runtime-config.js` from `.env` (via
 `scripts/generate-runtime-config.cjs`) and loads it before both the player and
 admin app. The generated file is still delivered to browsers, so it is

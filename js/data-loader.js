@@ -68,8 +68,6 @@ async function loadTeams() {
         }
         TEAMS = await response.json();
         console.log(`Loaded ${TEAMS.length} teams from teams.json`);
-        console.log('Teams:', TEAMS); // Debug log to verify
-
         // Validate that we have teams
         if (TEAMS.length === 0) {
             throw new Error('No teams found in teams.json');
