@@ -1,6 +1,9 @@
 // ==============================
 // GAME FLOW FUNCTIONS
 // ==============================
+let stepTransitionTimer = null;
+let stepTransitionId = 0;
+
 function showStep(stepNumber) {
     console.log('Showing step:', stepNumber);
 
@@ -11,6 +14,13 @@ function showStep(stepNumber) {
         : (document.getElementById(`step${stepNumber}`) || (Number(stepNumber) === 4 ? document.getElementById('step5') : null));
 
     if (!targetStep) return;
+
+    // Cancel any older transition so a rapid navigation cannot reveal a stale step.
+    if (stepTransitionTimer) {
+        clearTimeout(stepTransitionTimer);
+        stepTransitionTimer = null;
+    }
+    const transitionId = ++stepTransitionId;
 
     // Snappy Transition
     const fadeOutMs = 120;
@@ -26,7 +36,10 @@ function showStep(stepNumber) {
         }
     });
 
-    setTimeout(() => {
+    stepTransitionTimer = setTimeout(() => {
+        stepTransitionTimer = null;
+        if (transitionId !== stepTransitionId) return;
+
         // Hard-remove every active state, then activate ONLY the target.
         // This guarantees exactly one step is ever rendered at a time.
         steps.forEach(step => step.classList.remove('active'));
@@ -36,11 +49,11 @@ function showStep(stepNumber) {
         targetStep.style.transform = 'translateY(10px)';
         targetStep.style.transition = `all ${fadeInMs}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 
-        // Trigger reflow
-        targetStep.offsetHeight;
-
-        targetStep.style.opacity = '1';
-        targetStep.style.transform = 'translateY(0)';
+        requestAnimationFrame(() => {
+            if (transitionId !== stepTransitionId) return;
+            targetStep.style.opacity = '1';
+            targetStep.style.transform = 'translateY(0)';
+        });
     }, fadeOutMs);
 
     currentStep = stepNumber;
