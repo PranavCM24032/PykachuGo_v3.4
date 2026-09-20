@@ -23,8 +23,8 @@ function showStep(stepNumber) {
     const transitionId = ++stepTransitionId;
 
     // Snappy Transition
-    const fadeOutMs = 120;
-    const fadeInMs = 220;
+    const fadeOutMs = 0;
+    const fadeInMs = 140;
 
     // Fade out all currently-active steps (except the target, which may already
     // be active on first paint — avoids the initial load flash).
@@ -45,6 +45,7 @@ function showStep(stepNumber) {
         steps.forEach(step => step.classList.remove('active'));
 
         targetStep.classList.add('active');
+        targetStep.style.animation = 'none';
         targetStep.style.opacity = '0';
         targetStep.style.transform = 'translateY(10px)';
         targetStep.style.transition = `all ${fadeInMs}ms cubic-bezier(0.4, 0, 0.2, 1)`;
