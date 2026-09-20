@@ -26,6 +26,8 @@ dashboard** livetracks every team.
   CRT screen; installable PWA shell.
 - **Dual-language riddles** — every puzzle ships a Python (`questionPython`) and
   a C++ (`questionCpp`) version; teams pick a language at registration.
+- **Manual login on reload** — team name and security key are never autofilled;
+  players must submit the login form again after a page reload.
 - **Branching puzzle graph** — each puzzle declares what it unlocks via
   `nextPuzzleId`, so progression is a forward-linked DAG (see
   [`assets/docs/PUZZLE_LINKING_SYSTEM.md`](assets/docs/PUZZLE_LINKING_SYSTEM.md)).
@@ -48,6 +50,8 @@ dashboard** livetracks every team.
   **locally** in a per-puzzle notebook and ship as **one request** on solve.
 - **Server-side team state** — every solve leaves its own permanent `L1`/`L2`/`L3`
   row carrying the team's Solved + Unlocked queues and running Total Score.
+- **Smooth screen transitions** — rapid navigation cancels stale transitions so
+  an older page cannot flash back over the current screen.
 - **Sliding-window rate limiter** — protects the Apps Script endpoint from quota
   busts (see [Rate limiting](#rate-limiting)).
 - **GitHub Actions Auto-Deploy** — push to `main` → GitHub Pages.
@@ -158,7 +162,7 @@ flowchart TD
         LOAD --> EPOCH{"GET_EPOCH:<br/>server epoch > local?"}
         EPOCH -- "Yes (reset)" --> WIPE["Wipe localStorage<br/>(score · queue · progress)"]
         EPOCH -- "No" --> RESTORE
-        WIPE --> RESTORE["Restore saved team /<br/>language / current puzzle"]
+        WIPE --> RESTORE["Require fresh manual login<br/>then restore progress"]
         RESTORE --> DL["Resolve deep link<br/>(?linkid= / ?memid= / path)"]
         DL --> DLM{"Meme linked?"}
         DLM -- "Yes" --> MEMEPLAY["Show meme overlay"]
@@ -585,7 +589,7 @@ flowchart TD
         A -- "UNLOCK_FAILED" --> UFL["status: LOCKED"]
         A -- "QR_BLOCKED" --> QBL["status: BLOCKED"]
         A -- "PENALTY_TRIGGERED / PENALTY<br/>/ MALPRACTICE_DETECTED" --> PNL["status: MALPRACTICE<br/>tabSwitches update"]
-        A -- "HINT_REQUESTED / HINT_USED" --> HUS["hintUsed: YES<br/>tabSwitches update"]
+        A -- "HINT_REQUESTED / HINT_USED" --> HUS["hintUsed: 1 or 0<br/>tabSwitches update"]
         SLV --> WROW["Append finalized 15-col row<br/>(in-progress events update<br/>in place — old SOLVED rows<br/>never overwritten)"]
         WA --> WROW
         PUN --> WROW
@@ -699,6 +703,8 @@ Standalone page (own Tailwind build) with live tabs:
 - **LEVEL L1 / L2 / L3** — per-team live status per level
 - **LEADERBOARD** — ranked by Total Score / points
 - **ROSTER LOG** — full team roster with members
+- Level rows show hint usage as `1` (used) or `0` (not used), and status as
+  `SOLVED` or `UNSOLVED`.
 
 The dashboard queries the Apps Script `doGet` endpoint with the runtime token
 and renders aggregated JSON.
