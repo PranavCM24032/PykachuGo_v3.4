@@ -160,8 +160,11 @@ function activatePuzzle(puzzle, unlockedVia) {
     const questionEl = document.getElementById('puzzleQuestion');
     if (questionEl) questionEl.textContent = getPuzzleQuestion(puzzle);
 
-    // Safely update clue text (might be in Step 5 or 4)
-    const clueEl = document.getElementById('locationClue') || document.getElementById('locationClueText');
+    // The current puzzle's locationClue is a hunt clue ("where THIS riddle is").
+    // Only write it to a dedicated current-location slot if present — NEVER into
+    // step 4's next-location card, which renderNextLocations() owns (it resolves
+    // the NEXT locations from nextPuzzleId).
+    const clueEl = document.getElementById('locationClue');
     if (clueEl) clueEl.textContent = puzzle.locationClue;
 
     // Show CSS Pokeball (Mystery State)
@@ -282,9 +285,6 @@ function submitPuzzleAnswer() {
             caughtImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${currentPuzzle.pokemonId}.png`;
         }
 
-        const locationCard = document.getElementById('locationCard');
-        const nextBtn = document.getElementById('nextSignalBtn');
-
         // Show ALL next puzzle locations (graph: nextPuzzleId may branch into many)
         const nextPuzzles = getNextPuzzles(currentPuzzle);
 
@@ -294,17 +294,19 @@ function submitPuzzleAnswer() {
             showStep(4);
             playSound('hologram');
 
+            const nextBtn = document.getElementById('nextSignalBtn');
             if (isEnd) {
-                const locationCard = document.getElementById('locationCard');
-                const nextBtn = document.getElementById('nextSignalBtn');
-                if (locationCard) locationCard.classList.add('hidden');
                 if (nextBtn) nextBtn.classList.add('hidden');
 
                 const completionMessage = document.getElementById('completionMessage');
                 if (completionMessage) {
                     completionMessage.classList.remove('hidden');
 
-                    const levelNum = (currentMissionLevel || "L1").split('_')[0].replace('L', '');
+                    // Prefer the solved puzzle's OWN level (puzzle.json `level`
+                    // field); fall back to the mission level only if missing.
+                    const levelNum = (currentPuzzle && typeof currentPuzzle.level === 'number')
+                        ? currentPuzzle.level
+                        : ((currentMissionLevel || "L1").split('_')[0].replace('L', '') || '1');
                     const levelTitle = document.getElementById('completionLevelTitle');
                     if (levelTitle) levelTitle.textContent = `LEVEL ${levelNum} CHAMPION`;
 
@@ -318,10 +320,13 @@ function submitPuzzleAnswer() {
                 setTimeout(() => flushSessionBuffer(), 100);
                 setTimeout(() => triggerFinalCelebration(), 1500);
             } else {
-                if (locationCard) locationCard.classList.remove('hidden');
                 if (nextBtn) nextBtn.classList.remove('hidden');
-                renderNextLocations(nextPuzzles);
             }
+
+            // Step 4's location card ALWAYS shows the NEXT locations resolved
+            // from nextPuzzleId (never the current puzzle's clue). count 0 →
+            // final puzzle → hides the card entirely.
+            renderNextLocations(nextPuzzles);
 
         }, 500);
 

@@ -319,3 +319,102 @@
         transform: translateY(0);
     }
 }
+
+/* ── Fireworks (layered point-blast on the success screen) ──────────────── */
+.fw-particle {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity, filter;
+    animation: fw-burst 0.95s cubic-bezier(0.1, 0.75, 0.3, 1) forwards;
+}
+
+/* Outward burst → twinkle flare (brighten + grow) → gravity-drop tail */
+@keyframes fw-burst {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+        filter: brightness(1);
+    }
+
+    55% {
+        opacity: 1;
+    }
+
+    75% {
+        transform: translate(var(--dx), var(--dy)) scale(1.25);
+        opacity: 0.95;
+        filter: brightness(2.1);
+    }
+
+    100% {
+        transform: translate(var(--dx), calc(var(--dy) + var(--fall, 22px))) scale(0.15);
+        opacity: 0;
+        filter: brightness(2.6);
+    }
+}
+
+/* White-hot core flash at the burst epicenter */
+.fw-core {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+    animation: fw-core 0.4s ease-out forwards;
+}
+
+@keyframes fw-core {
+    0% {
+        transform: translate(-50%, -50%) scale(0.2);
+        opacity: 1;
+    }
+
+    60% {
+        transform: translate(-50%, -50%) scale(1.6);
+        opacity: 0.85;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(2.6);
+        opacity: 0;
+    }
+}
+
+/* ── Growing success-star field (behind the decryption content) ─────────── */
+#successStarField {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.success-star {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+    /* GPU-only twinkle: scale + opacity (compositor thread, no layout cost) */
+    animation: successStarTwinkle ease-in-out infinite;
+}
+
+@keyframes successStarTwinkle {
+    0%,
+    100% {
+        transform: scale(0.55);
+        opacity: 0;
+    }
+
+    25% {
+        opacity: 0.6;
+    }
+
+    50% {
+        transform: scale(1.15);
+        opacity: 1;
+    }
+
+    75% {
+        opacity: 0.6;
+    }
+}

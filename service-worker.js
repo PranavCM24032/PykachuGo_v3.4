@@ -27,6 +27,7 @@ const ASSETS = [
     'js/penalty.js',
     'js/hint.js',
     'js/game.js',
+    'js/fireworks.js',
     'js/main.js',
     'js/security.js',
     'js/include.js',
