@@ -70,9 +70,9 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     }
 
     // The server snapshot is keyed by TID, so progress follows the user rather
-    // than the device used to log in.
-    const serverState = await fetchTeamState(currentTeamTid);
-    if (serverState) applyServerTeamState(serverState);
+    // than the device used to log in. Do not block the first screen transition
+    // on network latency.
+    const serverStatePromise = fetchTeamState(currentTeamTid);
 
     submitToGoogleSheets('REGISTRATION', {
         teamName: currentTeam,
@@ -87,8 +87,11 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     playSound('powerUp');
     document.getElementById('screen')?.classList.add('premium-glow');
     showFeedback('registrationFeedback', `✓ Welcome back, ${currentTeam}`, 'success');
+    showStep(2);
 
-    setTimeout(() => {
+    serverStatePromise.then(serverState => {
+        if (serverState) applyServerTeamState(serverState);
+
         document.getElementById('screen')?.classList.remove('premium-glow');
         // Universal link: skip QR scan and jump straight to that puzzle
         if (urlLockedPuzzle) {
@@ -104,11 +107,8 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         } else if (!isDifferentTeam) {
             // Same team re-logging in: resume exactly where they left off
             resumeToLastStep();
-        } else {
-            // New/different team: start fresh at the scanner screen
-            showStep(2);
         }
-    }, 500);
+    });
 });
 
 // ==============================
