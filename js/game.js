@@ -44,7 +44,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     const previousTeamKey = getTeamStorageKey();
     const nextTeamTid = foundTeam.tid || '';
     const nextTeamKey = nextTeamTid || foundTeam.team;
-    const isDifferentTeam = Boolean(previousTeamKey && previousTeamKey !== nextTeamKey);
+    const isDifferentTeam = !previousTeamKey || previousTeamKey !== nextTeamKey;
 
     // A browser can be shared by multiple teams. Do not carry the previous
     // team's active puzzle, screen, or session into a new team's login.
@@ -69,19 +69,10 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         sessionId = generateSessionId();
     }
 
-    // Sync progress for a team signing in on a different device as well.
+    // The server snapshot is keyed by TID, so progress follows the user rather
+    // than the device used to log in.
     const serverState = await fetchTeamState(currentTeamTid);
     if (serverState) applyServerTeamState(serverState);
-
-    localStorage.setItem(CONFIG.STORAGE_KEYS.teamInfo, JSON.stringify({
-        name: currentTeam,
-        tid: currentTeamTid,
-        missionLevel,
-        language: currentLanguage,
-        registeredAt: gameStartTime.toISOString(),
-        sessionId: sessionId,
-        currentPuzzle: 0
-    }));
 
     submitToGoogleSheets('REGISTRATION', {
         teamName: currentTeam,

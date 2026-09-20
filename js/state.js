@@ -163,31 +163,20 @@ function hasSolvedPuzzle(puzzleId) {
     return currentTeamSolvedPuzzles.has(puzzleId);
 }
 
-// Merge the state fetched from Google Sheets into memory. The sheet stores the
-// team's current puzzle id + every unlocked puzzle id + score. The derived
-// frontier = unlocked − locally-solved, so refresh resume keeps working without
-// the server maintaining a queue. Empty server rows are ignored.
+// Replace the local snapshot with the state fetched for the logged-in TID. This
+// keeps a device's cached state from granting progress to another user.
 function applyServerTeamState(serverState) {
     if (!serverState || typeof serverState !== 'object') return;
     const solved = (Array.isArray(serverState.solved) ? serverState.solved : [])
         .map(Number).filter(n => Number.isFinite(n));
     const unlocked = (Array.isArray(serverState.unlocked) ? serverState.unlocked : [])
         .map(Number).filter(n => Number.isFinite(n));
-    if (!Number.isFinite(Number(serverState.score)) && unlocked.length === 0 && solved.length === 0) return;
 
     // Repeat-solve deductions are allowed to push the running total below zero,
     // so no lower clamp here — the signed score is restored as-is.
     currentTeamScore = Number(serverState.score || 0);
-    // Solved IDs decide whether a puzzle awards points again. Unlocked IDs are
-    // deliberately kept separate because they only control valid QR jumps.
-    solved.forEach(id => currentTeamSolvedPuzzles.add(id));
-    // Enrich the frontier: anything the sheet says was unlocked that this team
-    // hasn't solved locally yet becomes scannable (no duplicates).
-    for (const id of unlocked) {
-        if (!currentTeamSolvedPuzzles.has(id) && !teamUnlockQueue.includes(id)) {
-            teamUnlockQueue.push(id);
-        }
-    }
+    currentTeamSolvedPuzzles = new Set(solved);
+    teamUnlockQueue = unlocked.filter(id => !currentTeamSolvedPuzzles.has(id));
     saveTeamScoreState();
 }
 
