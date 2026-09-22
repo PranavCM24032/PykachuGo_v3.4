@@ -126,10 +126,22 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+var ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureSheetsExist(ss);
 
-    var data = JSON.parse(e.postData.contents);
+    // Reject malformed JSON bodies cleanly instead of throwing to the caller.
+    var raw = (e && e.postData && e.postData.contents) || '';
+    var data;
+    try {
+      data = JSON.parse(raw);
+    } catch (perr) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "bad json" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (!data || typeof data !== 'object' || !data.action || !data.token) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "missing fields" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
 
     // RESET_ALL has a separate credential: the player-facing telemetry token
     // must never be enough to wipe every team record.
@@ -650,6 +662,10 @@ function doGet(e) {
       var sheet = ss.getSheetByName(sheetName);
       var rows = sheet ? sheet.getDataRange().getValues() : [];
       for (var j = 1; j < rows.length; j++) {
+        // Skip filler rows with no real puzzle id (event arrived before any
+        // puzzle was active / open-row placeholder). They carry no scoring info.
+        var pid = parseInt(rows[j][4] || 0);
+        if (!pid) continue;
         list.push({
           isSummary: true,
           action: 'SUMMARY',
@@ -658,7 +674,7 @@ function doGet(e) {
           teamName: rows[j][2],
           mission: rows[j][3],
           level: sheetName,
-          puzzleId: parseInt(rows[j][4] || 0),
+          puzzleId: pid,
           wrongAttempts: parseInt(rows[j][5] || 0),
           solveTime: rows[j][6],
           hintUsed: isHintFlag(rows[j][7]),
