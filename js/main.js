@@ -307,10 +307,11 @@ function handlePowerTap() {
 
 function logoutCurrentUser() {
     if (!isLoggedIn()) return;
+    loginFlowId++;
 
     // Leaving mid-riddle is captured by flushPuzzleNotebooksOnUnload() below
     // (shared choke point with page-close), which bumps the tally + notepad
-    // before building the PUZZLE_ABANDONED payload — so it lands on the sheet.
+    // before building the PUZZLE_ABANDONED payload ï¿½ so it lands on the sheet.
 
     playSound('click');
     if ('vibrate' in navigator) navigator.vibrate(40);

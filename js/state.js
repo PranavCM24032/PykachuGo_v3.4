@@ -9,6 +9,7 @@ let currentPuzzle = null;
 let currentTeam = "";
 let currentTeamTid = "";
 let sessionId = "";
+let loginFlowId = 0;
 let urlLockedPuzzle = null;
 let currentStep = 1;
 let currentMissionLevel = "";

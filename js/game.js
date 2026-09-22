@@ -9,6 +9,7 @@ function getPuzzleQuestion(puzzle) {
 // ==============================
 document.getElementById('registrationForm').addEventListener('submit', async function (e) {
     e.preventDefault();
+    const thisLoginFlow = ++loginFlowId;
     const teamInput = document.getElementById('teamName').value.trim();
     const securityKeyInput = document.getElementById('teamSecurityKey').value.trim();
     const missionLevel = document.getElementById('missionLevel').value;
@@ -98,6 +99,11 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     showStep(2);
 
     serverStatePromise.then(serverState => {
+        // A slow state response must not navigate a player who has already
+        // scanned a puzzle, solved it, or started another login.
+        if (thisLoginFlow !== loginFlowId || currentTeamTid !== nextTeamTid || currentStep !== 2) {
+            return;
+        }
         if (serverState) applyServerTeamState(serverState);
 
         document.getElementById('screen')?.classList.remove('premium-glow');

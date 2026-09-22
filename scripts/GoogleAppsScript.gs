@@ -51,7 +51,7 @@ function processEvent_(ss, data) {
   var sheet = ss.getSheetByName('L' + level);
   var rows = sheet.getDataRange().getValues();
   var puzzleId = int_(data.puzzleId, 0);
-  var rowIndex = findLevelRow_(rows, teamName, puzzleId);
+  var rowIndex = findLevelRow_(rows, data.tid, teamName, puzzleId);
   var record = rowIndex < 0 ? newRecord_(data, teamName, puzzleId) : readRecord_(rows[rowIndex]);
   applyEvent_(record, action, data, puzzleId);
   var row = recordRow_(record);
@@ -111,7 +111,14 @@ function writeRegistration_(ss, data) {
   var team = clean_(data.teamName);
   var row = [epoch_(), data.tid || '', team, data.mission || '', data.language || '', data.level || levelNumber_(data.puzzleLevel, data.mission) || '', data.sessionId || ''];
   var index = -1;
-  for (var i = 1; i < rows.length; i++) if (teamKey_(rows[i][2]) === teamKey_(team)) { index = i; break; }
+  var incomingTid = clean_(data.tid);
+  for (var i = 1; i < rows.length; i++) {
+    var rowTid = clean_(rows[i][1]);
+    if (incomingTid && rowTid ? rowTid === incomingTid : !incomingTid && !rowTid && teamKey_(rows[i][2]) === teamKey_(team)) {
+      index = i;
+      break;
+    }
+  }
   if (index < 0) sheet.appendRow(row);
   else sheet.getRange(index + 1, 1, 1, row.length).setValues([row]);
 }
@@ -164,7 +171,19 @@ function withLock_(fn) { var lock = LockService.getScriptLock(); if (!lock.tryLo
 function newRecord_(data, teamName, puzzleId) { return { tid: data.tid || '', teamName: teamName, mission: data.mission || '', puzzleId: puzzleId, wrongAttempts: 0, solveTime: '', hintUsed: '0', tabSwitches: 0, points: 0, status: 'UNSOLVED', totalScore: 0, unlockedPuzzles: '', solvedPuzzles: '' }; }
 function readRecord_(row) { return { tid: row[0] || '', teamName: row[1] || '', mission: row[2] || '', puzzleId: int_(row[3], 0), wrongAttempts: int_(row[4], 0), solveTime: row[5] || '', hintUsed: flag_(row[6]) ? '1' : '0', tabSwitches: int_(row[7], 0), points: number_(row[8], 0), status: String(row[9] || '').toUpperCase() === 'SOLVED' ? 'SOLVED' : 'UNSOLVED', totalScore: number_(row[10], 0), unlockedPuzzles: row[11] || '', solvedPuzzles: row[12] || '' }; }
 function recordRow_(r) { return [r.tid, r.teamName, r.mission, r.puzzleId, r.wrongAttempts, r.solveTime, r.hintUsed, r.tabSwitches, sign_(r.points), r.status, r.totalScore, r.unlockedPuzzles, r.solvedPuzzles]; }
-function findLevelRow_(rows, team, puzzleId) { for (var i = 1; i < rows.length; i++) if (teamKey_(rows[i][1]) === teamKey_(team) && int_(rows[i][3], 0) === puzzleId) return i; return -1; }
+function findLevelRow_(rows, tid, team, puzzleId) {
+  var incomingTid = clean_(tid);
+  for (var i = 1; i < rows.length; i++) {
+    if (int_(rows[i][3], 0) !== puzzleId) continue;
+    var rowTid = clean_(rows[i][0]);
+    if (incomingTid && rowTid) {
+      if (rowTid === incomingTid) return i;
+      continue;
+    }
+    if (!incomingTid && !rowTid && teamKey_(rows[i][1]) === teamKey_(team)) return i;
+  }
+  return -1;
+}
 function levelNumber_(value, mission) { var n = int_(value, 0); if (n >= 1 && n <= 3) return n; var m = String(mission || '').match(/L([123])/i); return m ? int_(m[1], 0) : 0; }
 function mergeIds_(existing, incoming, forced) { var ids = []; addIds_(ids, existing); addIds_(ids, incoming); if (forced) addIds_(ids, forced); return ids.join(','); }
 function addIds_(out, value) { String(value || '').split(/[,;]/).forEach(function(v) { var n = int_(v.trim(), 0); if (n > 0 && out.indexOf(n) < 0) out.push(n); }); }
