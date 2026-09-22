@@ -398,6 +398,19 @@ Google Sheets persists two separate queues across `L1`, `L2`, and `L3`:
 The client fetches and combines both queues across all level sheets when a team
 returns. The latest Total Score snapshot is used by the leaderboard.
 
+### Leaderboard totals
+
+The Admin dashboard's **LEADERBOARD** tab aggregates records by TID:
+
+- Selecting **LEVEL 1** uses only `L1` records.
+- Selecting **LEVEL 2** uses only `L2` records.
+- Selecting **LEVEL 3** uses only `L3` records.
+- Selecting **ALL LEVELS** combines `L1` + `L2` + `L3`.
+- Each view shows the selected level's solved-puzzle count, total points,
+  total hints used, and total tab switches.
+- Teams are ranked from highest points to lowest points; TID and team name are
+  prefilled from the roster and activity is overlaid from the Sheets response.
+
 ---
 
 ## 👥 Teams (`data/teams.json`)
@@ -474,26 +487,23 @@ A single Google Apps Script web app that owns one Google Sheets workbook.
 
 | Tab | Schema |
 |-----|--------|
-| `Registration` | Registration Time, TID, Team Name, Mission, Language, Security Key, Level, Session ID |
+| `Registration` | Registration Time, TID, Team Name, Mission, Language, Level, Session ID |
 | `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Puzzle ID, Wrong Attempts, Solve Time, Hint Used, Tab Switches, Points Earned, Points Lost, Status, Total Score, Unlocked Puzzle IDs, Solved Puzzle IDs |
 
-Status column values: `SOLVED`, `ABANDONED` (left mid-puzzle at step 3), or an
-in-progress marker (`RETRYING`, `UNLOCKED`, `BLOCKED`, `LOCKED`, `MALPRACTICE`).
-A row that reached `SOLVED` is sealed — late/retried events (wrong attempt,
-penalty, hint, QR block) may update counters but can never downgrade the status.
+Status column values are `SOLVED` or `UNSOLVED`. Hint usage and tab switches are
+stored in their own columns. A row that reached `SOLVED` is sealed — late or
+retried events cannot downgrade the status.
 
 The backend creates these tabs automatically on first use.
 
 ### Design decisions
 
-- **1 append-log row per (team × puzzle)** — every puzzle gets its own
-  permanent row in the level tab. In-progress events (`WRONG_ATTEMPT`,
-  `HINT_*`, `PENALTY`/`MALPRACTICE`, `UNLOCK_*`) update only that puzzle's row;
-  a `SOLVED` finalizes it. Past records are **never overwritten** — each team's
-  history stays intact.
-- The row key is **Team Name + Puzzle ID** (`findPuzzleRow`); TID is stored in
-  every row for lookup but never used as the key (TIDs change across
-  sessions/devices).
+- **1 row per (TID × puzzle)** — every puzzle gets its own permanent row in the
+  level tab. In-progress events (`WRONG_ATTEMPT`, `HINT_*`,
+  `PENALTY`/`MALPRACTICE`, `UNLOCK_*`) update only that puzzle's row; a
+  `SOLVED` finalizes it.
+- The row is matched by **TID + Puzzle ID**, with team name retained for
+  display and compatibility.
 - Events are routed by puzzle **level** to `L1`/`L2`/`L3` (fallback: team's
   registered mission level).
 - `Registration` events only touch the Registration tab; the security key column is
@@ -508,6 +518,8 @@ The backend creates these tabs automatically on first use.
   Total Score; the client derives the frontier as `unlocked − solved`.
 - Uses `LockService` (`tryLock 20s`) for concurrency safety on every POST.
 - Token auth: every request carries `{ token: GOOGLE_SCRIPT_TOKEN }`.
+- Script properties include `PLAYER_TOKEN`, `ADMIN_TOKEN`, and
+  `SPREADSHEET_ID`; the Apps Script opens the configured spreadsheet by ID.
 
 ### API surface
 
@@ -715,7 +727,12 @@ Standalone page (own Tailwind build) with live tabs:
 - **LEADERBOARD** — ranked by Total Score / points
 - **ROSTER LOG** — full team roster with members
 - Level rows show hint usage as `1` (used) or `0` (not used), and status as
-  `SOLVED`, `ABANDONED`, or `UNSOLVED`.
+  `SOLVED` or `UNSOLVED`.
+- The leaderboard is level-aware: L1, L2, and L3 filters calculate totals from
+  only the selected level, while ALL LEVELS combines all three.
+- Leaderboard columns include solved puzzles, total hints, total tab switches,
+  and total points. Teams are sorted by points descending and matched by TID.
+- Sidebar filters support level, mission type, hint usage, and tab switches.
 
 The dashboard queries the Apps Script `doGet` endpoint with the runtime token
 and renders aggregated JSON.
@@ -725,10 +742,11 @@ and renders aggregated JSON.
 ## 💾 PWA
 
 - `manifest.json` — standalone install, portrait, maskable icon.
-- `service-worker.js` — caches shell + data for offline reloads.
+- `service-worker.js` — caches shell + data for offline reloads using cache
+  version `pykachu-go-v3.2`.
 - Requires HTTPS (GitHub Pages provides it). Bump `CACHE_NAME` in
-  `service-worker.js` when making a release that must replace offline assets
-  immediately.
+  `service-worker.js` and the Admin dashboard `CONFIG.VERSION` when making a
+  release that must replace offline assets and cached admin logs immediately.
 
 ---
 
@@ -750,9 +768,10 @@ GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit
 ```
 
 In the Apps Script project's **Script properties**, set `PLAYER_TOKEN` to the
-same value as `GOOGLE_SCRIPT_TOKEN`, then set a separate `ADMIN_TOKEN`. The
-admin token is prompted for only during a full reset and must not be placed in
-`.env`, GitHub Actions secrets, or `runtime-config.js`.
+same value as `GOOGLE_SCRIPT_TOKEN`, set a separate `ADMIN_TOKEN`, and set
+`SPREADSHEET_ID` to the target workbook ID. The admin token is prompted for only
+during a full reset and must not be placed in `.env`, GitHub Actions secrets, or
+`runtime-config.js`.
 
 `npm run serve` generates the ignored `js/runtime-config.js` from `.env` (via
 `scripts/generate-runtime-config.cjs`) and loads it before both the player and
@@ -766,6 +785,7 @@ uploads the site:
 ```text
 GOOGLE_SCRIPT_URL
 GOOGLE_SCRIPT_TOKEN
+GOOGLE_SHEET_URL
 ```
 
 ---
@@ -785,13 +805,14 @@ Open the local URL printed by `serve`. Camera access generally requires either
 
 ## 🚀 Deployment (GitHub Pages)
 
-1. Configure the Google Apps Script web app and deploy its latest version.
-2. Configure the `GOOGLE_SCRIPT_URL` and `GOOGLE_SCRIPT_TOKEN` API config, then
-   add them as GitHub Actions secrets (repository or `github-pages` env).
+1. Set the Apps Script Script Properties (`PLAYER_TOKEN`, `ADMIN_TOKEN`, and
+   `SPREADSHEET_ID`) and deploy the latest Apps Script version.
+2. Add `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and `GOOGLE_SHEET_URL` as
+   GitHub Actions secrets (repository or `github-pages` environment).
 3. Push to `main` or run the Pages workflow manually (`.github/workflows/static.yml`
    + `jekyll-gh-pages.yml`).
-4. Bump `CACHE_NAME` in `service-worker.js` when making a release that must
-   replace offline assets immediately.
+4. When releasing frontend changes, bump both `CACHE_NAME` in
+   `service-worker.js` and `CONFIG.VERSION` in `admin.html`.
 
 All content (`data/*.json`) is static JSON, so updating puzzles/teams and
 pushing is a live content update.
