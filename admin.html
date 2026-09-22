@@ -352,7 +352,7 @@
                         </button>
                         <button onclick="setSecurityFilter('MALPRACTICE')" id="filterMalpractice"
                             class="security-filter-btn w-full text-left px-3 py-3 sm:py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 transition-all flex justify-between items-center bg-transparent border border-slate-700/50">
-                            <span>Malpractice Detect</span>
+                            <span>Tab Switches</span>
                             <span class="text-red-500 text-[10px]">⚠️</span>
                         </button>
                     </div>
@@ -1049,13 +1049,10 @@
                     '<span class="text-yellow-400 font-bold">1</span>' :
                     '<span class="text-slate-600">0</span>';
 
-                const statusRaw = (lvlData.status || '').toString().trim().toUpperCase();
-                const adminStatus = statusRaw === 'SOLVED' ? 'SOLVED' : (statusRaw === 'ABANDONED' ? 'ABANDONED' : 'UNSOLVED');
+                const adminStatus = (lvlData.status || '').toString().trim().toUpperCase() === 'SOLVED' ? 'SOLVED' : 'UNSOLVED';
                 const statusBadge = adminStatus === 'SOLVED'
                     ? '<span class="text-emerald-400 font-bold">SOLVED</span>'
-                    : adminStatus === 'ABANDONED'
-                        ? '<span class="text-amber-400 font-bold">ABANDONED</span>'
-                        : '<span class="text-red-400 font-bold">UNSOLVED</span>';
+                    : '<span class="text-red-400 font-bold">UNSOLVED</span>';
 
                 const netPts = (parseInt(lvlData.pointsEarned || 0, 10) - parseInt(lvlData.pointsLost || 0, 10));
 
