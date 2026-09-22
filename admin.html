@@ -684,7 +684,7 @@
             const typeFilter = document.getElementById('typeFilter').value;
             const levelFilterDropdown = document.getElementById('levelFilter').value;
 
-            const L_COLS = "30px 88px 55px 1.5fr 76px 34px 36px 36px 36px 70px 62px 46px 46px 1fr";
+            const L_COLS = "30px 88px 1.4fr 90px 76px 34px 36px 36px 36px 70px 60px 46px 46px";
             const REG_COLS = "35px 140px 90px 180px 110px 130px";
             const LB_COLS = "40px 120px 1fr 150px 80px 110px";
             const ROSTER_COLS = "35px 1.4fr 100px 110px 2fr";
@@ -842,18 +842,23 @@
                 leaderboard = leaderboard.filter(t => t.mission && t.mission.includes(typeFilter));
             }
 
+            // HINT / MALPRACTICE filters inspect puzzle records. On the LB tab
+            // no single level is active, so flag a team if ANY level shows the
+            // marker (a nil level array keeps the team hidden).
+            const levelsForFilter = state.activeTab === 'LB' ? ['L1', 'L2', 'L3'] : [state.activeTab];
+            const teamHasHint = (t) => levelsForFilter.some(l => Array.isArray(t.levels[l]) && t.levels[l].some(r => r.hintUsed));
+            const teamHasMalpractice = (t) => levelsForFilter.some(l => Array.isArray(t.levels[l]) && t.levels[l].some(r => (r.tabSwitches || 0) > 0));
+
             if (state.filter === 'HINT') {
                 leaderboard = leaderboard.filter(t => {
                     if (state.activeTab === 'REG') return false;
-                    const recs = t.levels[state.activeTab];
-                    return Array.isArray(recs) && recs.some(r => r.hintUsed);
+                    return teamHasHint(t);
                 });
             }
             if (state.filter === 'MALPRACTICE') {
                 leaderboard = leaderboard.filter(t => {
                     if (state.activeTab === 'REG') return false;
-                    const recs = t.levels[state.activeTab];
-                    return Array.isArray(recs) && recs.some(r => (r.tabSwitches || 0) > 0);
+                    return teamHasMalpractice(t);
                 });
             }
 
@@ -880,11 +885,15 @@
                     let solved = 0;
                     let pts = 0;
                     let lastActive = '';
+                    let hasHint = false;
+                    let hasMalpractice = false;
                     ['L1', 'L2', 'L3'].forEach(l => {
                         const recs = t.levels[l];
                         if (!Array.isArray(recs)) return;
                         recs.forEach(r => {
                             if (r.status === 'SOLVED') solved++;
+                            if (r.hintUsed) hasHint = true;
+                            if ((r.tabSwitches || 0) > 0) hasMalpractice = true;
                             // Use the latest running total rather than adding
                             // the earned/lost audit fields from every puzzle.
                             if (r.lastActive && (!lastActive || r.lastActive > lastActive)) {
@@ -894,12 +903,15 @@
                         });
                     });
                     if (!lastActive) lastActive = t.regTime || '';
-                    return { name: t.name, teamName: t.teamName, tid: t.tid || '-', lastActive: lastActive, solved: solved, pts: pts, mission: t.mission };
+                    return { name: t.name, teamName: t.teamName, tid: t.tid || '-', lastActive: lastActive, solved: solved, pts: pts, mission: t.mission, hasHint: hasHint, hasMalpractice: hasMalpractice };
                 });
 
                 let lbRows = lb;
                 if (searchTerm) lbRows = lbRows.filter(r => r.name.toLowerCase().includes(searchTerm) || r.tid.toLowerCase().includes(searchTerm));
                 if (typeFilter !== 'ALL') lbRows = lbRows.filter(r => r.mission && r.mission.includes(typeFilter));
+                // Apply the security filters to the leaderboard build too.
+                if (state.filter === 'HINT') lbRows = lbRows.filter(r => r.hasHint);
+                if (state.filter === 'MALPRACTICE') lbRows = lbRows.filter(r => r.hasMalpractice);
 
                 lbRows.sort((a, b) => (b.pts - a.pts) || a.name.localeCompare(b.name));
 

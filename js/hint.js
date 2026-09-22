@@ -309,6 +309,14 @@ function resumeHintPenalty() {
     hintTabSwitchCount++;
     tabSwitchCount++;
 
+    // Live-flag the hint malpractice on the sheet with the cumulative total so
+    // the admin row updates immediately (throttled to every 5th switch). The
+    // notebook tally is already bumped once by runBlockingPenalty (the only
+    // caller) for the switch that started this malpractice run.
+    if (typeof submitToGoogleSheets === 'function') {
+        submitToGoogleSheets('PENALTY_TRIGGERED', { tabSwitches: tabSwitchCount });
+    }
+
     // RESET TIMER to full duration
     hintPenaltySeconds = (currentPuzzle.hintPenalty && currentPuzzle.hintPenalty > 0) ? currentPuzzle.hintPenalty : 60;
 
@@ -393,7 +401,11 @@ function showHint() {
         currentPuzzle.hintUsed = true;
         saveHintState();
         if (typeof submitToGoogleSheets === 'function') {
-            submitToGoogleSheets('HINT_USED', {});
+            submitToGoogleSheets('HINT_USED', {
+                tabSwitches: typeof tabSwitchCount === 'number' ? tabSwitchCount : 0,
+                tabSwitchesDuringPenalty: typeof hintTabSwitchCount === 'number' ? hintTabSwitchCount : 0,
+                hintTabSwitchesDuringPenalty: typeof hintTabSwitchCount === 'number' ? hintTabSwitchCount : 0
+            });
         }
     }
 }

@@ -53,8 +53,15 @@ function triggerPenalty(reason = 'TAB_SWITCH') {
     if (hintPenaltyActive && !penaltyActive) return;
 
     tabSwitchCount++;
-
     notepadBump('tabswitch');
+
+    // Flag the switch on the sheet right away. The notebook re-carries the
+    // count on SOLVED/ABANDONED, but this makes the admin Tabs column update
+    // live. The { interval: 5 } throttle + cumulative tabSwitches keep the
+    // event log bounded while the sheet still reflects the true total.
+    if (typeof submitToGoogleSheets === 'function') {
+        submitToGoogleSheets('PENALTY_TRIGGERED', { tabSwitches: tabSwitchCount });
+    }
 
     if (penaltyActive) {
         penaltySeconds = 15;
