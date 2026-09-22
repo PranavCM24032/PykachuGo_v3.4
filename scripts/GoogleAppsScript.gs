@@ -1,203 +1,636 @@
-// Pykachu v3 Google Apps Script backend.
-// Required Script Properties: PLAYER_TOKEN, ADMIN_TOKEN, and SPREADSHEET_ID.
+// =================================================================
+// PYKACHU GO - FINAL BACKEND SCRIPT (STRICT SCHEMA & IMMUTABLE)
+// =================================================================
 
-var REG_HEADERS = ['Registration Time', 'TID', 'Team Name', 'Mission', 'Language', 'Level', 'Session ID'];
-var LEVEL_HEADERS = ['TID', 'Team Name', 'Mission', 'Puzzle ID', 'Wrong Attempts', 'Solve Time', 'Hint Used', 'Tab Switches', 'Points', 'Status', 'Total Score', 'Unlocked Puzzle IDs', 'Solved Puzzle IDs'];
-var LEVEL_SHEET_NAMES = ['L1', 'L2', 'L3'];
+var GAME_STEP_ACTIONS = [
+  'QR_SCANNED',
+  'QR_BLOCKED',
+  'PUZZLE_UNLOCKED',
+  'UNLOCK_FAILED',
+  'SOLVED',
+  'WRONG_ATTEMPT',
+  'HINT_REQUESTED',
+  'HINT_USED',
+  'PENALTY_TRIGGERED',
+  'PENALTY',
+  'MALPRACTICE_DETECTED',
+  'PUZZLE_ABANDONED'
+];
 
-function doGet(e) {
-  var params = (e && e.parameter) || {};
-  if (!isPlayerToken_(params.token) && !isAdminToken_(params.token)) return json_({ status: 'error', message: 'unauthorized' });
-  var ss = getSpreadsheet_();
-  ensureSheets_(ss);
-  if (String(params.action || '').toUpperCase() === 'GET_EPOCH') return json_({ status: 'success', epoch: getEpoch_() });
-  return json_(adminRows_(ss));
+function getPlayerToken() {
+  var token = PropertiesService.getScriptProperties().getProperty('PLAYER_TOKEN');
+  if (!token) Logger.log('⚠️ Missing PLAYER_TOKEN script property');
+  return token || '';
+}
+
+function getAdminToken() {
+  var token = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
+  if (!token) Logger.log('⚠️ Missing ADMIN_TOKEN script property');
+  return token || '';
+}
+
+function getSpreadsheet_() {
+  var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if (id) return SpreadsheetApp.openById(id);
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+var TEAM_RATE_LIMIT = 90;
+var TEAM_RATE_WINDOW_SECS = 60;
+
+function checkTeamRate(teamKey) {
+  var key = String(teamKey || '').trim();
+  if (!key || key === 'Unknown' || key === 'NO TEAM') return true;
+  var cache = CacheService.getScriptCache();
+  var bucketKey = 'rate_' + key.replace(/[^A-Za-z0-9_]/g, '_');
+  var now = Math.floor(Date.now() / 1000);
+  var bucket = [0, now];
+  var raw = cache.get(bucketKey);
+  if (raw) {
+    try { bucket = JSON.parse(raw); } catch (e) { bucket = [0, now]; }
+  }
+  if (now - Number(bucket[1]) > TEAM_RATE_WINDOW_SECS) bucket = [0, now];
+  bucket[0] = Number(bucket[0] || 0) + 1;
+  cache.put(bucketKey, JSON.stringify(bucket), TEAM_RATE_WINDOW_SECS + 1);
+  return bucket[0] <= TEAM_RATE_LIMIT;
+}
+
+// REGISTRATION HEADERS (7 cols)
+var REG_HEADERS = [
+  "Registration Time", "TID", "Team Name", "Mission", "Language",
+  "Level", "Session ID"
+];
+
+// LEVEL HEADERS (13 cols)
+var LEVEL_HEADERS = [
+  "TID", "Team Name", "Mission", "Puzzle ID",
+  "Wrong Attempts", "Solve Time", "Hint Used", "Tab Switches",
+  "Points", "Status", "Total Score",
+  "Unlocked Puzzle IDs", "Solved Puzzle IDs"
+];
+
+var EVENT_DEDUPE_TTL_SECS = 21600;
+
+function eventCacheKey(eventId) {
+  return 'evt_' + String(eventId).replace(/[^A-Za-z0-9_]/g, '_').substring(0, 200);
+}
+
+function isDuplicateEvent(eventId) {
+  if (!eventId) return false;
+  try {
+    return CacheService.getScriptCache().get(eventCacheKey(eventId)) !== null;
+  } catch (e) {
+    return false;
+  }
+}
+
+function markEventProcessed(eventId) {
+  if (!eventId) return;
+  try {
+    CacheService.getScriptCache().put(eventCacheKey(eventId), '1', EVENT_DEDUPE_TTL_SECS);
+  } catch (e) { }
+}
+
+function doOptions(e) {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
 }
 
 function doPost(e) {
-  var body = parseJson_(e && e.postData && e.postData.contents);
-  if (!body) return json_({ status: 'error', message: 'bad json' });
-  var action = String(body.action || '').toUpperCase();
-  if (action === 'RESET_ALL') {
-    if (!isAdminToken_(body.adminToken || body.token)) return json_({ status: 'error', message: 'unauthorized' });
-    return withLock_(resetAll_);
-  }
-  if (!isPlayerToken_(body.token)) return json_({ status: 'error', message: 'unauthorized' });
-  return withLock_(function() {
-    var ss = getSpreadsheet_();
-    ensureSheets_(ss);
-    if (action === 'SESSION_BATCH') {
-      var events = Array.isArray(body.events) ? body.events : [];
-      var changed = 0;
-      events.forEach(function(event) { if (isData_(event) && processEvent_(ss, event)) changed++; });
-      SpreadsheetApp.flush();
-      return json_({ status: 'success', rowsChanged: changed });
+  var lock = LockService.getScriptLock();
+  var lockAcquired = lock.tryLock(20000);
+
+  try {
+    if (!lockAcquired) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "lock unavailable" }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
-    if (action === 'GET_TEAM_STATE') return json_(teamState_(ss, body.tid));
-    processEvent_(ss, body);
+
+    var ss = getSpreadsheet_();
+    ensureSheetsExist(ss);
+
+    var raw = (e && e.postData && e.postData.contents) || '';
+    var data;
+    try {
+      data = JSON.parse(raw);
+    } catch (perr) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "bad json" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (!data || typeof data !== 'object' || !data.action || !data.token) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "missing fields" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'RESET_ALL') {
+      var adminToken = getAdminToken();
+      if (!adminToken || data.adminToken !== adminToken) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "unauthorized" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      var sheetsToWipe = ['Registration', 'L1', 'L2', 'L3'];
+      sheetsToWipe.forEach(function(name) {
+        var sheet = ss.getSheetByName(name);
+        if (sheet && sheet.getLastRow() > 1) {
+          sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+        }
+      });
+      var resetProps = PropertiesService.getScriptProperties();
+      var resetEpoch = parseInt(resetProps.getProperty('gameEpoch') || '0', 10) + 1;
+      resetProps.setProperty('gameEpoch', resetEpoch.toString());
+      SpreadsheetApp.flush();
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", epoch: resetEpoch }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var playerToken = getPlayerToken();
+    if (!playerToken || data.token !== playerToken) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "unauthorized" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'GET_TEAM_STATE') {
+      var qTid = (data.tid || '').toString().trim();
+      var solved = [];
+      var currentPuzzle = null;
+      var unlocked = [];
+      var score = 0;
+      var hintsUsed = [];
+      var latestScoreTimestamp = -1;
+
+      ['L1', 'L2', 'L3'].forEach(function(name) {
+        var sheet = ss.getSheetByName(name);
+        if (!sheet) return;
+        var rows = sheet.getDataRange().getValues();
+        for (var i = 1; i < rows.length; i++) {
+          if (rows[i][0] && String(rows[i][0]).trim().toUpperCase() === qTid.toUpperCase()) {
+            var pid = Number(rows[i][3] || 0);
+            if (pid > 0) {
+              if (rows[i][9] === 'SOLVED') solved.push(pid);
+              if (isHintFlag(rows[i][6])) hintsUsed.push(pid);
+              currentPuzzle = pid;
+            }
+            unlocked = unlocked.concat(parseIdList(rows[i][11]));
+            solved = solved.concat(parseIdList(rows[i][12]));
+            var rowTimestamp = new Date(rows[i][5]).getTime();
+            if (isNaN(rowTimestamp)) rowTimestamp = 0;
+            if (rowTimestamp >= latestScoreTimestamp) {
+              latestScoreTimestamp = rowTimestamp;
+              score = Number(rows[i][10] || 0);
+            }
+          }
+        }
+      });
+      solved = uniqueNumbers(solved);
+      unlocked = uniqueNumbers(unlocked);
+      hintsUsed = uniqueNumbers(hintsUsed);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        solved: solved,
+        currentPuzzle: currentPuzzle,
+        unlocked: unlocked,
+        hintsUsed: hintsUsed,
+        score: score
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (!checkTeamRate(data.tid || data.teamName || '')) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", rateLimited: true }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'SESSION_BATCH' && Array.isArray(data.events)) {
+      var groups = {};
+      data.events.forEach(function(event) {
+        var label = eventSheetLabel(event);
+        if (!label) return;
+        (groups[label] = groups[label] || []).push(event);
+      });
+
+      Object.keys(groups).forEach(function(label) {
+        var sheet = ss.getSheetByName(label);
+        if (!sheet) return;
+        var rows = sheet.getDataRange().getValues();
+        var touched = {};
+        var applied = [];
+        var seen = {};
+
+        groups[label].forEach(function(event) {
+          var eid = event.eventId;
+          if (eid && seen[eid]) return;
+          if (isDuplicateEvent(eid)) return;
+          if (eid) seen[eid] = true;
+          var rowIdx = applyEvent(rows, event);
+          if (rowIdx > 0) {
+            touched[rowIdx] = true;
+            applied.push(eid);
+          }
+        });
+
+        Object.keys(touched).forEach(function(idx) {
+          writeRow(sheet, rows, Number(idx));
+        });
+        applied.forEach(markEventProcessed);
+      });
+    } else {
+      processEvent(ss, data);
+    }
+
     SpreadsheetApp.flush();
-    return json_({ status: 'success', message: 'written' });
-  });
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    if (lockAcquired) {
+      lock.releaseLock();
+    }
+  }
 }
 
-function processEvent_(ss, data) {
-  var action = normalizeAction_(data.action);
-  var teamName = clean_(data.teamName);
-  if (!teamName || ['UNKNOWN', 'NO TEAM'].indexOf(teamName.toUpperCase()) >= 0) return false;
-  if (action === 'MEME' || action === 'SESSION_START' || action === 'CONNECTION_TEST') return false;
-  if (action === 'REGISTRATION') { writeRegistration_(ss, data); return true; }
-  var level = levelNumber_(data.puzzleLevel || data.level, data.mission);
-  if (!level) return false;
-  var sheet = ss.getSheetByName('L' + level);
+function eventSheetLabel(data) {
+  var action = data.action || '';
+  if (action.indexOf('MEME') !== -1) return '';
+
+  var teamName = (data.teamName || data.team || '').toString().trim();
+  if (!teamName || teamName === 'Unknown' || teamName === 'NO TEAM') return '';
+
+  if (action === 'REGISTRATION') return 'Registration';
+
+  if (GAME_STEP_ACTIONS.indexOf(action) === -1) return '';
+
+  var level = '';
+  if (data.puzzleLevel == 1 || data.puzzleLevel === '1') level = 'L1';
+  else if (data.puzzleLevel == 2 || data.puzzleLevel === '2') level = 'L2';
+  else if (data.puzzleLevel == 3 || data.puzzleLevel === '3') level = 'L3';
+  if (!level) {
+    var m = (data.mission || '').split('_')[0].toUpperCase();
+    if (m === 'L1' || m === 'L2' || m === 'L3') level = m;
+  }
+  return level;
+}
+
+function processEvent(ss, data) {
+  var label = eventSheetLabel(data);
+  if (!label) return;
+  if (isDuplicateEvent(data.eventId)) return;
+  var sheet = ss.getSheetByName(label);
+  if (!sheet) return;
   var rows = sheet.getDataRange().getValues();
-  var puzzleId = int_(data.puzzleId, 0);
-  var rowIndex = findLevelRow_(rows, data.tid, teamName, puzzleId);
-  var record = rowIndex < 0 ? newRecord_(data, teamName, puzzleId) : readRecord_(rows[rowIndex]);
-  applyEvent_(record, action, data, puzzleId);
-  var row = recordRow_(record);
-  if (rowIndex < 0) sheet.appendRow(row);
-  else sheet.getRange(rowIndex + 1, 1, 1, row.length).setValues([row]);
-  return true;
+  var rowIdx = applyEvent(rows, data);
+  if (rowIdx > 0) {
+    writeRow(sheet, rows, rowIdx);
+    markEventProcessed(data.eventId);
+  }
 }
 
-function normalizeAction_(action) {
-  var value = String(action || '').toUpperCase();
-  if (value === 'REGISTER') return 'REGISTRATION';
-  if (value === 'PUZZLE_ABANDONED') return 'ABANDONED';
-  if (value === 'PENALTY_TRIGGERED' || value === 'MALPRACTICE_DETECTED') return 'PENALTY';
-  return value;
+function applyEvent(rows, data) {
+  var action = data.action || '';
+  var timestamp = data.timestamp || new Date().toISOString();
+  var teamName = (data.teamName || data.team || '').toString().trim();
+  var tid = (data.tid || '').toString().trim();
+  var mission = (data.mission || '').toString();
+
+  if (action === 'REGISTRATION') {
+    return applyRegistrationRow(rows, teamName, tid, data, timestamp);
+  }
+  return applyLevelRow(rows, teamName, tid, mission, action, data, timestamp);
 }
 
-function applyEvent_(record, action, data, puzzleId) {
-  record.tabSwitches = Math.max(
-    record.tabSwitches,
-    int_(data.tabSwitches, 0),
-    int_(data.tabSwitchesDuringPenalty, 0),
-    int_(data.hintTabSwitchesDuringPenalty, 0)
-  );
-  if (record.status === 'SOLVED' && action !== 'SOLVED') return;
-  if (record.status !== 'SOLVED') record.status = 'UNSOLVED';
+function applyRegistrationRow(rows, teamName, tid, data, timestamp) {
+  var rowIdx = findTeamRow(rows, teamName, tid);
+  var rowArray = [
+    timestamp,
+    tid,
+    teamName,
+    data.mission || '',
+    data.language || '',
+    data.level || '',
+    data.sessionId || ''
+  ];
+
+  if (rowIdx > 0) {
+    var existing = rows[rowIdx - 1];
+    existing[0] = existing[0] || timestamp;
+    existing[1] = tid || existing[1];
+    existing[2] = teamName || existing[2];
+    existing[3] = data.mission || existing[3];
+    existing[4] = data.language || existing[4];
+    existing[5] = data.level || existing[5];
+    existing[6] = data.sessionId || existing[6];
+  } else {
+    rows.push(rowArray);
+    rowIdx = rows.length;
+  }
+  return rowIdx;
+}
+
+function isHintFlag(val) {
+  if (val === true || val === 1 || val === '1') return true;
+  if (typeof val !== 'string') return false;
+  var v = val.trim().toLowerCase();
+  return v === 'true' || v === 'yes' || v === 'y' || v === '1';
+}
+
+function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
+  var puzzleId = Number(data.puzzleId);
+  if (isNaN(puzzleId) || puzzleId < 0) puzzleId = 0;
+
+  var rowIdx = findPuzzleRow(rows, teamName, tid, puzzleId);
+  var isNewPuzzle = false;
+
+  if (rowIdx === -1) {
+    if (puzzleId > 0) {
+      rowIdx = findPuzzleRow(rows, teamName, tid, 0, true);
+      if (rowIdx === -1) {
+        isNewPuzzle = true;
+      }
+    } else {
+      isNewPuzzle = true;
+    }
+  }
+
+  // 🔒 IMMUTABILITY LOCK: Reject ALL incoming updates if already SOLVED
+  if (!isNewPuzzle && rowIdx > 0) {
+    var existingStatus = rows[rowIdx - 1][9];
+    if (existingStatus === 'SOLVED') {
+      return -1;
+    }
+  }
+
+  var record = {
+    tid: tid || '',
+    teamName: teamName,
+    mission: mission,
+    puzzleId: puzzleId,
+    wrongAttempts: 0,
+    solveTime: '',
+    hintUsed: '0',
+    tabSwitches: 0,
+    points: 0,
+    status: 'UNSOLVED', // Default: answer not given yet
+    totalScore: 0,
+    unlockedPuzzles: '',
+    solvedPuzzles: ''
+  };
+
+  if (!isNewPuzzle && rowIdx > 0) {
+    var vals = rows[rowIdx - 1];
+    record.tid = tid || vals[0];
+    record.teamName = vals[1] || teamName;
+    record.mission = mission || vals[2] || '';
+    record.puzzleId = Number(vals[3] || puzzleId || 0);
+    record.wrongAttempts = parseInt(vals[4] || 0, 10);
+    record.solveTime = vals[5] || '';
+    record.hintUsed = isHintFlag(vals[6]) ? '1' : '0';
+    record.tabSwitches = parseInt(vals[7] || 0, 10);
+    record.points = Number(vals[8] || 0);
+    record.status = (vals[9] === 'SOLVED') ? 'SOLVED' : 'UNSOLVED';
+    record.totalScore = Number(vals[10] || 0);
+    record.unlockedPuzzles = vals[11] || '';
+    record.solvedPuzzles = vals[12] || '';
+  }
+
+  // Telemetry updates
+  if (typeof data.tabSwitches === 'number') {
+    record.tabSwitches = Math.max(record.tabSwitches, data.tabSwitches);
+  }
+  if (typeof data.penaltyCount === 'number') {
+    record.tabSwitches = Math.max(record.tabSwitches, data.penaltyCount);
+  }
+
+  // STATUS RULE: SOLVED = answer given, UNSOLVED = answer not given yet
   if (action === 'SOLVED') {
     record.status = 'SOLVED';
-    record.points = number_(data.points !== undefined ? data.points : data.pointsEarned, record.points);
-    record.solveTime = data.solveTime || epoch_();
-    record.wrongAttempts = Math.max(record.wrongAttempts, int_(data.wrongAttempts, 0));
-    if (data.hintUsed !== undefined) record.hintUsed = flag_(data.hintUsed) ? '1' : '0';
-    record.totalScore = number_(data.totalScore, record.totalScore + record.points);
-    record.solvedPuzzles = mergeIds_(record.solvedPuzzles, data.solvedPuzzles || data.solvedIds, puzzleId);
-    record.unlockedPuzzles = mergeIds_(record.unlockedPuzzles, data.unlockedPuzzles || data.queueIds);
-  } else if (action === 'ABANDONED') {
-    record.wrongAttempts = Math.max(record.wrongAttempts, int_(data.wrongAttempts, 0));
-  } else if (action === 'WRONG_ATTEMPT') {
-    if (!isFinal_(record.status)) record.wrongAttempts = Math.max(record.wrongAttempts, int_(data.attemptCount, record.wrongAttempts + 1));
-  } else if (action === 'HINT_USED' || action === 'HINT_REQUESTED') {
-    if (!isFinal_(record.status)) record.hintUsed = '1';
-  } else if (action === 'PENALTY' || action === 'TAB_SWITCH') {
-    record.tabSwitches = Math.max(
-      record.tabSwitches,
-      int_(data.tabSwitches, 0),
-      int_(data.tabSwitchesDuringPenalty, 0),
-      int_(data.hintTabSwitchesDuringPenalty, 0)
-    );
-  } else if (action === 'PUZZLE_UNLOCKED') {
-  } else if (action === 'UNLOCK_FAILED') {
-  } else if (action === 'QR_BLOCKED') {
+    record.solveTime = timestamp;
+
+    var deltaPoints = Number(data.points != null ? data.points : (data.pointsEarned || 0) - (data.pointsLost || 0));
+    record.points += deltaPoints;
+
+    if (typeof data.wrongAttempts === 'number') record.wrongAttempts = Math.max(record.wrongAttempts, data.wrongAttempts);
+    // Keep the flag set by HINT_USED even when the later solve payload does
+    // not include hintUsed (older clients may omit it).
+    if (isHintFlag(data.hintUsed)) record.hintUsed = '1';
+
+    var queue = record.unlockedPuzzles ? record.unlockedPuzzles.split(',').map(Number) : [];
+    (Array.isArray(data.queueIds) ? data.queueIds : []).forEach(function(id) {
+      var n = Number(id);
+      if (!isNaN(n) && n > 0 && queue.indexOf(n) === -1) queue.push(n);
+    });
+    record.unlockedPuzzles = queue.join(',');
+
+    var solvedQueue = record.solvedPuzzles ? record.solvedPuzzles.split(',').map(Number) : [];
+    (Array.isArray(data.solvedIds) ? data.solvedIds : []).concat([puzzleId]).forEach(function(id) {
+      var n = Number(id);
+      if (!isNaN(n) && n > 0 && solvedQueue.indexOf(n) === -1) solvedQueue.push(n);
+    });
+    record.solvedPuzzles = solvedQueue.join(',');
+    record.totalScore = Number(data.score || 0);
+
+  } else {
+    // Answer not given yet
+    record.status = 'UNSOLVED';
+
+    if (action === 'PENALTY_TRIGGERED' || action === 'PENALTY' || action === 'MALPRACTICE_DETECTED') {
+      if (typeof data.tabSwitches === 'number') record.tabSwitches = data.tabSwitches;
+      else record.tabSwitches += 1;
+    } else if (action === 'WRONG_ATTEMPT') {
+      if (typeof data.attemptCount === 'number') {
+        record.wrongAttempts = Math.max(parseInt(record.wrongAttempts || 0, 10), data.attemptCount);
+      } else {
+        record.wrongAttempts += 1;
+      }
+    } else if (action === 'HINT_USED' || action === 'HINT_REQUESTED' || data.hintUsed) {
+      record.hintUsed = '1';
+    }
   }
+
+  var rowArray = [
+    record.tid,
+    record.teamName,
+    record.mission,
+    record.puzzleId,
+    record.wrongAttempts,
+    record.solveTime,
+    record.hintUsed,
+    record.tabSwitches,
+    record.points,
+    record.status,
+    record.totalScore,
+    record.unlockedPuzzles,
+    record.solvedPuzzles
+  ];
+
+  if (isNewPuzzle) {
+    rows.push(rowArray);
+    rowIdx = rows.length;
+  } else {
+    rows[rowIdx - 1] = rowArray;
+  }
+  return rowIdx;
 }
 
-function writeRegistration_(ss, data) {
-  var sheet = ss.getSheetByName('Registration');
-  var rows = sheet.getDataRange().getValues();
-  var team = clean_(data.teamName);
-  var row = [epoch_(), data.tid || '', team, data.mission || '', data.language || '', data.level || levelNumber_(data.puzzleLevel, data.mission) || '', data.sessionId || ''];
-  var index = -1;
-  var incomingTid = clean_(data.tid);
+function findTeamRow(rows, teamName, tid) {
+  var tName = String(teamName || '').trim().toUpperCase();
+  var tId = String(tid || '').trim().toUpperCase();
+
   for (var i = 1; i < rows.length; i++) {
-    var rowTid = clean_(rows[i][1]);
-    if (incomingTid && rowTid ? rowTid === incomingTid : !incomingTid && !rowTid && teamKey_(rows[i][2]) === teamKey_(team)) {
-      index = i;
-      break;
+    var rowTid = String(rows[i][1] || '').trim().toUpperCase();
+    var rowTeam = String(rows[i][2] || '').trim().toUpperCase();
+    if ((tId && rowTid === tId) || (tName && rowTeam === tName)) {
+      return i + 1;
     }
   }
-  if (index < 0) sheet.appendRow(row);
-  else sheet.getRange(index + 1, 1, 1, row.length).setValues([row]);
+  return -1;
 }
 
-function teamState_(ss, tid) {
-  var solved = [], unlocked = [], score = 0, latest = null;
-  LEVEL_SHEET_NAMES.forEach(function(name) {
-    var rows = ss.getSheetByName(name).getDataRange().getValues();
-    for (var i = 1; i < rows.length; i++) if (String(rows[i][0]) === String(tid || '')) {
-      addIds_(solved, rows[i][12]); addIds_(unlocked, rows[i][11]); score = number_(rows[i][10], score); latest = rows[i];
+function findPuzzleRow(rows, teamName, tid, puzzleId, nullPuzzleMatch) {
+  var tName = String(teamName || '').trim().toUpperCase();
+  var tId = String(tid || '').trim().toUpperCase();
+
+  for (var i = 1; i < rows.length; i++) {
+    var rowTid = String(rows[i][0] || '').trim().toUpperCase();
+    var rowTeam = String(rows[i][1] || '').trim().toUpperCase();
+
+    var teamMatches = (tId && rowTid === tId) || (tName && rowTeam === tName);
+
+    if (teamMatches) {
+      var rowPid = rows[i][3];
+      var rowHasPid = rowPid !== '' && rowPid !== null && !isNaN(rowPid);
+      if (puzzleId) {
+        if (rowHasPid && Number(rowPid) === Number(puzzleId)) return i + 1;
+      } else if (nullPuzzleMatch && !rowHasPid) {
+        return i + 1;
+      }
     }
-  });
-  return { status: 'success', solved: solved, unlocked: unlocked, score: score, currentPuzzle: latest ? int_(latest[3], 0) : 0 };
+  }
+  return -1;
 }
 
-function adminRows_(ss) {
-  var out = [], registrations = ss.getSheetByName('Registration').getDataRange().getValues();
-  for (var i = 1; i < registrations.length; i++) { var r = registrations[i]; if (r[2]) out.push({ action: 'REGISTRATION', lastActive: r[0], timestamp: r[0], tid: r[1], teamName: r[2], mission: r[3], language: r[4], level: 'L' + r[5], sessionId: r[6] }); }
-  LEVEL_SHEET_NAMES.forEach(function(name) {
-    var rows = ss.getSheetByName(name).getDataRange().getValues();
-    for (var j = 1; j < rows.length; j++) { var r = rows[j]; if (!r[1] || !int_(r[3], 0)) continue; out.push({ action: 'SUMMARY', lastActive: r[5] || '', level: name, tid: r[0], teamName: r[1], mission: r[2], puzzleId: int_(r[3], 0), wrongAttempts: int_(r[4], 0), solveTime: r[5], hintUsed: r[6], tabSwitches: int_(r[7], 0), pointsEarned: Math.max(number_(r[8], 0), 0), pointsLost: Math.abs(Math.min(number_(r[8], 0), 0)), points: number_(r[8], 0), status: String(r[9] || '').toUpperCase() === 'SOLVED' ? 'SOLVED' : 'UNSOLVED', totalScore: number_(r[10], 0), unlockedPuzzles: r[11] || '', solvedPuzzles: r[12] || '' }); }
+function writeRow(sheet, rows, rowIdx) {
+  if (rowIdx <= 0 || !rows[rowIdx - 1]) return;
+  var rowData = rows[rowIdx - 1];
+  sheet.getRange(rowIdx, 1, 1, rowData.length).setValues([rowData]);
+}
+
+function parseIdList(text) {
+  if (!text) return [];
+  return String(text)
+    .split(/[,\s]+/)
+    .map(function(s) { return parseInt(s, 10); })
+    .filter(function(n) { return !isNaN(n); });
+}
+
+function uniqueNumbers(list) {
+  var seen = {};
+  var out = [];
+  (list || []).forEach(function(n) {
+    n = Number(n);
+    if (!isNaN(n) && !seen[n]) { seen[n] = true; out.push(n); }
   });
   return out;
 }
 
-function resetAll_() {
-  var ss = getSpreadsheet_(); ensureSheets_(ss);
-  ['Registration', 'L1', 'L2', 'L3'].forEach(function(name) { var sheet = ss.getSheetByName(name), last = sheet.getLastRow(); if (last > 1) sheet.deleteRows(2, last - 1); });
-  var props = PropertiesService.getScriptProperties(), epoch = int_(props.getProperty('GAME_EPOCH'), 0) + 1; props.setProperty('GAME_EPOCH', String(epoch));
-  return json_({ status: 'success', epoch: epoch });
+function ensureSheetsExist(ss) {
+  var tabs = [
+    { name: "Registration", headers: REG_HEADERS },
+    { name: "L1", headers: LEVEL_HEADERS },
+    { name: "L2", headers: LEVEL_HEADERS },
+    { name: "L3", headers: LEVEL_HEADERS }
+  ];
+
+  tabs.forEach(function(t) {
+    var sheet = ss.getSheetByName(t.name);
+    if (!sheet) {
+      sheet = ss.insertSheet(t.name);
+    }
+    if (sheet.getLastRow() <= 0) {
+      var headerRange = sheet.getRange(1, 1, 1, t.headers.length);
+      headerRange.setValues([t.headers]);
+      headerRange.setFontWeight("bold").setBackground("#1e293b").setFontColor("#ffffff");
+    }
+
+    // Auto-delete extra trailing columns
+    if (sheet.getMaxColumns() > t.headers.length) {
+      sheet.deleteColumns(t.headers.length + 1, sheet.getMaxColumns() - t.headers.length);
+    }
+  });
 }
 
-function ensureSheets_(ss) { ensureSheet_(ss, 'Registration', REG_HEADERS); LEVEL_SHEET_NAMES.forEach(function(name) { ensureSheet_(ss, name, LEVEL_HEADERS); normalizeStatuses_(ss.getSheetByName(name)); }); }
-function getSpreadsheet_() {
-  var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
-  if (id) return SpreadsheetApp.openById(id);
-  var active = SpreadsheetApp.getActiveSpreadsheet();
-  if (!active) throw new Error('Set SPREADSHEET_ID in Script Properties');
-  return active;
-}
-function normalizeStatuses_(sheet) {
-  var lastRow = sheet.getLastRow();
-  if (lastRow <= 1) return;
-  var range = sheet.getRange(2, 10, lastRow - 1, 1);
-  var values = range.getValues().map(function(row) { return [String(row[0] || '').toUpperCase() === 'SOLVED' ? 'SOLVED' : 'UNSOLVED']; });
-  range.setValues(values);
-}
-function ensureSheet_(ss, name, headers) { var sheet = ss.getSheetByName(name) || ss.insertSheet(name); if (sheet.getLastRow() === 0) sheet.appendRow(headers); }
-function withLock_(fn) { var lock = LockService.getScriptLock(); if (!lock.tryLock(20000)) return json_({ status: 'error', message: 'lock unavailable' }); try { return fn(); } catch (error) { return json_({ status: 'error', message: String(error.message || error) }); } finally { lock.releaseLock(); } }
-function newRecord_(data, teamName, puzzleId) { return { tid: data.tid || '', teamName: teamName, mission: data.mission || '', puzzleId: puzzleId, wrongAttempts: 0, solveTime: '', hintUsed: '0', tabSwitches: 0, points: 0, status: 'UNSOLVED', totalScore: 0, unlockedPuzzles: '', solvedPuzzles: '' }; }
-function readRecord_(row) { return { tid: row[0] || '', teamName: row[1] || '', mission: row[2] || '', puzzleId: int_(row[3], 0), wrongAttempts: int_(row[4], 0), solveTime: row[5] || '', hintUsed: flag_(row[6]) ? '1' : '0', tabSwitches: int_(row[7], 0), points: number_(row[8], 0), status: String(row[9] || '').toUpperCase() === 'SOLVED' ? 'SOLVED' : 'UNSOLVED', totalScore: number_(row[10], 0), unlockedPuzzles: row[11] || '', solvedPuzzles: row[12] || '' }; }
-function recordRow_(r) { return [r.tid, r.teamName, r.mission, r.puzzleId, r.wrongAttempts, r.solveTime, r.hintUsed, r.tabSwitches, sign_(r.points), r.status, r.totalScore, r.unlockedPuzzles, r.solvedPuzzles]; }
-function findLevelRow_(rows, tid, team, puzzleId) {
-  var incomingTid = clean_(tid);
-  for (var i = 1; i < rows.length; i++) {
-    if (int_(rows[i][3], 0) !== puzzleId) continue;
-    var rowTid = clean_(rows[i][0]);
-    if (incomingTid && rowTid) {
-      if (rowTid === incomingTid) return i;
-      continue;
+function doGet(e) {
+  try {
+    var playerToken = getPlayerToken();
+    if (!playerToken || !e.parameter.token || e.parameter.token !== playerToken) {
+      return ContentService.createTextOutput(JSON.stringify({ error: true, message: "unauthorized" }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
-    if (!incomingTid && !rowTid && teamKey_(rows[i][1]) === teamKey_(team)) return i;
+
+    if (e.parameter.action === 'GET_EPOCH') {
+      var props = PropertiesService.getScriptProperties();
+      var epoch = parseInt(props.getProperty('gameEpoch') || '0', 10);
+      return ContentService.createTextOutput(JSON.stringify({ epoch: epoch }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var ss = getSpreadsheet_();
+    ensureSheetsExist(ss);
+
+    var list = [];
+
+    // Read Registration
+    var regSheet = ss.getSheetByName("Registration");
+    var regData = regSheet ? regSheet.getDataRange().getValues() : [];
+    for (var i = 1; i < regData.length; i++) {
+      list.push({
+        isSummary: true,
+        action: 'REGISTRATION',
+        registered: true,
+        registeredAt: regData[i][0],
+        tid: regData[i][1],
+        teamName: regData[i][2],
+        mission: regData[i][3],
+        language: regData[i][4],
+        level: regData[i][5]
+      });
+    }
+
+    // Read L1/L2/L3
+    ['L1', 'L2', 'L3'].forEach(function(sheetName) {
+      var sheet = ss.getSheetByName(sheetName);
+      var rows = sheet ? sheet.getDataRange().getValues() : [];
+      for (var j = 1; j < rows.length; j++) {
+        var pid = parseInt(rows[j][3] || 0, 10);
+        if (!pid) continue;
+        list.push({
+          isSummary: true,
+          action: 'SUMMARY',
+          tid: rows[j][0],
+          teamName: rows[j][1],
+          mission: rows[j][2],
+          level: sheetName,
+          puzzleId: pid,
+          wrongAttempts: parseInt(rows[j][4] || 0, 10),
+          solveTime: rows[j][5],
+          hintUsed: isHintFlag(rows[j][6]),
+          tabSwitches: parseInt(rows[j][7] || 0, 10),
+          points: parseInt(rows[j][8] || 0, 10),
+          status: rows[j][9],
+          totalScore: parseInt(rows[j][10] || 0, 10),
+          unlockedPuzzles: rows[j][11],
+          solvedPuzzles: rows[j][12]
+        });
+      }
+    });
+
+    return ContentService.createTextOutput(JSON.stringify(list))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: true, message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-  return -1;
 }
-function levelNumber_(value, mission) { var n = int_(value, 0); if (n >= 1 && n <= 3) return n; var m = String(mission || '').match(/L([123])/i); return m ? int_(m[1], 0) : 0; }
-function mergeIds_(existing, incoming, forced) { var ids = []; addIds_(ids, existing); addIds_(ids, incoming); if (forced) addIds_(ids, forced); return ids.join(','); }
-function addIds_(out, value) { String(value || '').split(/[,;]/).forEach(function(v) { var n = int_(v.trim(), 0); if (n > 0 && out.indexOf(n) < 0) out.push(n); }); }
-function isFinal_(status) { return status === 'SOLVED'; }
-function flag_(value) { return value === true || value === 1 || ['1', 'TRUE', 'YES', 'Y'].indexOf(String(value).toUpperCase()) >= 0; }
-function clean_(value) { return String(value == null ? '' : value).trim(); }
-function teamKey_(value) { return clean_(value).toUpperCase(); }
-function int_(value, fallback) { var n = parseInt(value, 10); return isNaN(n) ? fallback : n; }
-function number_(value, fallback) { var n = Number(value); return isNaN(n) ? fallback : n; }
-function sign_(value) { var n = number_(value, 0); return n > 0 ? '+' + n : String(n); }
-function epoch_() { return Math.floor(Date.now() / 1000); }
-function getEpoch_() { return int_(PropertiesService.getScriptProperties().getProperty('GAME_EPOCH'), 0); }
-function parseJson_(value) { try { return value ? JSON.parse(value) : null; } catch (error) { return null; } }
-function isData_(value) { return value && typeof value === 'object' && !Array.isArray(value); }
-function json_(value) { return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON); }
-function isPlayerToken_(token) { var expected = PropertiesService.getScriptProperties().getProperty('PLAYER_TOKEN'); return !!expected && String(token) === String(expected); }
-function isAdminToken_(token) { var expected = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN'); return !!expected && String(token) === String(expected); }

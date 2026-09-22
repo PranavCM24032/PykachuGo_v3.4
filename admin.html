@@ -450,7 +450,7 @@
         const CONFIG = {
             SCRIPT_URL: RUNTIME_CONFIG.googleScriptUrl || '',
             TOKEN: RUNTIME_CONFIG.googleScriptToken || '',
-            SHEET_URL: 'https://docs.google.com/spreadsheets/d/1cNugflEtlmjDo-B2DWDC2PK-iy3z9QhHVpbotO5EeW0/edit?gid=276009518#gid=276009518',
+            SHEET_URL: RUNTIME_CONFIG.googleSheetUrl || '',
             REFRESH_RATE: 5000,
             MAX_LOGS: 500,
             VERSION: '3.1.0'
@@ -686,7 +686,7 @@
 
             const L_COLS = "30px 88px 1.4fr 90px 76px 34px 36px 36px 36px 70px 60px 46px 46px";
             const REG_COLS = "35px 140px 90px 180px 110px 130px";
-            const LB_COLS = "40px 120px 1fr 150px 80px 110px";
+            const LB_COLS = "40px 88px 1fr 120px 58px 58px 58px 90px";
             const ROSTER_COLS = "35px 1.4fr 100px 110px 2fr";
 
             if (state.activeTab === 'REG') {
@@ -708,6 +708,8 @@
                     <div class="text-left font-bold pl-1">Team Name</div>
                     <div class="text-center font-mono text-slate-400">Last Active</div>
                     <div class="text-center font-mono text-slate-400">Solved</div>
+                    <div class="text-center font-mono text-amber-400">Hints</div>
+                    <div class="text-center font-mono text-pink-400">Tabs</div>
                     <div class="text-center font-mono text-emerald-300">Total Pts</div>
                 `;
                 header.className = "grid gap-1 px-3 py-2.5 bg-slate-950/90 border-b border-slate-800 text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono text-center";
@@ -761,13 +763,25 @@
                 });
             }
 
+            const findTeamRecord = (name, tid) => {
+                const normalizedTid = (tid || '').toString().trim().toUpperCase();
+                if (normalizedTid) {
+                    const byTid = Object.values(teamMap).find(t =>
+                        (t.tid || '').toString().trim().toUpperCase() === normalizedTid
+                    );
+                    if (byTid) return byTid;
+                }
+                return teamMap[name] || null;
+            };
+
             // 2. Overlay telemetry logs from Google Sheets
             state.logs.forEach(log => {
                 const name = (log.teamName || log.team || '').toString().trim().toUpperCase();
                 if (!name || name === 'UNKNOWN' || name === 'NO TEAM') return;
 
-                if (!teamMap[name]) {
-                    teamMap[name] = {
+                let t = findTeamRecord(name, log.tid);
+                if (!t) {
+                    t = {
                         name: name,
                         teamName: log.teamName || log.team || name,
                         tid: log.tid || '',
@@ -778,9 +792,9 @@
                         mission: log.mission || 'UNKNOWN',
                         levels: { L1: [], L2: [], L3: [] }
                     };
+                    teamMap[name] = t;
                 }
 
-                const t = teamMap[name];
                 if (log.tid && !t.tid) t.tid = log.tid;
                 if (log.mission && (t.mission === 'UNASSIGNED' || t.mission === 'UNKNOWN')) t.mission = log.mission;
                 if (log.sessionId && !t.sessionId) t.sessionId = log.sessionId;
@@ -808,6 +822,9 @@
                         solveTime: log.solveTime || '',
                         pointsEarned: toInt(log.pointsEarned, 0),
                         pointsLost: toInt(log.pointsLost, 0),
+                        hasPointData: log.pointsEarned !== undefined ||
+                            log.pointsLost !== undefined ||
+                            log.points !== undefined,
                         totalScore: toInt(log.totalScore, 0),
                         unlockedPuzzles: log.unlockedPuzzles || ''
                     });
@@ -839,13 +856,17 @@
             }
 
             if (typeFilter !== 'ALL') {
-                leaderboard = leaderboard.filter(t => t.mission && t.mission.includes(typeFilter));
+                leaderboard = leaderboard.filter(t =>
+                    (t.mission || '').toString().toUpperCase().includes(typeFilter)
+                );
             }
 
             // HINT / MALPRACTICE filters inspect puzzle records. On the LB tab
-            // no single level is active, so flag a team if ANY level shows the
-            // marker (a nil level array keeps the team hidden).
-            const levelsForFilter = state.activeTab === 'LB' ? ['L1', 'L2', 'L3'] : [state.activeTab];
+            // no single level is active, so inspect every level unless the
+            // sidebar level selector narrows the view.
+            const levelsForFilter = levelFilterDropdown !== 'ALL'
+                ? [levelFilterDropdown]
+                : (state.activeTab === 'LB' ? ['L1', 'L2', 'L3'] : [state.activeTab]);
             const teamHasHint = (t) => levelsForFilter.some(l => Array.isArray(t.levels[l]) && t.levels[l].some(r => r.hintUsed));
             const teamHasMalpractice = (t) => levelsForFilter.some(l => Array.isArray(t.levels[l]) && t.levels[l].some(r => (r.tabSwitches || 0) > 0));
 
@@ -881,34 +902,72 @@
             };
 
             if (state.activeTab === 'LB') {
+                const leaderboardLevels = levelFilterDropdown === 'ALL'
+                    ? ['L1', 'L2', 'L3']
+                    : [levelFilterDropdown];
                 const lb = Object.values(teamMap).map(t => {
                     let solved = 0;
-                    let pts = 0;
+                    let totalHints = 0;
+                    let totalTabs = 0;
+                    let pointsFromRecords = 0;
+                    let hasPointData = false;
                     let lastActive = '';
                     let hasHint = false;
                     let hasMalpractice = false;
-                    ['L1', 'L2', 'L3'].forEach(l => {
+                    let latestScore = 0;
+                    let latestScoreTime = '';
+                    leaderboardLevels.forEach(l => {
                         const recs = t.levels[l];
                         if (!Array.isArray(recs)) return;
                         recs.forEach(r => {
                             if (r.status === 'SOLVED') solved++;
-                            if (r.hintUsed) hasHint = true;
-                            if ((r.tabSwitches || 0) > 0) hasMalpractice = true;
-                            // Use the latest running total rather than adding
-                            // the earned/lost audit fields from every puzzle.
+                            if (r.hintUsed) {
+                                totalHints++;
+                                hasHint = true;
+                            }
+                            totalTabs += Math.max(0, toInt(r.tabSwitches, 0));
+                            if (r.tabSwitches > 0) hasMalpractice = true;
+                            const earned = toInt(r.pointsEarned, 0);
+                            const lost = toInt(r.pointsLost, 0);
+                            if (r.hasPointData) {
+                                pointsFromRecords += earned - lost;
+                                hasPointData = true;
+                            }
+                            // Use the latest running total as a fallback for
+                            // older records that do not expose point fields.
+                            if (r.lastActive && (!latestScoreTime || r.lastActive > latestScoreTime)) {
+                                latestScoreTime = r.lastActive;
+                                latestScore = toInt(r.totalScore, 0);
+                            }
                             if (r.lastActive && (!lastActive || r.lastActive > lastActive)) {
                                 lastActive = r.lastActive;
-                                pts = parseInt(r.totalScore || 0, 10);
                             }
                         });
                     });
                     if (!lastActive) lastActive = t.regTime || '';
-                    return { name: t.name, teamName: t.teamName, tid: t.tid || '-', lastActive: lastActive, solved: solved, pts: pts, mission: t.mission, hasHint: hasHint, hasMalpractice: hasMalpractice };
+                    const pts = hasPointData ? pointsFromRecords : latestScore;
+                    return {
+                        name: t.name,
+                        teamName: t.teamName,
+                        tid: t.tid || '-',
+                        lastActive: lastActive,
+                        solved: solved,
+                        totalHints: totalHints,
+                        totalTabs: totalTabs,
+                        pts: pts,
+                        mission: t.mission,
+                        hasHint: hasHint,
+                        hasMalpractice: hasMalpractice
+                    };
                 });
 
                 let lbRows = lb;
                 if (searchTerm) lbRows = lbRows.filter(r => r.name.toLowerCase().includes(searchTerm) || r.tid.toLowerCase().includes(searchTerm));
-                if (typeFilter !== 'ALL') lbRows = lbRows.filter(r => r.mission && r.mission.includes(typeFilter));
+                if (typeFilter !== 'ALL') {
+                    lbRows = lbRows.filter(r =>
+                        (r.mission || '').toString().toUpperCase().includes(typeFilter)
+                    );
+                }
                 // Apply the security filters to the leaderboard build too.
                 if (state.filter === 'HINT') lbRows = lbRows.filter(r => r.hasHint);
                 if (state.filter === 'MALPRACTICE') lbRows = lbRows.filter(r => r.hasMalpractice);
@@ -937,6 +996,8 @@
                         <div class="text-left font-bold text-slate-200 uppercase tracking-tight truncate pl-1" title="${escapeHTML(r.name)}">${escapeHTML(r.name)}</div>
                         <div class="text-slate-400 font-mono text-[10px]">${escapeHTML(formatTime(r.lastActive))}</div>
                         <div class="font-mono text-slate-300">${r.solved}</div>
+                        <div class="font-mono text-amber-300">${r.totalHints}</div>
+                        <div class="font-mono text-pink-300">${r.totalTabs}</div>
                         <div class="font-mono font-bold ${r.pts > 0 ? 'text-emerald-300' : 'text-slate-500'}">${r.pts}</div>
                     </div>`;
                 }).join('');
