@@ -26,8 +26,9 @@ dashboard** livetracks every team.
   CRT screen; installable PWA shell.
 - **Dual-language riddles** — every puzzle ships a Python (`questionPython`) and
   a C++ (`questionCpp`) version; teams pick a language at registration.
-- **Manual login on reload** — team name and security key are never autofilled;
-  players must submit the login form again after a page reload.
+- **Manual login on reload** — players must submit the login form again after a
+  page reload; the last-used team name, security key, language and mission are
+  prefilled from local storage (tap to sign out/in via the power button).
 - **Branching puzzle graph** — each puzzle declares what it unlocks via
   `nextPuzzleId`, so progression is a forward-linked DAG (see
   [`assets/docs/PUZZLE_LINKING_SYSTEM.md`](assets/docs/PUZZLE_LINKING_SYSTEM.md)).
@@ -45,6 +46,9 @@ dashboard** livetracks every team.
 - **Anti-copy / anti-cheat blackout** — tab switch / window blur / print screen /
   5-finger touch / logic-freeze heartbeat detection all trigger a full-screen
   blackout overlay.
+- **Tab-switch tally survives reload** — the tab-switch count is restored on
+  reload and logging out / closing mid-riddle (step 3) counts as a tab switch, so
+  a team can't clear its cheating tally by refreshing or quitting.
 - **Google Sheets telemetry (per-puzzle notebook)** — every puzzle's events
   (scan, wrong attempts, hints, tab switches, timestamps) are collected
   **locally** in a per-puzzle notebook and ship as **one request** on solve.
@@ -473,6 +477,11 @@ A single Google Apps Script web app that owns one Google Sheets workbook.
 | `Registration` | Registration Time, TID, Team Name, Mission, Language, Security Key, Level, Session ID |
 | `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Puzzle ID, Wrong Attempts, Solve Time, Hint Used, Tab Switches, Points Earned, Points Lost, Status, Total Score, Unlocked Puzzle IDs, Solved Puzzle IDs |
 
+Status column values: `SOLVED`, `ABANDONED` (left mid-puzzle at step 3), or an
+in-progress marker (`RETRYING`, `UNLOCKED`, `BLOCKED`, `LOCKED`, `MALPRACTICE`).
+A row that reached `SOLVED` is sealed — late/retried events (wrong attempt,
+penalty, hint, QR block) may update counters but can never downgrade the status.
+
 The backend creates these tabs automatically on first use.
 
 ### Design decisions
@@ -654,6 +663,8 @@ notepad — zero requests fire during solving.
   the unlock queue (`queueIds`), solved `puzzleId` history, current `puzzleId`,
   the running `score` and whether it was a repeat solve — the backend writes
   these straight into the team's row (no separate tab).
+- **Hints** → `HINT_USED` is reported on every reveal (once-per-puzzle), so the
+  sheet's Hint Used flag lands even if an earlier send was buffered or lost.
 - **Left mid-puzzle** → after 60 s idle the watchdog sends one
   `PUZZLE_ABANDONED` with the half-done notebook. The notepad lives in
   `localStorage` (`pykachuPuzzleNotebook`) so a mid-puzzle reload never loses
@@ -704,7 +715,7 @@ Standalone page (own Tailwind build) with live tabs:
 - **LEADERBOARD** — ranked by Total Score / points
 - **ROSTER LOG** — full team roster with members
 - Level rows show hint usage as `1` (used) or `0` (not used), and status as
-  `SOLVED` or `UNSOLVED`.
+  `SOLVED`, `ABANDONED`, or `UNSOLVED`.
 
 The dashboard queries the Apps Script `doGet` endpoint with the runtime token
 and renders aggregated JSON.
