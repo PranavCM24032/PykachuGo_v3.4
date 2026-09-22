@@ -223,8 +223,7 @@
                     </div>
                 </div>
 
-                <!-- Steps loaded from partials -->
-                <!-- Inlined from html/step0.html -->
+                <!-- Step 0: Mission protocol -->
 <div id="step0" class="flow-step active h-full">
     <div class="flex flex-col h-full justify-center items-center gap-4 p-3 sm:p-5 text-center">
 
@@ -274,7 +273,7 @@
         </button>
     </div>
 </div>
-                <!-- Inlined from html/step1.html -->
+                <!-- Step 1: Registration / login -->
 <div id="step1" class="flow-step h-full">
     <div class="flex flex-col h-full justify-center items-center gap-3 p-3 sm:p-5">
         <div class="text-center w-full shrink-0">
@@ -400,7 +399,7 @@
         </form>
     </div>
 </div>
-                <!-- Inlined from html/step2.html -->
+                <!-- Step 2: QR scanner -->
 <div id="step2" class="flow-step h-full">
     <div class="flex flex-col h-full justify-center items-center gap-4 p-3 sm:p-5">
         <div class="text-center w-full shrink-0">
@@ -505,7 +504,7 @@
         </div>
     </div>
 </div>
-                <!-- Inlined from html/startcode.html -->
+                <!-- Start-key entry -->
 <div id="startcode" class="flow-step h-full">
     <div class="flex flex-col h-full justify-center items-center gap-4 p-3 sm:p-5">
         <div class="w-full text-center shrink-0">
@@ -560,7 +559,7 @@
         </form>
     </div>
 </div>
-                <!-- Inlined from html/step3.html -->
+                <!-- Step 3: Puzzle + answer form -->
 <div id="step3" class="flow-step h-full relative overflow-hidden">
     <div class="flex flex-col h-full relative z-10 p-2 sm:p-3 overflow-hidden">
         <!-- Header with timer -->
@@ -622,7 +621,7 @@ Loading puzzle data...</pre>
         </form>
     </div>
 </div>
-                <!-- Inlined from html/step4.html -->
+                <!-- Step 4: Success / completion -->
 <div id="step4" class="flow-step relative h-full overflow-hidden">
     <div
         class="step4-success-layout relative flex min-h-0 h-full flex-col items-center justify-center gap-3 p-4 text-center sm:p-6">
@@ -788,9 +787,7 @@ Loading puzzle data...</pre>
 </div>
 
 
-                <!-- Overlays loaded from partials -->
-                <!-- Inlined from html/penalty.html -->
-<!-- Penalty Overlay -->
+                <!-- Penalty Overlay -->
 <div id="penaltyOverlay"
     class="hidden absolute inset-0 z-[150] flex flex-col items-center justify-center p-4 backdrop-blur-3xl">
 
@@ -837,8 +834,7 @@ Loading puzzle data...</pre>
         </div>
     </div>
 </div>
-                <!-- Inlined from html/hint.html -->
-<!-- Hint System -->
+                <!-- Hint System -->
 <div id="hintContainer" class="hidden">
     <!-- Hint Request Overlay -->
     <div id="hintRequestOverlay"
@@ -947,7 +943,7 @@ Loading puzzle data...</pre>
 </div>
 
                 <!-- Meme player loaded from partial -->
-                <!-- Inlined from html/meme.html -->
+                <!-- Meme player (inlined at build time) -->
 <div id="memePlayerContainer"
     class="hidden absolute inset-0 z-[130] bg-black">
 
@@ -1004,8 +1000,8 @@ Loading puzzle data...</pre>
         </div>
     </div> <!-- End Pokedex Shell -->
 
-    <script src="js/include.js"></script>
     <script src="js/runtime-config.js"></script>
+    <script src="js/include.js"></script>
     <script src="js/config.js"></script>
     <script src="js/state.js"></script>
     <script src="js/audio.js"></script>
