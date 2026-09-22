@@ -41,7 +41,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         return;
     }
 
-    const previousTeamKey = getTeamStorageKey();
+    const previousTeamKey = getRememberedTeamKey();
     const nextTeamTid = foundTeam.tid || '';
     const nextTeamKey = nextTeamTid || foundTeam.team;
     const isDifferentTeam = !previousTeamKey || previousTeamKey !== nextTeamKey;
@@ -61,6 +61,13 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     currentTeamTid = nextTeamTid;
     currentMissionLevel = missionLevel;
     currentLanguage = codeLanguage;
+    saveTeamInfo({
+        teamName: currentTeam,
+        tid: currentTeamTid,
+        securityKey: securityKeyInput,
+        mission: missionLevel,
+        language: codeLanguage
+    });
     resetHintForNewTeam();
     loadTeamScoreState();
     gameStartTime = new Date();
@@ -84,6 +91,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     });
 
     updateTeamStatus();
+    updatePowerLed();
     playSound('powerUp');
     document.getElementById('screen')?.classList.add('premium-glow');
     showFeedback('registrationFeedback', `✓ Welcome back, ${currentTeam}`, 'success');

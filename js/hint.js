@@ -381,7 +381,10 @@ function showHint() {
 
     hintDisplayed = true;
 
-    // Mark hint as used only when the actual hint is revealed after the penalty.
+    // Mark hint as used (scoring) + flag it on the sheet right away.
+    // HINT_USED fires on EVERY reveal so a lost/throttled first request never
+    // leaves the sheet at 0; the once-per-puzzle throttle + idempotent backend
+    // keep repeated re-opens from spamming the event log.
     if (currentPuzzle) {
         const firstUse = !currentPuzzle.hintUsed;
         if (firstUse) {
@@ -389,10 +392,7 @@ function showHint() {
         }
         currentPuzzle.hintUsed = true;
         saveHintState();
-        // Flag the hint on the sheet right away. The notepad summary carries it
-        // again on SOLVED/ABANDONED, but that only lands when the puzzle closes;
-        // this makes the flag show up immediately (backend is idempotent).
-        if (firstUse && typeof submitToGoogleSheets === 'function') {
+        if (typeof submitToGoogleSheets === 'function') {
             submitToGoogleSheets('HINT_USED', {});
         }
     }

@@ -164,6 +164,16 @@ setInterval(() => {
 // reached, the notebook stays dirty and the next load's watchdog retries.
 function flushPuzzleNotebooksOnUnload() {
     if (typeof isValidTeam === 'function' && !isValidTeam()) return;
+
+    // Leaving while a puzzle is ACTIVE on step 3 is the same cheat signal as
+    // a tab switch (the loser can no longer log out / close to clear the tally).
+    // Bumped here so logout (shared path) AND page-close both count it, and so
+    // the count is included in the PUZZLE_ABANDONED payload built below.
+    if (typeof isPuzzleActive !== 'undefined' && isPuzzleActive && currentStep === 3) {
+        if (typeof tabSwitchCount !== 'undefined') tabSwitchCount++;
+        notepadBump('tabswitch');
+    }
+
     const notebook = getPuzzleNotebook();
     for (const pid of Object.keys(notebook)) {
         const n = notebook[pid];

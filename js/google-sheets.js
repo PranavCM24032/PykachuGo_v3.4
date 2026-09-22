@@ -63,7 +63,8 @@ function isValidTeam() {
 const EVENT_THROTTLE = {
     'WRONG_ATTEMPT':     { interval: 5, countField: 'attemptCount' },
     'QR_BLOCKED':        { interval: 5, countField: 'blockedCount' },
-    'PENALTY_TRIGGERED': { interval: 5 } // already carries cumulative tabSwitches
+    'PENALTY_TRIGGERED': { interval: 5 }, // already carries cumulative tabSwitches
+    'HINT_USED':         { once: true }   // one live flag per puzzle; re-reveals resend safely (sheet is idempotent)
 };
 const _throttleCounts = {};
 

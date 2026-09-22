@@ -93,10 +93,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     updateTeamStatus();
+    prefillRegistrationForm();
+    updatePowerLed();
 
     // Always require a fresh manual login after a reload. Gameplay progress is
     // still restored after the team submits the login form.
     showStep(0);
+
+    // Auxiliary power button: short tap = sign in/out, long hold = CRT power.
+    const powerButton = document.getElementById('power-button');
+    if (powerButton) {
+        let pressTimer = null;
+        let longPressFired = false;
+        const clearPressTimer = () => {
+            if (pressTimer) {
+                clearTimeout(pressTimer);
+                pressTimer = null;
+            }
+        };
+        powerButton.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            longPressFired = false;
+            clearPressTimer();
+            pressTimer = setTimeout(() => {
+                longPressFired = true;
+                toggleCrtPower();
+            }, 650);
+        });
+        powerButton.addEventListener('pointerup', () => {
+            clearPressTimer();
+            if (longPressFired) {
+                longPressFired = false;
+                return;
+            }
+            handlePowerTap();
+        });
+        powerButton.addEventListener('pointercancel', clearPressTimer);
+        powerButton.addEventListener('pointerleave', clearPressTimer);
+        powerButton.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            handlePowerTap();
+        });
+    }
 
     // Auto-play memes for ?memid=M01 deep links (overlays the start screen)
     if (meme) {
@@ -135,6 +174,27 @@ function resumeToLastStep() {
     }
 
     const stepNum = Number(savedStep);
+
+    // Restore the tab-switch tally so a reload can never harvest-clear the
+    // anti-cheat count (saveGameState persists it; nothing used to read it back).
+    try {
+        const restoredState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.gameState) || '{}');
+        if (typeof restoredState.tabSwitchCount === 'number') {
+            tabSwitchCount = restoredState.tabSwitchCount;
+        }
+    } catch (e) { }
+
+    // Hydrate the live puzzle from the saved id so a returning team that was
+    // mid-riddle lands straight back on the riddle (step 3) instead of the
+    // scanner. On a fresh reload currentPuzzle is null; without this the
+    // `stepNum === 3 && currentPuzzle` branch below is always dead.
+    try {
+        const savedState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.gameState) || '{}');
+        if (typeof savedState.currentPuzzleId !== 'undefined' && savedState.currentPuzzleId) {
+            const restored = PUZZLES.find(p => p.id === Number(savedState.currentPuzzleId));
+            if (restored) currentPuzzle = restored;
+        }
+    } catch (e) { }
 
     // Resume is only meaningful from the scanner onward; 0/1 mean "not started".
     if (stepNum === 3 && currentPuzzle) {
@@ -185,19 +245,25 @@ window.addEventListener('beforeunload', (e) => {
 // ==============================
 // AUXILIARY INTERFACE LOGIC
 // ==============================
-let isPowerOn = true;
+let isCrtOn = true;
 
-function togglePowerMode() {
-    isPowerOn = !isPowerOn;
-    const indicator = document.getElementById('power-indicator');
+function isLoggedIn() {
+    return currentTeam && currentTeam.trim() !== "";
+}
+
+function updatePowerLed() {
+    const indicator = document.getElementById('power-led');
+    if (!indicator) return;
+    indicator.classList.toggle('session-on', isLoggedIn());
+    indicator.classList.toggle('session-idle', !isLoggedIn());
+}
+
+function toggleCrtPower() {
+    isCrtOn = !isCrtOn;
     const crtScreen = document.getElementById('screen');
 
-    if (indicator) {
-        indicator.className = `w-2 h-2 rounded-full transition-all ${isPowerOn ? 'power-on' : 'bg-red-900 shadow-none'}`;
-    }
-
     if (crtScreen) {
-        if (isPowerOn) {
+        if (isCrtOn) {
             crtScreen.style.filter = '';
             crtScreen.style.opacity = '1';
             playSound('powerUp');
@@ -207,6 +273,89 @@ function togglePowerMode() {
             playSound('click');
         }
     }
+}
+
+function prefillRegistrationForm() {
+    const info = getTeamInfo();
+    if (!info) return;
+
+    const teamInput = document.getElementById('teamName');
+    const keyInput = document.getElementById('teamSecurityKey');
+    const langSel = document.getElementById('codeLanguage');
+    const missionSel = document.getElementById('missionLevel');
+
+    if (teamInput && info.teamName) teamInput.value = info.teamName;
+    if (keyInput && info.securityKey) keyInput.value = info.securityKey;
+    if (langSel && info.language && langSel.querySelector(`option[value="${info.language}"]`)) {
+        langSel.value = info.language;
+    }
+    if (missionSel && info.mission && missionSel.querySelector(`option[value="${info.mission}"]`)) {
+        missionSel.value = info.mission;
+    }
+}
+
+function handlePowerTap() {
+    if (isLoggedIn()) {
+        if (confirm(`Sign out trainer ${currentTeam}?`)) {
+            logoutCurrentUser();
+        }
+    } else {
+        showToast('Trainer sign-in required', 'info');
+        showStep(1);
+    }
+}
+
+function logoutCurrentUser() {
+    if (!isLoggedIn()) return;
+
+    // Leaving mid-riddle is captured by flushPuzzleNotebooksOnUnload() below
+    // (shared choke point with page-close), which bumps the tally + notepad
+    // before building the PUZZLE_ABANDONED payload — so it lands on the sheet.
+
+    playSound('click');
+    if ('vibrate' in navigator) navigator.vibrate(40);
+
+    // Push every unsent mid-game detail (open puzzle notebook + session buffer)
+    // to the backend BEFORE the session is cleared, so logout never loses data.
+    // Both senders capture globals synchronously at call time (keepalive fetch);
+    // anything still blocked by the rate limiter stays buffered for next login.
+    flushPuzzleNotebooksOnUnload();
+    flushSessionBuffer();
+
+    stopQRScanner();
+    destroyMemePlayer();
+    stopTabMonitoring();
+    cleanupHintSystem();
+
+    if (penaltyTimer) clearInterval(penaltyTimer);
+    if (penaltyDelayTimeout) clearTimeout(penaltyDelayTimeout);
+    if (graceCountdownInterval) clearInterval(graceCountdownInterval);
+    cancelGracePeriodUI();
+
+    Scheduler.stopTimer('puzzleTimer');
+    if (puzzleTimerInterval) {
+        clearInterval(puzzleTimerInterval);
+        puzzleTimerInterval = null;
+    }
+
+    penaltyActive = false;
+    hintPenaltyActive = false;
+
+    currentTeam = "";
+    currentTeamTid = "";
+    currentMissionLevel = "";
+    sessionId = generateSessionId();
+    currentPuzzle = null;
+    urlLockedPuzzle = null;
+    currentStep = 1;
+    tabSwitchCount = 0;
+    isPuzzleActive = false;
+    resetHintForNewTeam();
+
+    updateTeamStatus();
+    updatePowerLed();
+    showToast('Trainer signed out. Data backed up!', 'success');
+    showStep(0);
 }
 
 function handleAuxClick(btnId) {
@@ -253,7 +402,7 @@ function handleAuxClick(btnId) {
 }
 
 // Map globals
-window.togglePowerMode = togglePowerMode;
+window.toggleCrtPower = toggleCrtPower;
 window.handleAuxClick = handleAuxClick;
 window.acceptRules = function () {
     playSound('powerUp');

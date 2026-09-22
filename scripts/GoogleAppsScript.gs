@@ -422,6 +422,11 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     record.puzzleId = puzzleId;
   }
 
+  // A puzzle that reached SOLVED must never be visually downgraded by a late
+  // retried event (WRONG_ATTEMPT, PENALTY, HINT_USED, QR_BLOCKED, ...). Those
+  // may still update counters below, but the SOLVED status is sealed here.
+  var wasSolved = record.status === 'SOLVED';
+
   if (action === 'SOLVED') {
     var pts = Number(data.pointsEarned || 0);
     if (pts > 0) {
@@ -492,6 +497,10 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
       record.tabSwitches = data.tabSwitchesDuringPenalty;
     }
   }
+
+  // Sealed: a solved puzzle's row keeps SOLVED no matter what late/retried
+  // non-solve event touches it (it already earned its points + solve time).
+  if (wasSolved && record.status !== 'SOLVED') record.status = 'SOLVED';
 
   var rowArray = [
     record.lastActive,

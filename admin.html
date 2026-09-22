@@ -1037,10 +1037,13 @@
                     '<span class="text-yellow-400 font-bold">1</span>' :
                     '<span class="text-slate-600">0</span>';
 
-                const adminStatus = lvlData.status === 'SOLVED' ? 'SOLVED' : 'UNSOLVED';
+                const statusRaw = (lvlData.status || '').toString().trim().toUpperCase();
+                const adminStatus = statusRaw === 'SOLVED' ? 'SOLVED' : (statusRaw === 'ABANDONED' ? 'ABANDONED' : 'UNSOLVED');
                 const statusBadge = adminStatus === 'SOLVED'
                     ? '<span class="text-emerald-400 font-bold">SOLVED</span>'
-                    : '<span class="text-red-400 font-bold">UNSOLVED</span>';
+                    : adminStatus === 'ABANDONED'
+                        ? '<span class="text-amber-400 font-bold">ABANDONED</span>'
+                        : '<span class="text-red-400 font-bold">UNSOLVED</span>';
 
                 const netPts = (parseInt(lvlData.pointsEarned || 0, 10) - parseInt(lvlData.pointsLost || 0, 10));
 

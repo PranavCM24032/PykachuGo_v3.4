@@ -82,6 +82,27 @@ function getTeamStorageKey() {
     return currentTeamTid ? currentTeamTid : currentTeam;
 }
 
+function getTeamInfo() {
+    try {
+        return JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.teamInfo) || 'null');
+    } catch (e) {
+        return null;
+    }
+}
+
+function saveTeamInfo(info) {
+    try {
+        localStorage.setItem(CONFIG.STORAGE_KEYS.teamInfo, JSON.stringify(info || {}));
+    } catch (e) {
+        console.warn('Could not save remembered trainer:', e);
+    }
+}
+
+function getRememberedTeamKey() {
+    const info = getTeamInfo();
+    return info ? (info.tid || info.teamName || '') : '';
+}
+
 function loadTeamScoreState() {
     currentTeamScore = 0;
     currentTeamSolvedPuzzles = new Set();
