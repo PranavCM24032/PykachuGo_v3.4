@@ -29,11 +29,15 @@ var GAME_STEP_ACTIONS = [
 // PLAYER_TOKEN is used by player telemetry; ADMIN_TOKEN is used only for
 // destructive admin actions and must never be shipped in runtime-config.js.
 function getPlayerToken() {
-  return PropertiesService.getScriptProperties().getProperty('PLAYER_TOKEN') || '';
+  var token = PropertiesService.getScriptProperties().getProperty('PLAYER_TOKEN');
+  if (!token) Logger.log('⚠️ Missing PLAYER_TOKEN script property');
+  return token || '';
 }
 
 function getAdminToken() {
-  return PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN') || '';
+  var token = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
+  if (!token) Logger.log('⚠️ Missing ADMIN_TOKEN script property');
+  return token || '';
 }
 
 // Server-side per-team request budget. The client already spaces calls through
@@ -56,7 +60,9 @@ function checkTeamRate(teamKey) {
   if (raw) {
     try { bucket = JSON.parse(raw); } catch (e) { bucket = [0, now]; }
   }
-  if (now - Number(bucket[1]) >= TEAM_RATE_WINDOW_SECS) bucket = [0, now];
+  // Reset once the window has fully elapsed (strict > so an entry at exactly
+  // WINDOW_SECS old is already outside the window, no off-by-one free request).
+  if (now - Number(bucket[1]) > TEAM_RATE_WINDOW_SECS) bucket = [0, now];
   bucket[0] = Number(bucket[0] || 0) + 1;
   cache.put(bucketKey, JSON.stringify(bucket), TEAM_RATE_WINDOW_SECS + 1);
   return bucket[0] <= TEAM_RATE_LIMIT;
