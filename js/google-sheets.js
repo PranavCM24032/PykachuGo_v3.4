@@ -52,8 +52,17 @@ function clearSessionBuffer() {
 }
 
 function isValidTeam() {
-    const name = (typeof currentTeam !== 'undefined' ? currentTeam : '').trim();
-    return name && name !== 'Unknown' && name !== 'NO TEAM' && name !== '';
+    let name = (typeof currentTeam !== 'undefined' ? currentTeam : '').trim();
+    if (!name || name === 'Unknown' || name === 'NO TEAM') {
+        const info = typeof getTeamInfo === 'function' ? getTeamInfo() : null;
+        if (info && info.teamName) {
+            currentTeam = info.teamName;
+            if (info.tid && typeof currentTeamTid !== 'undefined' && !currentTeamTid) currentTeamTid = info.tid;
+            if (info.mission && typeof currentMissionLevel !== 'undefined' && !currentMissionLevel) currentMissionLevel = info.mission;
+            name = currentTeam;
+        }
+    }
+    return Boolean(name && name !== 'Unknown' && name !== 'NO TEAM');
 }
 
 // ── Per-puzzle event throttling (quota guard) ──
@@ -80,14 +89,20 @@ function shouldSendThrottled(action, puzzleId) {
 
 async function submitToGoogleSheets(action, data = {}) {
     try {
+        // Skip entirely if no valid team (anonymous sessions)
+        if (!isValidTeam()) {
+            console.log('[Sheets] Skipping — no valid team set');
+            return;
+        }
+
         const payload = {
             action: action,
             sessionId: sessionId,
             teamName: currentTeam || 'Unknown',
             tid: currentTeamTid || '',
             mission: typeof currentMissionLevel !== 'undefined' ? currentMissionLevel : '',
-            puzzleId: currentPuzzle?.id || 0,
-            puzzleLevel: currentPuzzle?.level,
+            puzzleId: data.puzzleId || currentPuzzle?.id || 0,
+            puzzleLevel: data.puzzleLevel || currentPuzzle?.level,
             timestamp: new Date().toISOString(),
             ...data
         };
@@ -108,12 +123,6 @@ async function submitToGoogleSheets(action, data = {}) {
         if (throttle.countField) payload[throttle.countField] = throttle.count;
         if (!throttle.send) {
             console.log(`[Sheets] Throttled ${action} (${throttle.count}th occurrence)`);
-            return;
-        }
-
-        // Skip entirely if no valid team (anonymous sessions)
-        if (!isValidTeam()) {
-            console.log('[Sheets] Skipping — no valid team set');
             return;
         }
 

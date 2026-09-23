@@ -119,8 +119,13 @@ function notepadSummary(puzzleId) {
 // One request carrying the whole puzzle's notepad.
 async function flushPuzzleNotebook(puzzleId, solved, extra) {
     const notebook = getPuzzleNotebook();
-    const n = notebook[puzzleId];
-    if (!n) return false;
+    let n = notebook[puzzleId];
+    if (!n) {
+        const fallbackPuzzle = (typeof currentPuzzle !== 'undefined' && currentPuzzle && currentPuzzle.id === puzzleId)
+            ? currentPuzzle
+            : (typeof PUZZLES !== 'undefined' ? PUZZLES.find(p => p.id === puzzleId) : null);
+        n = createNotepad(notebook, fallbackPuzzle || { id: puzzleId, level: typeof currentMissionLevel !== 'undefined' ? currentMissionLevel : 1 });
+    }
 
     if (solved) n.solvedAt = Date.now();
     const summary = notepadSummaryOf(n);

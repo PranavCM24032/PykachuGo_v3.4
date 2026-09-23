@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v1.0.6';
+const CACHE_NAME = 'pykachu-go-v1.0.7';
 const ASSETS = [
     'admin.html',
     'index.html',
@@ -99,6 +99,24 @@ self.addEventListener('fetch', (event) => {
         'raw.githubusercontent.com', 'fonts.googleapis.com', 'fonts.gstatic.com'
     ];
     if (networkOnlyHosts.some(h => url.hostname.includes(h))) return;
+
+    // Config is regenerated on every deploy (URL/token can change). Serving a
+    // stale copy cache-first silently breaks all future writes for that device,
+    // so runtime-config.js must always hit the network (cache only as offline fallback).
+    if (url.pathname.endsWith('/js/runtime-config.js')) {
+        event.respondWith(
+            fetch(event.request)
+                .then((response) => {
+                    if (response && response.status === 200 && response.type === 'basic') {
+                        const copy = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+                    }
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
 
     // Cache-first for all local static assets: instant serve + background refresh.
     event.respondWith(
