@@ -64,7 +64,7 @@ var REG_HEADERS = [
 // LEVEL HEADERS (13 cols)
 var LEVEL_HEADERS = [
   "TID", "Team Name", "Mission", "Puzzle ID",
-  "Wrong Attempts", "Solve Time", "Hint Used", "Tab Switches",
+  "Wrong Attempts", "Timestamp", "Hint Used", "Tab Switches",
   "Points", "Status", "Total Score",
   "Unlocked Puzzle IDs", "Solved Puzzle IDs"
 ];
@@ -357,16 +357,12 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
   // ──────────────────────────────────────────────────────────────
   // SNAPSHOT MODEL — a team+puzzle row is written EXACTLY ONCE.
   //
-  // Intermediate events (wrong attempts, hints, penalties) are collected in
-  // the client's per-puzzle notebook and only arrive here as ONE terminal
-  // event:
-  //   • SOLVED           -> final record (status SOLVED, points, solve time)
-  //   • PUZZLE_ABANDONED -> half-info record for a mid-way exit (UNSOLVED,
-  //                         empty points)
-  // Non-terminal events never create or modify rows. This keeps status on
-  // BOTH the Google Sheet and the admin panel strictly SOLVED / UNSOLVED
-  // with no points while unsolved, and a row never changes after it has
-  // been written once.
+  // Only two terminal actions ever touch a row:
+  //   • SOLVED           -> status SOLVED + timestamp + points
+  //   • PUZZLE_ABANDONED -> row recorded mid-way (identity + exit timestamp);
+  //                         status EMPTY, points EMPTY
+  // Status cell is therefore SOLVED or EMPTY (never "UNSOLVED"),
+  // and a row never changes after it has been written once.
   // ──────────────────────────────────────────────────────────────
 
   var existingStatus = (rowIdx > 0) ? String(rows[rowIdx - 1][9] || '') : '';
@@ -377,9 +373,9 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
   // 🔒 SOLVED rows are sealed forever.
   if (existingStatus === 'SOLVED') return -1;
 
-  // Already recorded as UNSOLVED (mid-way exit recorded once). Only a later
-  // SOLVED may upgrade that row; nothing may keep churning it.
-  if (existingStatus !== '' && action !== 'SOLVED') return -1;
+  // A mid-way row is recorded once. Only a later SOLVED may upgrade it;
+  // another PUZZLE_ABANDONED (or anything else) must not rewrite it.
+  if (rowIdx > 0 && action !== 'SOLVED') return -1;
 
   var record = {
     tid: tid || '',
@@ -387,12 +383,12 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     mission: mission,
     puzzleId: puzzleId,
     wrongAttempts: 0,
-    solveTime: '',
+    timestamp: '',
     hintUsed: '0',
     tabSwitches: 0,
-    points: '',   // UNSOLVED rows get EMPTY points
-    status: 'UNSOLVED', // Default: answer not given yet
-    totalScore: 0,
+    points: '',
+    status: '',   // EMPTY unless solved
+    totalScore: '',
     unlockedPuzzles: '',
     solvedPuzzles: ''
   };
@@ -404,54 +400,46 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     record.mission = mission || vals[2] || '';
     record.puzzleId = Number(vals[3] || puzzleId || 0);
     record.wrongAttempts = parseInt(vals[4] || 0, 10);
-    record.solveTime = vals[5] || '';
+    record.timestamp = vals[5] || '';
     record.hintUsed = isHintFlag(vals[6]) ? '1' : '0';
     record.tabSwitches = parseInt(vals[7] || 0, 10);
-    record.points = Number(vals[8] || 0);
-    record.status = (vals[9] === 'SOLVED') ? 'SOLVED' : 'UNSOLVED';
-    record.totalScore = Number(vals[10] || 0);
-    record.unlockedPuzzles = vals[11] || '';
-    record.solvedPuzzles = vals[12] || '';
+    record.points = (String(vals[8]).trim() === '') ? '' : Number(vals[8] || 0);
+    record.status = (vals[9] === 'SOLVED') ? 'SOLVED' : '';
   }
 
-  // STATUS RULE: exactly SOLVED or UNSOLVED.
+  // Wrong attempts, tab switches and hint usage are recorded in BOTH cases.
+  if (typeof data.wrongAttempts === 'number') record.wrongAttempts = Math.max(record.wrongAttempts, data.wrongAttempts);
+  if (typeof data.tabSwitches === 'number') record.tabSwitches = Math.max(record.tabSwitches, data.tabSwitches);
+  if (isHintFlag(data.hintUsed) || (typeof data.hintsUsed === 'number' && data.hintsUsed > 0)) record.hintUsed = '1';
+
   if (action === 'SOLVED') {
     record.status = 'SOLVED';
-    record.solveTime = timestamp;
-    record.points = Number(record.points || 0);
+    record.timestamp = timestamp;
+    record.points = (String(record.points).trim() === '') ? 0 : Number(record.points);
 
     var deltaPoints = Number(data.points != null ? data.points : (data.pointsEarned || 0) - (data.pointsLost || 0));
     if (isNaN(deltaPoints)) deltaPoints = 0;
     record.points += deltaPoints;
 
-    if (typeof data.wrongAttempts === 'number') record.wrongAttempts = Math.max(record.wrongAttempts, data.wrongAttempts);
-    if (typeof data.tabSwitches === 'number') record.tabSwitches = Math.max(record.tabSwitches, data.tabSwitches);
-    if (isHintFlag(data.hintUsed) || (typeof data.hintsUsed === 'number' && data.hintsUsed > 0)) record.hintUsed = '1';
-
-    var queue = record.unlockedPuzzles ? record.unlockedPuzzles.split(',').map(Number) : [];
-    (Array.isArray(data.queueIds) ? data.queueIds : []).forEach(function(id) {
-      var n = Number(id);
-      if (!isNaN(n) && n > 0 && queue.indexOf(n) === -1) queue.push(n);
-    });
-    record.unlockedPuzzles = queue.join(',');
-
-    var solvedQueue = record.solvedPuzzles ? record.solvedPuzzles.split(',').map(Number) : [];
-    (Array.isArray(data.solvedIds) ? data.solvedIds : []).concat([puzzleId]).forEach(function(id) {
-      var n = Number(id);
-      if (!isNaN(n) && n > 0 && solvedQueue.indexOf(n) === -1) solvedQueue.push(n);
-    });
-    record.solvedPuzzles = solvedQueue.join(',');
+    // Score + unlock/solved queues are recorded only on SOLVE.
     record.totalScore = Number(data.score || 0);
 
-  } else {
-    // Answer not given yet — mid-way exit snapshot (half info).
-    record.status = 'UNSOLVED';
-    record.points = '';   // UNSOLVED => no points, empty cell
-    record.solveTime = '';
+    var queue = (Array.isArray(data.queueIds) ? data.queueIds : []).map(function(id) { return Number(id); });
+    record.unlockedPuzzles = queue.filter(function(n) { return !isNaN(n) && n > 0; }).join(',');
 
-    if (typeof data.wrongAttempts === 'number') record.wrongAttempts = Math.max(record.wrongAttempts, data.wrongAttempts);
-    if (isHintFlag(data.hintUsed) || (typeof data.hintsUsed === 'number' && data.hintsUsed > 0)) record.hintUsed = '1';
-    if (typeof data.tabSwitches === 'number') record.tabSwitches = Math.max(record.tabSwitches, data.tabSwitches);
+    var solvedQueue = (Array.isArray(data.solvedIds) ? data.solvedIds : []).concat([puzzleId]).map(function(id) { return Number(id); });
+    record.solvedPuzzles = solvedQueue.filter(function(n) { return !isNaN(n) && n > 0; }).join(',');
+
+  } else {
+    // Mid-way exit: row recorded with the exit timestamp (so we have a
+    // record of when they went out); status & points stay EMPTY, and
+    // score + queues are NOT recorded.
+    record.status = '';
+    record.points = '';
+    record.timestamp = timestamp;
+    record.totalScore = '';
+    record.unlockedPuzzles = '';
+    record.solvedPuzzles = '';
   }
 
   var rowArray = [
@@ -460,7 +448,7 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     record.mission,
     record.puzzleId,
     record.wrongAttempts,
-    record.solveTime,
+    record.timestamp,
     record.hintUsed,
     record.tabSwitches,
     record.points,
@@ -619,7 +607,7 @@ function doGet(e) {
           level: sheetName,
           puzzleId: pid,
           wrongAttempts: parseInt(rows[j][4] || 0, 10),
-          solveTime: rows[j][5],
+          timestamp: rows[j][5],
           hintUsed: isHintFlag(rows[j][6]),
           tabSwitches: parseInt(rows[j][7] || 0, 10),
           points: parseInt(rows[j][8] || 0, 10),

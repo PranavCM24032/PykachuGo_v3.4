@@ -412,7 +412,7 @@
                             <div class="text-center font-mono text-red-400">Wrong</div>
                             <div class="text-center font-mono text-pink-400">Tabs</div>
                             <div class="text-center font-mono text-amber-400">Hint</div>
-                            <div class="text-center font-mono text-emerald-400">Solve Time</div>
+                            <div class="text-center font-mono text-emerald-400">Timestamp</div>
                             <div class="text-center font-mono text-cyan-400">Last Node</div>
                             <div class="text-center font-mono text-slate-400">Scans</div>
                             <div class="text-center font-mono text-amber-300" title="Points = Earned - Lost">Points</div>
@@ -735,7 +735,7 @@
                     <div class="text-center font-mono text-red-400">Wrong</div>
                     <div class="text-center font-mono text-pink-400">Tabs</div>
                     <div class="text-center font-mono text-amber-400">Hint</div>
-                    <div class="text-center font-mono text-emerald-400">Solve Time</div>
+                    <div class="text-center font-mono text-emerald-400">Timestamp</div>
                     <div class="text-center font-mono">Status</div>
                     <div class="text-center font-mono text-slate-400" title="Points = Earned - Lost (this puzzle)">Points</div>
                     <div class="text-center font-mono text-amber-300" title="Running score">Score</div>
@@ -820,7 +820,7 @@
                         wrongAttempts: toInt(log.wrongAttempts, 0),
                         tabSwitches: toInt(log.tabSwitches, 0),
                         hintUsed: toBooleanFlag(log.hintUsed),
-                        solveTime: log.solveTime || '',
+                        timestamp: log.timestamp || '',
                         pointsEarned: toInt(log.pointsEarned, 0),
                         pointsLost: toInt(log.pointsLost, 0),
                         points: log.points !== undefined ? toInt(log.points, 0) : undefined,
@@ -1097,7 +1097,7 @@
                     wrongAttempts: 0,
                     tabSwitches: 0,
                     hintUsed: false,
-                    solveTime: '',
+                    timestamp: '',
                     pointsEarned: 0,
                     pointsLost: 0,
                     totalScore: 0,
@@ -1105,7 +1105,7 @@
                 };
 
                 const lastActiveStr = formatTime(lvlData.lastActive);
-                const solveTimeStr = formatTime(lvlData.solveTime);
+                const timestampStr = formatTime(lvlData.timestamp);
 
                 const hintBadge = lvlData.hintUsed ?
                     '<span class="text-yellow-400 font-bold">1</span>' :
@@ -1133,7 +1133,7 @@
                     <div class="font-bold font-mono ${lvlData.wrongAttempts > 0 ? 'text-red-400' : 'text-slate-600'}">${lvlData.wrongAttempts}</div>
                     <div class="font-bold font-mono ${lvlData.tabSwitches > 0 ? 'text-pink-400' : 'text-slate-600'}">${lvlData.tabSwitches}</div>
                     <div class="font-bold">${hintBadge}</div>
-                    <div class="font-mono text-emerald-400 text-[8px]">${escapeHTML(solveTimeStr)}</div>
+                    <div class="font-mono text-emerald-400 text-[8px]">${escapeHTML(timestampStr)}</div>
                     <div class="font-bold">${statusBadge}</div>
                     <div class="font-mono text-[8px] font-bold ${adminStatus === 'SOLVED' ? (netPts > 0 ? 'text-emerald-300' : netPts < 0 ? 'text-red-300' : 'text-slate-500') : 'text-slate-600'}" title="${adminStatus === 'SOLVED' ? 'Points ' + (lvlData.points || 0) : 'No points - unsolved'}">${adminStatus === 'SOLVED' ? netPts : '-'}</div>
                     <div class="font-mono text-amber-300 font-bold text-[8px]">${lvlData.totalScore || 0}</div>

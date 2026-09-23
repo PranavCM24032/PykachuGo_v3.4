@@ -488,9 +488,9 @@ A single Google Apps Script web app that owns one Google Sheets workbook.
 | Tab | Schema |
 |-----|--------|
 | `Registration` | Registration Time, TID, Team Name, Mission, Language, Level, Session ID |
-| `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Puzzle ID, Wrong Attempts, Solve Time, Hint Used, Tab Switches, Points Earned, Points Lost, Status, Total Score, Unlocked Puzzle IDs, Solved Puzzle IDs |
+| `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Puzzle ID, Wrong Attempts, Timestamp, Hint Used, Tab Switches, Points Earned, Points Lost, Status, Total Score, Unlocked Puzzle IDs, Solved Puzzle IDs |
 
-Status column values are `SOLVED` or `UNSOLVED`. Hint usage and tab switches are
+Status column values are `SOLVED` or empty (mid-way rows). Hint usage and tab switches are
 stored in their own columns. A row that reached `SOLVED` is sealed — late or
 retried events cannot downgrade the status.
 
@@ -604,7 +604,7 @@ flowchart TD
         FIND -- "Yes" --> LOAD["Load that puzzle's 15-col record"]
         LOAD --> A{"action type?"}
         FIND -- "No" --> A
-        A -- "SOLVED" --> SLV["status: SOLVED · solveTime · lastActive<br/>Puzzle ID + solved/unlocked queues<br/>+ running Total Score finalized"]
+        A -- "SOLVED" --> SLV["status: SOLVED · timestamp · lastActive<br/>Puzzle ID + solved/unlocked queues<br/>+ running Total Score finalized"]
         A -- "WRONG_ATTEMPT" --> WA["wrongAttempts++<br/>status: RETRYING"]
         A -- "PUZZLE_UNLOCKED" --> PUN["status: UNLOCKED"]
         A -- "UNLOCK_FAILED" --> UFL["status: LOCKED"]
