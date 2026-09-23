@@ -40,7 +40,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     // localStorage.removeItem(CONFIG.STORAGE_KEYS.gameState); 
     // localStorage.removeItem(CONFIG.STORAGE_KEYS.teamInfo); 
 
-    await Promise.all([loadPuzzles(), loadTeams(), loadMemes()]);
+    const [puzzlesLoaded, teamsLoaded, memesLoaded] = await Promise.all([
+        loadPuzzles(),
+        loadTeams(),
+        loadMemes()
+    ]);
+    if (!puzzlesLoaded || !teamsLoaded) {
+        showToast('Game data could not be loaded. Please refresh or contact administrator.', 'error');
+        console.error('[Startup] Required game data failed to load.', {
+            puzzlesLoaded,
+            teamsLoaded,
+            memesLoaded
+        });
+        return;
+    }
     // Preload the player without delaying the rest of the game if YouTube is
     // unavailable or slow on the current network.
     warmupMemePlayer().catch(() => {});
