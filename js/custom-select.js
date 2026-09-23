@@ -11,7 +11,13 @@
         if (!img) return null;
         const clone = img.cloneNode(true);
         clone.removeAttribute('class');
-        clone.setAttribute('class', 'w-3.5 h-3.5 sm:w-4 sm:h-4 object-contain shrink-0 select-none pointer-events-none');
+        clone.style.width = '1em';
+        clone.style.height = '1em';
+        clone.style.minWidth = '1em';
+        clone.style.objectFit = 'contain';
+        clone.style.display = 'inline-block';
+        clone.style.pointerEvents = 'none';
+        clone.style.userSelect = 'none';
         return clone;
     }
 
@@ -59,8 +65,8 @@
         wrap.appendChild(btn);
 
         const menu = document.createElement('div');
-        menu.className = 'hidden absolute z-50 w-full top-full left-0 mt-1 max-h-64 overflow-y-auto bg-[#0a0f1d] border border-slate-800 rounded-lg shadow-2xl custom-select-menu';
-        wrap.appendChild(menu);
+        menu.className = 'hidden z-50 w-full overflow-y-auto bg-[#0a0f1d] border border-slate-800 rounded-lg shadow-2xl custom-select-menu';
+        document.body.appendChild(menu);
 
         container.appendChild(wrap);
         container.classList.add('custom-select-host');
@@ -117,27 +123,41 @@
         }
 
         function open() {
-            const menuRaw = menu.scrollHeight || 256;
             const rect = btn.getBoundingClientRect();
+            const maxH = 256;
+
+            // Measure real height first (off-screen, hidden visually) so the
+            // open direction and max-height are accurate.
+            menu.style.position = 'fixed';
+            menu.style.left = '-99999px';
+            menu.style.top = '0';
+            menu.style.bottom = 'auto';
+            menu.style.maxHeight = 'none';
+            menu.style.visibility = 'hidden';
+            menu.classList.remove('hidden');
+
+            const menuRaw = menu.scrollHeight || 256;
+
             const spaceBelow = window.innerHeight - rect.bottom;
             const spaceAbove = rect.top;
-            const maxH = 256;
-            const openUp = spaceBelow < Math.min(maxH, menuRaw) + 12;
+            const openUp = spaceBelow < Math.min(maxH, menuRaw) + 8;
 
-            menu.classList.remove('bottom-full');
-            menu.classList.remove('top-full');
-            menu.classList.remove('mb-1');
-            menu.classList.remove('mt-1');
-            menu.style.maxHeight = '';
+            const cap = openUp
+                ? Math.max(96, Math.min(maxH, spaceAbove - 8))
+                : Math.max(96, Math.min(maxH, spaceBelow - 8));
 
+            menu.style.width = rect.width + 'px';
+            menu.style.left = rect.left + 'px';
+            menu.style.visibility = '';
+            menu.style.zIndex = '99999';
             if (openUp) {
-                menu.classList.add('bottom-full', 'mb-1');
-                menu.style.maxHeight = Math.max(96, Math.min(maxH, spaceAbove - 8)) + 'px';
+                menu.style.top = 'auto';
+                menu.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
             } else {
-                menu.classList.add('top-full', 'mt-1');
-                menu.style.maxHeight = Math.max(96, Math.min(maxH, spaceBelow - 12)) + 'px';
+                menu.style.top = (rect.bottom + 6) + 'px';
+                menu.style.bottom = 'auto';
             }
-
+            menu.style.maxHeight = cap + 'px';
             menu.classList.remove('hidden');
             chevron.textContent = 'expand_less';
             btn.setAttribute('aria-expanded', 'true');
@@ -165,8 +185,11 @@
         });
 
         document.addEventListener('click', (e) => {
-            if (!wrap.contains(e.target)) close();
+            if (!wrap.contains(e.target) && !menu.contains(e.target)) close();
         });
+
+        window.addEventListener('resize', close);
+        window.addEventListener('scroll', close, true);
 
         select.addEventListener('change', () => {
             refresh();
