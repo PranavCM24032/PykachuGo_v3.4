@@ -506,6 +506,13 @@
             return parseInt(s, 10);
         }
 
+        // Numeric coercion that preserves decimal points (points/total score).
+        function toNumber(v, fallback = 0) {
+            if (v === undefined || v === null) return fallback;
+            const n = Number(String(v).trim());
+            return isNaN(n) ? fallback : n;
+        }
+
         function toBooleanFlag(v) {
             if (v === true || v === 1) return true;
             const normalized = String(v ?? '').trim().toUpperCase();
@@ -869,11 +876,11 @@
                         timestamp: log.timestamp || '',
                         pointsEarned: toInt(log.pointsEarned, 0),
                         pointsLost: toInt(log.pointsLost, 0),
-                        points: log.points !== undefined ? toInt(log.points, 0) : undefined,
+                        points: log.points !== undefined ? toNumber(log.points, 0) : undefined,
                         hasPointData: log.pointsEarned !== undefined ||
                             log.pointsLost !== undefined ||
                             log.points !== undefined,
-                        totalScore: toInt(log.totalScore, 0),
+                        totalScore: toNumber(log.totalScore, 0),
                         unlockedPuzzles: log.unlockedPuzzles || ''
                     });
                 }
@@ -977,7 +984,7 @@
                             if (r.tabSwitches > 0) hasMalpractice = true;
                             // Only solved puzzles earn points; unsolved rows stay empty.
                             if (r.status === 'SOLVED') {
-                                pointsFromRecords += toInt(r.points, 0);
+                                pointsFromRecords += toNumber(r.points, 0);
                                 hasPointData = true;
                             }
                             // Use the latest running total as a fallback for
@@ -990,7 +997,7 @@
                                 recordTimestampMs >= latestTimestampMs) {
                                 latestTimestampMs = recordTimestampMs;
                                 latestTimestamp = recordTimestamp;
-                                latestScore = toInt(r.totalScore, 0);
+                                latestScore = toNumber(r.totalScore, 0);
                             }
                         });
                     });
@@ -1165,7 +1172,7 @@
                     ? '<span class="text-emerald-400 font-bold">SOLVED</span>'
                     : '<span class="text-red-400 font-bold">UNSOLVED</span>';
 
-                const netPts = adminStatus === 'SOLVED' ? toInt(lvlData.points, 0) : '';
+                const netPts = adminStatus === 'SOLVED' ? toNumber(lvlData.points, 0) : '';
 
                 return `
                 <div class="grid gap-1 px-3 py-2 border-b border-slate-800/50 transition-all items-center hover:bg-white/5 text-[9px] text-center fade-in" style="grid-template-columns: ${L_COLS}">

@@ -441,8 +441,8 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     var queue = (Array.isArray(data.queueIds) ? data.queueIds : []).map(function(id) { return Number(id); });
     record.unlockedPuzzles = queue.filter(function(n) { return !isNaN(n) && n > 0; }).join(',');
 
-    var solvedQueue = (Array.isArray(data.solvedIds) ? data.solvedIds : []).concat([puzzleId]).map(function(id) { return Number(id); });
-    record.solvedPuzzles = solvedQueue.filter(function(n) { return !isNaN(n) && n > 0; }).join(',');
+    var solvedQueue = uniqueNumbers((Array.isArray(data.solvedIds) ? data.solvedIds : []).concat([puzzleId]))
+    record.solvedPuzzles = solvedQueue.join(',');
 
   } else {
     // Mid-way exit: row recorded with the exit timestamp (so we have a
@@ -625,9 +625,9 @@ function doGet(e) {
           timestamp: rows[j][5],
           hintUsed: isHintFlag(rows[j][6]),
           tabSwitches: parseInt(rows[j][7] || 0, 10),
-          points: parseInt(rows[j][8] || 0, 10),
+          points: parseFloat(rows[j][8] || 0),
           status: rows[j][9],
-          totalScore: parseInt(rows[j][10] || 0, 10),
+          totalScore: parseFloat(rows[j][10] || 0),
           unlockedPuzzles: rows[j][11],
           solvedPuzzles: rows[j][12]
         });
