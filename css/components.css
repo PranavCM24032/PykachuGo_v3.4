@@ -645,6 +645,8 @@ label {
 
 .custom-select-menu {
     scrollbar-width: none;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .custom-select-menu::-webkit-scrollbar {

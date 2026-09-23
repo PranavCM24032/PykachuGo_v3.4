@@ -189,7 +189,11 @@
         });
 
         window.addEventListener('resize', close);
-        window.addEventListener('scroll', close, true);
+        window.addEventListener('scroll', function (e) {
+            const t = e.target;
+            if (t && t.nodeType === 1 && (t === menu || menu.contains(t))) return;
+            close();
+        }, true);
 
         select.addEventListener('change', () => {
             refresh();
