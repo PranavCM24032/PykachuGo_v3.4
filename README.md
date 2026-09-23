@@ -128,7 +128,7 @@ scripts/
 assets/
   img/                         Sprites (oak, jenny, brock, badges, trophies …)
   docs/                        Design docs + challenge brief (docx)
-.github/workflows/             static.yml + jekyll-gh-pages.yml
+.github/workflows/             static.yml (single Pages deployment)
 ```
 
 ---
@@ -809,8 +809,8 @@ Open the local URL printed by `serve`. Camera access generally requires either
    `SPREADSHEET_ID`) and deploy the latest Apps Script version.
 2. Add `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and `GOOGLE_SHEET_URL` as
    GitHub Actions secrets (repository or `github-pages` environment).
-3. Push to `main` or run the Pages workflow manually (`.github/workflows/static.yml`
-   + `jekyll-gh-pages.yml`).
+3. Push to `main` or run the single Pages workflow manually
+   (`.github/workflows/static.yml`).
 4. When releasing frontend changes, bump both `CACHE_NAME` in
    `service-worker.js` and `CONFIG.VERSION` in `admin.html`.
 
