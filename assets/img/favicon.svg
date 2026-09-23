@@ -1,0 +1,110 @@
+<svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Sphere Curved Shadow (Gives 3D Volume) -->
+    <radialGradient id="sphereShade" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.5"/>
+      <stop offset="50%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.6"/>
+    </radialGradient>
+
+    <!-- Top Red Hemisphere (3D Metallic Red) -->
+    <radialGradient id="realRed" cx="35%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="#FF334B"/>
+      <stop offset="50%" stop-color="#D60D28"/>
+      <stop offset="100%" stop-color="#7A0010"/>
+    </radialGradient>
+
+    <!-- Bottom White Hemisphere (3D Plastic/Ceramic White) -->
+    <radialGradient id="realWhite" cx="35%" cy="65%" r="60%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="60%" stop-color="#E2E8F0"/>
+      <stop offset="100%" stop-color="#94A3B8"/>
+    </radialGradient>
+
+    <!-- Metallic Ring Gradient (Chrome/Silver Rim) -->
+    <linearGradient id="chromeRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="35%" stop-color="#94A3B8"/>
+      <stop offset="50%" stop-color="#475569"/>
+      <stop offset="65%" stop-color="#CBD5E1"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+
+    <!-- Center Button Dark Base -->
+    <radialGradient id="buttonInner" cx="35%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+
+    <!-- Realistic Lightning Bolt Gradient -->
+    <linearGradient id="realBolt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="40%" stop-color="#FFEA00"/>
+      <stop offset="100%" stop-color="#FF9100"/>
+    </linearGradient>
+
+    <!-- Soft Ground Shadow -->
+    <radialGradient id="groundShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Subtle Lightning Glow -->
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Ground Drop Shadow -->
+  <ellipse cx="150" cy="275" rx="100" ry="12" fill="url(#groundShadow)"/>
+
+  <!-- POKÉBALL BODY -->
+  <g>
+    <!-- Outer Black Border Base -->
+    <circle cx="150" cy="145" r="122" fill="#090D16"/>
+
+    <!-- Top Red Hemisphere -->
+    <path d="M 28 145 A 122 122 0 0 1 272 145 Z" fill="url(#realRed)"/>
+
+    <!-- Bottom White Hemisphere -->
+    <path d="M 28 145 A 122 122 0 0 0 272 145 Z" fill="url(#realWhite)"/>
+
+    <!-- Center Black Rubber Band -->
+    <rect x="28" y="133" width="244" height="24" fill="#090D16"/>
+    <!-- Band Top/Bottom Highlights -->
+    <line x1="28" y1="133" x2="272" y2="133" stroke="#262E3B" stroke-width="1.5"/>
+    <line x1="28" y1="157" x2="272" y2="157" stroke="#262E3B" stroke-width="1.5"/>
+
+    <!-- 3D Sphere Shading Overlay -->
+    <circle cx="150" cy="145" r="122" fill="url(#sphereShade)" opacity="0.85"/>
+
+    <!-- Top Glossy Surface Reflection Specular -->
+    <path d="M 60 70 A 100 100 0 0 1 240 70 A 120 120 0 0 0 60 70 Z" fill="#FFFFFF" opacity="0.25"/>
+
+    <!-- CENTER BUTTON ASSEMBLY -->
+    <!-- Outer Chrome Ring -->
+    <circle cx="150" cy="145" r="40" fill="url(#chromeRing)"/>
+    
+    <!-- Outer Black Button Gap -->
+    <circle cx="150" cy="145" r="33" fill="#090D16"/>
+
+    <!-- Inner Dark Button Base -->
+    <circle cx="150" cy="145" r="28" fill="url(#buttonInner)"/>
+    
+    <!-- Button Rim Highlight -->
+    <circle cx="150" cy="145" r="28" fill="none" stroke="#FFFFFF" stroke-width="1" opacity="0.3"/>
+
+    <!-- REALISTIC LIGHTNING BOLT -->
+    <g filter="url(#softGlow)">
+      <!-- Core Gold Bolt -->
+      <path d="M 157 119 L 135 147 H 151 L 143 171 L 165 143 H 149 Z" fill="url(#realBolt)" stroke="#FFE500" stroke-width="0.7" stroke-linejoin="round"/>
+    </g>
+
+    <!-- Center Lens Specular Highlight -->
+    <ellipse cx="142" cy="132" rx="10" ry="5" fill="#FFFFFF" opacity="0.35" transform="rotate(-20 142 132)"/>
+  </g>
+</svg>

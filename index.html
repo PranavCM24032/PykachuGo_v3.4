@@ -33,7 +33,7 @@
     <link rel="stylesheet" href="css/meme.css">
     <link rel="stylesheet" href="css/tailwind.css">
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="assets/img/poketropy.png" type="image/png">
+    <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 
     <!-- iOS PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -82,6 +82,58 @@
             }
         }
 
+        .brand-lockup {
+            min-width: 0;
+            width: min(58vw, 280px);
+        }
+
+        .brand-mark-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            width: max-content;
+            max-width: 100%;
+            min-width: 0;
+        }
+
+        .brand-pykachu {
+            display: block;
+            width: min(72%, 205px);
+            height: auto;
+            max-height: 2.25rem;
+            object-fit: contain;
+        }
+
+        .brand-go {
+            display: block;
+            width: min(24%, 64px);
+            height: auto;
+            max-height: 2.25rem;
+            object-fit: contain;
+        }
+
+        .brand-tagline {
+            margin: 1px 0 0;
+            max-width: 100%;
+            line-height: 1.05;
+        }
+
+        @media (min-width: 640px) {
+            .brand-lockup {
+                width: min(48vw, 330px);
+            }
+
+            .brand-pykachu,
+            .brand-go {
+                max-height: 2.75rem;
+            }
+
+            .brand-tagline {
+                font-size: 16px;
+            }
+        }
+
         html {
             -webkit-text-size-adjust: 100%;
             -moz-text-size-adjust: 100%;
@@ -111,10 +163,10 @@
     <div class="pokedex-shell flex flex-col">
 
         <!-- Top Header Section -->
-        <div class="flex gap-2 sm:gap-3 mb-3 sm:mb-4 px-2 pt-1 flex-shrink-0">
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3 mb-3 sm:mb-4 px-2 pt-1 flex-shrink-0">
             <!-- Avatar Container -->
             <div
-                class="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center relative flex-shrink-0">
+            class="justify-self-start w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center relative flex-shrink-0">
                 <div class="absolute -inset-1 bg-blue-400/30 rounded-full blur-sm"></div>
 
                 <div
@@ -139,18 +191,19 @@
             </div>
 
             <!-- Center Content -->
-            <div class="flex-1 text-center flex flex-col justify-center">
-                <h1 class="text-base sm:text-lg md:text-xl font-pixel text-white select-none truncate px-1"
-                    style="text-shadow: 0 2px 6px rgba(4, 7, 19, 0.9), 0 0 8px rgba(19, 40, 73, 0.5);">
-                    <span class="text-blue-400">P</span><span class="text-yellow-300">y</span><span
-                        class="text-blue-400">KaChu</span><span class="text-yellow-300"> Go</span>
-                </h1>
-                <p class="text-[10px] sm:text-xs md:text-sm text-slate-200 font-medium truncate">Decode Code. Capture
-                    Pikachu.</p>
+            <div class="brand-lockup justify-self-center flex-shrink-0 text-center flex flex-col justify-center items-center">
+                <div class="brand-mark-row">
+                    <img src="assets/img/pykachu.png" alt="Pykachu" loading="lazy"
+                        class="brand-pykachu select-none pointer-events-none" />
+                    <img src="assets/img/go.png" alt="Go" loading="lazy"
+                        class="brand-go select-none pointer-events-none" />
+                </div>
+                <p class="brand-tagline text-[10px] sm:text-xs md:text-sm text-slate-200 font-medium truncate">
+                    Decode Code. Capture Pikachu.</p>
             </div>
 
             <!-- Status Dots -->
-            <div class="flex gap-1 sm:gap-1.5 pt-1 sm:pt-1.5 flex-shrink-0">
+            <div class="justify-self-end flex gap-1 sm:gap-1.5 pt-1 sm:pt-1.5 flex-shrink-0">
                 <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 rounded-full relative">
                     <div
                         class="absolute inset-0 rounded-full bg-gradient-to-br from-red-500 via-red-600 to-red-700 border border-red-900/80">

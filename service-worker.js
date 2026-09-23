@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v1.0.7';
+const CACHE_NAME = 'pykachu-go-v1.0.8';
 const ASSETS = [
     'admin.html',
     'index.html',
@@ -63,7 +63,10 @@ const ASSETS = [
     'assets/img/ground.png',
     'assets/img/ghost.png',
     'assets/img/fairy.png',
-    'assets/img/pikachu.png'
+    'assets/img/pikachu.png',
+    'assets/img/pykachu.png',
+    'assets/img/go.png',
+    'assets/img/favicon.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -129,7 +132,7 @@ self.addEventListener('fetch', (event) => {
                             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
                         }
                     })
-                    .catch(() => {});
+                    .catch(() => { });
                 return cached;
             }
             // Not in cache yet: fetch, cache, and return.
