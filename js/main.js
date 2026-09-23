@@ -319,10 +319,15 @@ function handlePowerTap() {
     if (isLoggedIn()) {
         showConfirmDialog({
             title: 'SIGN OUT',
-            message: `Trainer <span class="text-white">${escapeHTML(currentTeam)}</span><br>Your progress is backed up before sign-out. Continue?`,
+            message: `Trainer <span class="font-bold text-white">${escapeHTML(currentTeam)}</span><br>Your progress is backed up before sign-out. Continue?`,
             icon: 'power_settings_new',
-            okText: 'Sign Out',
-            cancelText: 'Stay'
+            iconClass: 'text-red-500',
+            titleClass: 'text-red-500',
+            accentClass: 'border-red-600/50',
+            primaryClass: 'bg-red-600 text-white hover:bg-red-700',
+            primaryIcon: 'logout',
+            okText: 'LOGOUT',
+            cancelText: 'STAY'
         }).then((ok) => {
             if (ok) {
                 logoutCurrentUser();
