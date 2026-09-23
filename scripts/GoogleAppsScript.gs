@@ -370,7 +370,7 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
 
   // ──────────────────────────────────────────────────────────────
   // SNAPSHOT MODEL — a team+puzzle row is written EXACTLY ONCE.
-  //
+  //pranav
   // Only two terminal actions ever touch a row:
   //   • SOLVED           -> status SOLVED + timestamp + points
   //   • PUZZLE_ABANDONED -> row recorded mid-way (identity + exit timestamp);
@@ -384,8 +384,15 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
   // Ignore every non-terminal action (no row creation, no updates).
   if (action !== 'SOLVED' && action !== 'PUZZLE_ABANDONED') return -1;
 
-  // 🔒 SOLVED rows are sealed forever.
-  if (existingStatus === 'SOLVED') return -1;
+  // 🔒 A SOLVED row is sealed for further upgrades, but a REPEAT solve of an
+  // already-solved puzzle must still be RECORDED as a brand-new row carrying
+  // the negative (deduction) points — never merged into the sealed row.
+  if (existingStatus === 'SOLVED') {
+    if (action !== 'SOLVED') return -1;
+    isNewPuzzle = true;
+    rowIdx = -1;
+    existingStatus = '';
+  }
 
   // A mid-way row is recorded once. Only a later SOLVED may upgrade it;
   // another PUZZLE_ABANDONED (or anything else) must not rewrite it.
@@ -439,7 +446,7 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     record.totalScore = Number(data.score || 0);
 
     var queue = (Array.isArray(data.queueIds) ? data.queueIds : []).map(function(id) { return Number(id); });
-    record.unlockedPuzzles = queue.filter(function(n) { return !isNaN(n) && n > 0; }).join(',');
+    record.unlockedPuzzles = uniqueNumbers(queue).join(',');
 
     var solvedQueue = uniqueNumbers((Array.isArray(data.solvedIds) ? data.solvedIds : []).concat([puzzleId]))
     record.solvedPuzzles = solvedQueue.join(',');
