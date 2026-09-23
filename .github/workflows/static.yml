@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Create client runtime config
         env:
-          GOOGLE_SCRIPT_URL: ${{ secrets.GOOGLE_SCRIPT_URL }}
+          GOOGLE_SCRIPT_URL: https://script.google.com/macros/s/AKfycbyBXQlorxIZWisQOvmS3dJ5tA9QtbqQ29BM6e1sxXzti2K8lsz6_sMRPED_1nm9E5RY/exec
           GOOGLE_SCRIPT_TOKEN: ${{ secrets.GOOGLE_SCRIPT_TOKEN }}
           GOOGLE_SHEET_URL: https://docs.google.com/spreadsheets/d/1sXcAgdp9dDJ9ygx2xkBSdC3HyRlC-5TxDQ_y-Gyrg30/edit?gid=0#gid=0
         run: >-
