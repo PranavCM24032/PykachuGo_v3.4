@@ -158,6 +158,7 @@ function doPost(e) {
       var score = 0;
       var hintsUsed = [];
       var latestScoreTimestamp = -1;
+      var latestPuzzleTimestamp = -1;
 
       ['L1', 'L2', 'L3'].forEach(function(name) {
         var sheet = ss.getSheetByName(name);
@@ -169,12 +170,15 @@ function doPost(e) {
             if (pid > 0) {
               if (rows[i][9] === 'SOLVED') solved.push(pid);
               if (isHintFlag(rows[i][6])) hintsUsed.push(pid);
-              currentPuzzle = pid;
             }
             unlocked = unlocked.concat(parseIdList(rows[i][11]));
             solved = solved.concat(parseIdList(rows[i][12]));
             var rowTimestamp = new Date(rows[i][5]).getTime();
             if (isNaN(rowTimestamp)) rowTimestamp = 0;
+            if (pid > 0 && rowTimestamp >= latestPuzzleTimestamp) {
+              latestPuzzleTimestamp = rowTimestamp;
+              currentPuzzle = pid;
+            }
             if (rowTimestamp >= latestScoreTimestamp) {
               latestScoreTimestamp = rowTimestamp;
               score = Number(rows[i][10] || 0);
