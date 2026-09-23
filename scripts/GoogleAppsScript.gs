@@ -354,13 +354,32 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     }
   }
 
-  // 🔒 IMMUTABILITY LOCK: Reject ALL incoming updates if already SOLVED
-  if (!isNewPuzzle && rowIdx > 0) {
-    var existingStatus = rows[rowIdx - 1][9];
-    if (existingStatus === 'SOLVED') {
-      return -1;
-    }
-  }
+  // ──────────────────────────────────────────────────────────────
+  // SNAPSHOT MODEL — a team+puzzle row is written EXACTLY ONCE.
+  //
+  // Intermediate events (wrong attempts, hints, penalties) are collected in
+  // the client's per-puzzle notebook and only arrive here as ONE terminal
+  // event:
+  //   • SOLVED           -> final record (status SOLVED, points, solve time)
+  //   • PUZZLE_ABANDONED -> half-info record for a mid-way exit (UNSOLVED,
+  //                         empty points)
+  // Non-terminal events never create or modify rows. This keeps status on
+  // BOTH the Google Sheet and the admin panel strictly SOLVED / UNSOLVED
+  // with no points while unsolved, and a row never changes after it has
+  // been written once.
+  // ──────────────────────────────────────────────────────────────
+
+  var existingStatus = (rowIdx > 0) ? String(rows[rowIdx - 1][9] || '') : '';
+
+  // Ignore every non-terminal action (no row creation, no updates).
+  if (action !== 'SOLVED' && action !== 'PUZZLE_ABANDONED') return -1;
+
+  // 🔒 SOLVED rows are sealed forever.
+  if (existingStatus === 'SOLVED') return -1;
+
+  // Already recorded as UNSOLVED (mid-way exit recorded once). Only a later
+  // SOLVED may upgrade that row; nothing may keep churning it.
+  if (existingStatus !== '' && action !== 'SOLVED') return -1;
 
   var record = {
     tid: tid || '',
@@ -371,7 +390,7 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     solveTime: '',
     hintUsed: '0',
     tabSwitches: 0,
-    points: 0,
+    points: '',   // UNSOLVED rows get EMPTY points
     status: 'UNSOLVED', // Default: answer not given yet
     totalScore: 0,
     unlockedPuzzles: '',
@@ -395,26 +414,19 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     record.solvedPuzzles = vals[12] || '';
   }
 
-  // Telemetry updates
-  if (typeof data.tabSwitches === 'number') {
-    record.tabSwitches = Math.max(record.tabSwitches, data.tabSwitches);
-  }
-  if (typeof data.penaltyCount === 'number') {
-    record.tabSwitches = Math.max(record.tabSwitches, data.penaltyCount);
-  }
-
-  // STATUS RULE: SOLVED = answer given, UNSOLVED = answer not given yet
+  // STATUS RULE: exactly SOLVED or UNSOLVED.
   if (action === 'SOLVED') {
     record.status = 'SOLVED';
     record.solveTime = timestamp;
+    record.points = Number(record.points || 0);
 
     var deltaPoints = Number(data.points != null ? data.points : (data.pointsEarned || 0) - (data.pointsLost || 0));
+    if (isNaN(deltaPoints)) deltaPoints = 0;
     record.points += deltaPoints;
 
     if (typeof data.wrongAttempts === 'number') record.wrongAttempts = Math.max(record.wrongAttempts, data.wrongAttempts);
-    // Keep the flag set by HINT_USED even when the later solve payload does
-    // not include hintUsed (older clients may omit it).
-    if (isHintFlag(data.hintUsed)) record.hintUsed = '1';
+    if (typeof data.tabSwitches === 'number') record.tabSwitches = Math.max(record.tabSwitches, data.tabSwitches);
+    if (isHintFlag(data.hintUsed) || (typeof data.hintsUsed === 'number' && data.hintsUsed > 0)) record.hintUsed = '1';
 
     var queue = record.unlockedPuzzles ? record.unlockedPuzzles.split(',').map(Number) : [];
     (Array.isArray(data.queueIds) ? data.queueIds : []).forEach(function(id) {
@@ -432,21 +444,14 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
     record.totalScore = Number(data.score || 0);
 
   } else {
-    // Answer not given yet
+    // Answer not given yet — mid-way exit snapshot (half info).
     record.status = 'UNSOLVED';
+    record.points = '';   // UNSOLVED => no points, empty cell
+    record.solveTime = '';
 
-    if (action === 'PENALTY_TRIGGERED' || action === 'PENALTY' || action === 'MALPRACTICE_DETECTED') {
-      if (typeof data.tabSwitches === 'number') record.tabSwitches = data.tabSwitches;
-      else record.tabSwitches += 1;
-    } else if (action === 'WRONG_ATTEMPT') {
-      if (typeof data.attemptCount === 'number') {
-        record.wrongAttempts = Math.max(parseInt(record.wrongAttempts || 0, 10), data.attemptCount);
-      } else {
-        record.wrongAttempts += 1;
-      }
-    } else if (action === 'HINT_USED' || action === 'HINT_REQUESTED' || data.hintUsed) {
-      record.hintUsed = '1';
-    }
+    if (typeof data.wrongAttempts === 'number') record.wrongAttempts = Math.max(record.wrongAttempts, data.wrongAttempts);
+    if (isHintFlag(data.hintUsed) || (typeof data.hintsUsed === 'number' && data.hintsUsed > 0)) record.hintUsed = '1';
+    if (typeof data.tabSwitches === 'number') record.tabSwitches = Math.max(record.tabSwitches, data.tabSwitches);
   }
 
   var rowArray = [

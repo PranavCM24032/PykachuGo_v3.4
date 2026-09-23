@@ -823,6 +823,7 @@
                         solveTime: log.solveTime || '',
                         pointsEarned: toInt(log.pointsEarned, 0),
                         pointsLost: toInt(log.pointsLost, 0),
+                        points: log.points !== undefined ? toInt(log.points, 0) : undefined,
                         hasPointData: log.pointsEarned !== undefined ||
                             log.pointsLost !== undefined ||
                             log.points !== undefined,
@@ -928,10 +929,9 @@
                             }
                             totalTabs += Math.max(0, toInt(r.tabSwitches, 0));
                             if (r.tabSwitches > 0) hasMalpractice = true;
-                            const earned = toInt(r.pointsEarned, 0);
-                            const lost = toInt(r.pointsLost, 0);
-                            if (r.hasPointData) {
-                                pointsFromRecords += earned - lost;
+                            // Only solved puzzles earn points; unsolved rows stay empty.
+                            if (r.status === 'SOLVED') {
+                                pointsFromRecords += toInt(r.points, 0);
                                 hasPointData = true;
                             }
                             // Use the latest running total as a fallback for
@@ -999,7 +999,7 @@
                         <div class="font-mono text-slate-300">${r.solved}</div>
                         <div class="font-mono text-amber-300">${r.totalHints}</div>
                         <div class="font-mono text-pink-300">${r.totalTabs}</div>
-                        <div class="font-mono font-bold ${r.pts > 0 ? 'text-emerald-300' : 'text-slate-500'}">${r.pts}</div>
+                        <div class="font-mono font-bold ${r.solved > 0 && r.pts > 0 ? 'text-emerald-300' : 'text-slate-500'}">${r.solved > 0 ? r.pts : '-'}</div>
                     </div>`;
                 }).join('');
                 return;
@@ -1116,7 +1116,7 @@
                     ? '<span class="text-emerald-400 font-bold">SOLVED</span>'
                     : '<span class="text-red-400 font-bold">UNSOLVED</span>';
 
-                const netPts = (parseInt(lvlData.pointsEarned || 0, 10) - parseInt(lvlData.pointsLost || 0, 10));
+                const netPts = adminStatus === 'SOLVED' ? toInt(lvlData.points, 0) : '';
 
                 return `
                 <div class="grid gap-1 px-3 py-2 border-b border-slate-800/50 transition-all items-center hover:bg-white/5 text-[9px] text-center fade-in" style="grid-template-columns: ${L_COLS}">
@@ -1135,7 +1135,7 @@
                     <div class="font-bold">${hintBadge}</div>
                     <div class="font-mono text-emerald-400 text-[8px]">${escapeHTML(solveTimeStr)}</div>
                     <div class="font-bold">${statusBadge}</div>
-                    <div class="font-mono text-[8px] font-bold ${netPts > 0 ? 'text-emerald-300' : netPts < 0 ? 'text-red-300' : 'text-slate-500'}" title="Earned ${lvlData.pointsEarned || 0} - Lost ${lvlData.pointsLost || 0}">${netPts}</div>
+                    <div class="font-mono text-[8px] font-bold ${adminStatus === 'SOLVED' ? (netPts > 0 ? 'text-emerald-300' : netPts < 0 ? 'text-red-300' : 'text-slate-500') : 'text-slate-600'}" title="${adminStatus === 'SOLVED' ? 'Points ' + (lvlData.points || 0) : 'No points - unsolved'}">${adminStatus === 'SOLVED' ? netPts : '-'}</div>
                     <div class="font-mono text-amber-300 font-bold text-[8px]">${lvlData.totalScore || 0}</div>
                     <div class="font-mono text-purple-400 truncate text-[8px]" title="Unlock queue after this puzzle">${escapeHTML(lvlData.unlockedPuzzles || '-')}</div>
                 </div>`;
