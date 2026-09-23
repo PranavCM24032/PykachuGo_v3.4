@@ -1261,16 +1261,25 @@ function wipeData() {
             try {
                 const resp = await fetch(CONFIG.SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
+                    mode: 'cors',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({
                         action: 'RESET_ALL',
                         adminToken,
+                        token: CONFIG.TOKEN,
                         timestamp: new Date().toISOString()
                     })
                 });
 
-                // With no-cors we can't read the body; assume success unless it threw.
+                let resetResponse = null;
+                try {
+                    resetResponse = await resp.json();
+                } catch (e) {
+                    resetResponse = null;
+                }
+                if (!resetResponse || resetResponse.status !== 'success') {
+                    throw new Error('Server rejected reset: ' + ((resetResponse && resetResponse.message) || resp.status));
+                }
                 localStorage.removeItem('pykachuLogs');
                 state.logs = [];
                 state.usingCachedData = false;

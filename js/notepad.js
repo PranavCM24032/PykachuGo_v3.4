@@ -193,15 +193,33 @@ function flushPuzzleNotebooksOnUnload() {
             eventId: (typeof generateEventId === 'function' ? generateEventId() : undefined),
             ...summary
         };
-        fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'cors',
-            cache: 'no-cache',
-            keepalive: true,
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ ...payload, token: GOOGLE_SCRIPT_TOKEN })
-        }).catch(() => { });
-        n.dirty = false;
-        savePuzzleNotebook(notebook);
+        const body = JSON.stringify({ ...payload, token: GOOGLE_SCRIPT_TOKEN });
+        let queued = false;
+
+        if (typeof navigator.sendBeacon === 'function') {
+            try {
+                queued = navigator.sendBeacon(
+                    GOOGLE_SCRIPT_URL,
+                    new Blob([body], { type: 'text/plain;charset=utf-8' })
+                );
+            } catch (e) { }
+        }
+
+        if (!queued) {
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'cors',
+                cache: 'no-cache',
+                keepalive: true,
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: body
+            }).catch(() => { });
+        }
+
+        // Keep failed/unconfirmed unloads dirty so the next session can retry.
+        if (queued) {
+            n.dirty = false;
+            savePuzzleNotebook(notebook);
+        }
     }
 }
