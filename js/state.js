@@ -229,10 +229,11 @@ function standardizeString(str) {
 // ==============================
 // A puzzle is only allowed to be scanned/unlocked if it is listed in the
 // NEXT puzzle chain of the player's current progress: the scanned puzzle must
-// appear in currentPuzzle.nextPuzzleId. Starting puzzles (marked by startCode)
-// are always allowed to begin the chain.
+// appear in currentPuzzle.nextPuzzleId. Entry/starting puzzles (marked by a
+// startCode AND badgeId) are legitimate chain entry points, NOT jumps, and
+// always bypass the queue gate.
 function isStartingPuzzle(puzzle) {
-    return !!(puzzle && puzzle.startCode);
+    return !!(puzzle && puzzle.startCode && puzzle.badgeId);
 }
 
 function getNextPuzzle(puzzle) {
@@ -265,7 +266,7 @@ function puzzleGateMessage(puzzle) {
         return '❌ Access Denied - This location is already completed';
     }
     if (isStartingPuzzle(puzzle)) {
-        return '❌ Access Denied - Start from the first location';
+        return '❌ Access Denied - Enter this location\'s start key first';
     }
     return '❌ Access Denied - Complete a connected location first';
 }
