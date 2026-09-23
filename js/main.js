@@ -317,9 +317,19 @@ function prefillRegistrationForm() {
 
 function handlePowerTap() {
     if (isLoggedIn()) {
-        if (confirm(`Sign out trainer ${currentTeam}?`)) {
-            logoutCurrentUser();
-        }
+        showConfirmDialog({
+            title: 'SIGN OUT',
+            message: `Trainer <span class="text-white">${escapeHTML(currentTeam)}</span><br>Your progress is backed up before sign-out. Continue?`,
+            icon: 'power_settings_new',
+            okText: 'Sign Out',
+            cancelText: 'Stay'
+        }).then((ok) => {
+            if (ok) {
+                logoutCurrentUser();
+            } else {
+                showToast('Stay in battle, trainer!', 'info');
+            }
+        });
     } else {
         showToast('Trainer sign-in required', 'info');
         showStep(1);

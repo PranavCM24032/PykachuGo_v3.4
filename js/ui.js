@@ -45,6 +45,61 @@ function showToast(message, type = 'info') {
     if (type === 'success') playSound('success');
 }
 
+function showConfirmDialog(opts) {
+    const screen = document.querySelector('.crt-screen');
+    if (!screen) return Promise.resolve(false);
+
+    opts = opts || {};
+
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-dialog-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+
+        overlay.innerHTML = `
+            <div class="confirm-dialog-box glass-black font-pixel">
+                <div class="confirm-dialog-icon">
+                    <span class="material-symbols-rounded text-2xl">${opts.icon || 'logout'}</span>
+                </div>
+                <div class="confirm-dialog-title text-[10px] sm:text-xs text-white tracking-widest">${escapeHTML(opts.title || 'Confirm')}</div>
+                <div class="confirm-dialog-message text-[9px] sm:text-[10px] text-gray-300 leading-relaxed">${opts.message || ''}</div>
+                <div class="confirm-dialog-actions">
+                    <button type="button" class="confirm-dialog-btn confirm-dialog-cancel" data-act="cancel" onclick="playSound('click')">
+                        <span class="material-symbols-rounded text-sm">close</span>
+                        <span>${escapeHTML(opts.cancelText || 'Cancel')}</span>
+                    </button>
+                    <button type="button" class="confirm-dialog-btn confirm-dialog-danger" data-act="ok" onclick="playSound('click')">
+                        <span class="material-symbols-rounded text-sm">logout</span>
+                        <span>${escapeHTML(opts.okText || 'Confirm')}</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        function close(result) {
+            overlay.remove();
+            document.removeEventListener('keydown', onKey);
+            resolve(result);
+        }
+
+        function onKey(e) {
+            if (e.key === 'Escape') close(false);
+        }
+
+        overlay.querySelector('[data-act="cancel"]').addEventListener('click', () => close(false));
+        overlay.querySelector('[data-act="ok"]').addEventListener('click', () => close(true));
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) close(false);
+        });
+        document.addEventListener('keydown', onKey);
+
+        screen.appendChild(overlay);
+
+        requestAnimationFrame(() => overlay.classList.add('is-open'));
+    });
+}
+
 function triggerShake(elementId) {
     const el = document.getElementById(elementId);
     if (!el) return;
