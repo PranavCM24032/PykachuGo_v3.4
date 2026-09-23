@@ -470,7 +470,7 @@
             SHEET_URL: RUNTIME_CONFIG.googleSheetUrl || '',
             REFRESH_RATE: 5000,
             MAX_LOGS: 500,
-            VERSION: '3.3.0'
+            VERSION: '3.4.0'
         };
 
         const masterSheetLink = document.getElementById('masterSheetLink');
@@ -525,6 +525,8 @@
             const authInput = document.getElementById('adminPassword');
             const authError = document.getElementById('adminAuthError');
 
+            const authSubmitBtn = authForm.querySelector('button[type="submit"]');
+
             authForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
                 authError.classList.add('hidden');
@@ -533,6 +535,12 @@
                     authError.classList.remove('hidden');
                     authInput.select();
                     return;
+                }
+                const originalBtnText = authSubmitBtn ? authSubmitBtn.textContent : '';
+                if (authSubmitBtn) {
+                    authSubmitBtn.disabled = true;
+                    authSubmitBtn.textContent = 'AUTHENTICATING...';
+                    authSubmitBtn.classList.add('opacity-75', 'cursor-not-allowed');
                 }
                 try {
                     const resp = await fetch(CONFIG.SCRIPT_URL, {
@@ -556,6 +564,11 @@
                     console.error('Admin auth failed:', e);
                     authError.textContent = 'ACCESS DENIED - INVALID ADMIN TOKEN';
                     authError.classList.remove('hidden');
+                    if (authSubmitBtn) {
+                        authSubmitBtn.disabled = false;
+                        authSubmitBtn.textContent = originalBtnText;
+                        authSubmitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    }
                     authInput.select();
                 }
             });
@@ -652,7 +665,7 @@
                 const url = `${CONFIG.SCRIPT_URL}?t=${timestamp}&token=${encodeURIComponent(CONFIG.TOKEN)}`;
 
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 12000);
+                const timeoutId = setTimeout(() => controller.abort(), 35000);
                 const response = await fetch(url, { signal: controller.signal });
                 clearTimeout(timeoutId);
                 if (!response.ok) throw new Error('Network response was not ok');

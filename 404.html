@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pykachu Go - Redirecting...</title>
+    <script>
+        (function() {
+            var path = window.location.pathname || '';
+            var segments = path.split('/').filter(Boolean);
+            var lastSegment = segments.pop() || '';
+
+            // Base repository name on GitHub Pages (e.g. /PykachuGo_v3.4/ or /)
+            var repoSegment = segments.length > 0 ? '/' + segments[0] + '/' : '/';
+
+            // Route to admin if requested
+            if (lastSegment.toLowerCase() === 'admin' || lastSegment.toLowerCase() === 'admin.html') {
+                window.location.replace(repoSegment + 'admin.html' + window.location.search);
+                return;
+            }
+
+            // Route memes or puzzles if last segment is an ID
+            if (lastSegment && lastSegment !== 'PykachuGo_v3.4' && lastSegment !== 'index.html') {
+                var queryParam = /^M\d+/i.test(lastSegment) ? 'memid=' : 'linkid=';
+                window.location.replace(repoSegment + 'index.html?' + queryParam + encodeURIComponent(lastSegment));
+                return;
+            }
+
+            // Default fallback: return to home
+            window.location.replace(repoSegment);
+        })();
+    </script>
+</head>
+<body style="background:#020617;color:#94a3b8;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+    <p>Redirecting to Pykachu Go...</p>
+</body>
+</html>

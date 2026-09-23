@@ -2,6 +2,7 @@ const CACHE_NAME = 'pykachu-go-v1.0.6';
 const ASSETS = [
     'admin.html',
     'index.html',
+    '404.html',
     'css/base.css',
     'css/shell.css',
     'css/buttons.css',
