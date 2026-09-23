@@ -53,12 +53,14 @@
     {
         "id": 4,
         "linkid": "XG04",
+        "badgeId": 3,
         "questionPython": "def func(n):\n    return n * 4 - 1\n\nx = func(2)\ny = func(3)\nz = y - x\nprint(z)",
         "questionCpp": "#include <iostream>\nusing namespace std;\n\nint func(int n) {\n    return n * 4 - 1;\n}\n\nint main() {\n    int x = func(2);\n    int y = func(3);\n    int z = y - x;\n    cout << z << endl;\n    return 0;\n}",
         "answer": "4",
         "nextPuzzleId": [
             5
         ],
+        "startCode": "GRASS",
         "locationClue": "M215 back door",
         "level": 1,
         "points": 10,
