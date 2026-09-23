@@ -289,8 +289,16 @@ function prefillRegistrationForm() {
     if (langSel && info.language && langSel.querySelector(`option[value="${info.language}"]`)) {
         langSel.value = info.language;
     }
-    if (missionSel && info.mission && missionSel.querySelector(`option[value="${info.mission}"]`)) {
-        missionSel.value = info.mission;
+    if (missionSel && info.mission) {
+        const legacyMappings = { 'L2_CHARIZARD': 'L2_GHOST', 'L2_GRENINJA': 'L2_FAIRY' };
+        const mappedMission = legacyMappings[info.mission] || info.mission;
+        if (missionSel.querySelector(`option[value="${mappedMission}"]`)) {
+            missionSel.value = mappedMission;
+        }
+    }
+    if (typeof refreshSelectDisplay === 'function') {
+        if (langSel) refreshSelectDisplay(langSel);
+        if (missionSel) refreshSelectDisplay(missionSel);
     }
 }
 

@@ -318,13 +318,13 @@
                         <select id="typeFilter" onchange="renderLogs()"
                             class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg px-3 py-3 sm:py-2 focus:border-indigo-500 outline-none">
                             <option value="ALL">ALL TYPES</option>
-                            <option value="GRASS">🌿 GRASS</option>
-                            <option value="FIRE">🔥 FIRE</option>
-                            <option value="WATER">💧 WATER</option>
-                            <option value="GROUND">🌍 GROUND</option>
-                            <option value="CHARIZARD">🐲 CHARIZARD</option>
-                            <option value="GRENINJA">🐸 GRENINJA</option>
-                            <option value="PIKACHU">⚡ PIKACHU</option>
+                            <option value="GRASS"><img src="assets/img/grass.png" alt="Grass" class="inline w-4 h-4 mr-1 align-middle"> GRASS</option>
+                            <option value="FIRE"><img src="assets/img/fire.png" alt="Fire" class="inline w-4 h-4 mr-1 align-middle"> FIRE</option>
+                            <option value="WATER"><img src="assets/img/water.png" alt="Water" class="inline w-4 h-4 mr-1 align-middle"> WATER</option>
+                            <option value="GROUND"><img src="assets/img/ground.png" alt="Ground" class="inline w-4 h-4 mr-1 align-middle"> GROUND</option>
+                            <option value="GHOST"><img src="assets/img/ghost.png" alt="Ghost" class="inline w-4 h-4 mr-1 align-middle"> GHOST</option>
+                            <option value="FAIRY"><img src="assets/img/fairy.png" alt="Fairy" class="inline w-4 h-4 mr-1 align-middle"> FAIRY</option>
+                            <option value="PIKACHU"><img src="assets/img/pikachu.png" alt="Pikachu" class="inline w-4 h-4 mr-1 align-middle"> PIKACHU</option>
                         </select>
                     </div>
 
@@ -445,6 +445,7 @@
     </main>
 
     <script src="js/runtime-config.js"></script>
+    <script src="js/custom-select.js"></script>
     <script>
         const RUNTIME_CONFIG = window.PYKACHU_RUNTIME_CONFIG || {};
         const CONFIG = {

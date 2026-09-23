@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v3.2';
+const CACHE_NAME = 'pykachu-go-v3.4';
 const ASSETS = [
     'admin.html',
     'index.html',
@@ -32,6 +32,7 @@ const ASSETS = [
     'js/include.js',
     'js/rate-limiter.js',
     'js/notepad.js',
+    'js/custom-select.js',
     'html/step0.html',
     'html/step1.html',
     'html/step2.html',
@@ -52,7 +53,16 @@ const ASSETS = [
     'assets/img/joy.png',
     'assets/img/oak.png',
     'assets/img/officer-jenny.png',
-    'assets/img/poketropy.png'
+    'assets/img/poketropy.png',
+    'assets/img/python.png',
+    'assets/img/C++.png',
+    'assets/img/grass.png',
+    'assets/img/fire.png',
+    'assets/img/water.png',
+    'assets/img/ground.png',
+    'assets/img/ghost.png',
+    'assets/img/fairy.png',
+    'assets/img/pikachu.png'
 ];
 
 self.addEventListener('install', (event) => {
