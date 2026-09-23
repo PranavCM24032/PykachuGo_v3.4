@@ -201,8 +201,10 @@
 </head>
 
 <body class="min-h-screen flex flex-col">
-    <div id="adminAuthModal" class="fixed inset-0 z-50 grid place-items-center bg-slate-950/95 p-6">
-        <form id="adminAuthForm" class="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+    <div id="adminAuthModal"
+        class="fixed inset-0 z-50 grid min-h-[100dvh] place-items-start overflow-y-auto bg-slate-950/95 px-4 py-[max(1rem,env(safe-area-inset-top))] sm:place-items-center sm:p-6">
+        <form id="adminAuthForm"
+            class="my-auto w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl sm:p-6">
             <h1 class="font-mono text-lg font-bold text-slate-100">ADMIN ACCESS</h1>
             <p class="mt-2 text-sm text-slate-400">Enter the administrator password to continue.</p>
             <label for="adminPassword" class="sr-only">Administrator password</label>

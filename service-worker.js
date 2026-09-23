@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v3.8';
+const CACHE_NAME = 'pykachu-go-v1.0.1';
 const ASSETS = [
     'admin.html',
     'index.html',
