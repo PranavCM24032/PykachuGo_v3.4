@@ -707,7 +707,7 @@
                     <div class="text-center font-mono">#</div>
                     <div class="text-center font-mono text-blue-400">TID</div>
                     <div class="text-left font-bold pl-1">Team Name</div>
-                    <div class="text-center font-mono text-slate-400">Last Active</div>
+                    <div class="text-center font-mono text-slate-400">Timestamp</div>
                     <div class="text-center font-mono text-slate-400">Solved</div>
                     <div class="text-center font-mono text-amber-400">Hints</div>
                     <div class="text-center font-mono text-pink-400">Tabs</div>
@@ -913,11 +913,11 @@
                     let totalTabs = 0;
                     let pointsFromRecords = 0;
                     let hasPointData = false;
-                    let lastActive = '';
+                    let latestTimestamp = '';
+                    let latestTimestampMs = -1;
                     let hasHint = false;
                     let hasMalpractice = false;
                     let latestScore = 0;
-                    let latestScoreTime = '';
                     leaderboardLevels.forEach(l => {
                         const recs = t.levels[l];
                         if (!Array.isArray(recs)) return;
@@ -936,22 +936,25 @@
                             }
                             // Use the latest running total as a fallback for
                             // older records that do not expose point fields.
-                            if (r.lastActive && (!latestScoreTime || r.lastActive > latestScoreTime)) {
-                                latestScoreTime = r.lastActive;
+                            const recordTimestamp = r.timestamp || '';
+                            const recordTimestampMs = recordTimestamp
+                                ? new Date(recordTimestamp).getTime()
+                                : NaN;
+                            if (Number.isFinite(recordTimestampMs) &&
+                                recordTimestampMs >= latestTimestampMs) {
+                                latestTimestampMs = recordTimestampMs;
+                                latestTimestamp = recordTimestamp;
                                 latestScore = toInt(r.totalScore, 0);
-                            }
-                            if (r.lastActive && (!lastActive || r.lastActive > lastActive)) {
-                                lastActive = r.lastActive;
                             }
                         });
                     });
-                    if (!lastActive) lastActive = t.regTime || '';
+                    if (!latestTimestamp) latestTimestamp = t.regTime || '';
                     const pts = hasPointData ? pointsFromRecords : latestScore;
                     return {
                         name: t.name,
                         teamName: t.teamName,
                         tid: t.tid || '-',
-                        lastActive: lastActive,
+                        timestamp: latestTimestamp,
                         solved: solved,
                         totalHints: totalHints,
                         totalTabs: totalTabs,
@@ -995,7 +998,7 @@
                         <div class="text-slate-500 font-mono">${medal}</div>
                         <div class="font-mono text-blue-400 font-bold truncate">${escapeHTML(r.tid)}</div>
                         <div class="text-left font-bold text-slate-200 uppercase tracking-tight truncate pl-1" title="${escapeHTML(r.name)}">${escapeHTML(r.name)}</div>
-                        <div class="text-slate-400 font-mono text-[10px]">${escapeHTML(formatTime(r.lastActive))}</div>
+                        <div class="text-slate-400 font-mono text-[10px]">${escapeHTML(formatTime(r.timestamp))}</div>
                         <div class="font-mono text-slate-300">${r.solved}</div>
                         <div class="font-mono text-amber-300">${r.totalHints}</div>
                         <div class="font-mono text-pink-300">${r.totalTabs}</div>
