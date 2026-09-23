@@ -520,13 +520,37 @@
 
             authForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                if (authInput.value !== 'pykachugo-26') {
+                authError.classList.add('hidden');
+                const password = authInput.value.trim();
+                if (!password) {
                     authError.classList.remove('hidden');
                     authInput.select();
                     return;
                 }
-                authModal.remove();
-                await initializeAdmin();
+                try {
+                    const resp = await fetch(CONFIG.SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'cors',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({
+                            action: 'ADMIN_AUTH',
+                            adminToken: password,
+                            token: CONFIG.TOKEN,
+                            timestamp: new Date().toISOString()
+                        })
+                    });
+                    const json = await resp.json();
+                    if (json.status !== 'success') {
+                        throw new Error(json.message || 'unauthorized');
+                    }
+                    authModal.remove();
+                    await initializeAdmin();
+                } catch (e) {
+                    console.error('Admin auth failed:', e);
+                    authError.textContent = 'ACCESS DENIED - INVALID ADMIN TOKEN';
+                    authError.classList.remove('hidden');
+                    authInput.select();
+                }
             });
         });
 
@@ -824,7 +848,7 @@
 
                 if (log.action === 'REGISTRATION') {
                     t.registered = true;
-                    t.regTime = log.lastActive || log.timestamp || '';
+                    t.regTime = log.registeredAt || log.lastActive || log.timestamp || '';
                     t.language = log.language || t.language || 'PYTHON';
                     if (log.mission) t.mission = log.mission;
                 } else if (log.action === 'SUMMARY' && log.level) {
@@ -833,7 +857,7 @@
                     // One row per (team, puzzle) — past records are preserved,
                     // each summary log appends its own record below the last.
                     t.levels[lvl].push({
-                        lastActive: log.lastActive || '',
+                        lastActive: log.lastActive || log.timestamp || '',
                         tid: log.tid || t.tid || '',
                         teamName: log.teamName || t.teamName,
                         mission: log.mission || t.mission,

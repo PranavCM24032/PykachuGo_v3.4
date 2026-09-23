@@ -122,6 +122,16 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (data.action === 'ADMIN_AUTH') {
+      var adminTokenCheck = getAdminToken();
+      if (!adminTokenCheck || data.adminToken !== adminTokenCheck) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "unauthorized" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (data.action === 'RESET_ALL') {
       var adminToken = getAdminToken();
       if (!adminToken || data.adminToken !== adminToken) {
@@ -591,7 +601,8 @@ function doGet(e) {
         teamName: regData[i][2],
         mission: regData[i][3],
         language: regData[i][4],
-        level: regData[i][5]
+        level: regData[i][5],
+        sessionId: regData[i][6]
       });
     }
 
