@@ -211,6 +211,44 @@
     transform: translate(-50%, -50%) scale(0.1);
 }
 
+.reveal-ring {
+    position: absolute;
+    left: 50%;
+    top: 75%;
+    width: 70px;
+    height: 22px;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0.2);
+    z-index: 8;
+}
+
+.pokemon-reveal.reveal-ready .reveal-ring-one {
+    animation: reveal-ring 0.75s 0.08s ease-out both;
+}
+
+.pokemon-reveal.reveal-ready .reveal-ring-two {
+    animation: reveal-ring 0.75s 0.25s ease-out both;
+}
+
+@keyframes reveal-ring {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.2);
+    }
+
+    18% {
+        opacity: 0.9;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(2.4);
+    }
+}
+
 .pokemon-reveal.reveal-ready .reveal-shockwave {
     animation: reveal-shockwave 0.7s linear forwards;
 }
