@@ -192,48 +192,136 @@
     perspective: 700px;
 }
 
-/* Radial flash fired the instant the ball bursts open */
-.reveal-flash {
+/* White gradient shockwave pulse expanding from the ball's center */
+.reveal-shockwave {
     position: absolute;
     left: 50%;
     top: 55%;
-    width: 170%;
-    height: 170%;
-    transform: translate(-50%, -50%) scale(0.2);
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     background: radial-gradient(circle,
-            rgba(255, 255, 255, 0.95) 0%,
-            rgba(255, 215, 0, 0.55) 35%,
-            rgba(96, 165, 250, 0.15) 62%,
-            transparent 74%);
+            rgba(255, 255, 255, 0.9) 0%,
+            rgba(255, 255, 255, 0.45) 28%,
+            rgba(255, 255, 255, 0.12) 55%,
+            transparent 72%);
     opacity: 0;
     pointer-events: none;
-    z-index: 8;
+    z-index: 11;
+    transform: translate(-50%, -50%) scale(0.1);
 }
 
-.pokemon-reveal.reveal-ready .reveal-flash {
-    animation: reveal-flash-burst 0.55s ease-out forwards;
+.pokemon-reveal.reveal-ready .reveal-shockwave {
+    animation: reveal-shockwave 0.7s linear forwards;
 }
 
-@keyframes reveal-flash-burst {
+/* SUDDEN — the instant the ball pops open the wave SLAMS out to full size,
+   then lingers while it fades. No slow lead-in. */
+@keyframes reveal-shockwave {
     0% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.2);
+        transform: translate(-50%, -50%) scale(0.1);
     }
 
-    25% {
+    8% {
         opacity: 1;
+        transform: translate(-50%, -50%) scale(1.8);
+    }
+
+    16% {
+        opacity: 0.95;
+        transform: translate(-50%, -50%) scale(4.5);
+    }
+
+    30% {
+        opacity: 0.7;
+        transform: translate(-50%, -50%) scale(7.5);
+    }
+
+    55% {
+        opacity: 0.45;
+        transform: translate(-50%, -50%) scale(10);
     }
 
     100% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(1.5);
+        transform: translate(-50%, -50%) scale(14);
     }
 }
 
-/* The 3D ball body — shakes like something is trying to break free…
-   Sized like a real hand-held Pokéball, clearly smaller than the
-   Pokémon it releases. */
+/* White sparkle burst — falling stars. Each tinytiny star spawns at a random
+   spot along the top of the screen and DRIFTS DOWN in slow motion, swaying
+   and twinkling like a star. JS sets --dx (sway) / --dy (fall). */
+.reveal-sparkle {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: #FFFFFF;
+    border-radius: 50%;
+    box-shadow: 0 0 3px rgba(255, 255, 255, 0.9), 0 0 6px rgba(255, 255, 255, 0.5);
+    pointer-events: none;
+    z-index: 12;
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
+    animation: sparkle-fall 6s linear forwards;
+}
+
+.reveal-sparkle.sparkle-star {
+    border-radius: 0;
+    --rot: 45deg;
+}
+
+/* STAR FALL — SLOW MOTION: born just above the top edge (top:0), then
+   drifts down the full screen height over 6s, swaying and twinkling. */
+@keyframes sparkle-fall {
+    0% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--dx, 0px) * 0.1), calc(-50% - 6px)) rotate(var(--rot, 0deg)) scale(0.6);
+    }
+
+    8% {
+        opacity: 0.95;
+        transform: translate(calc(-50% + var(--dx, 0px) * 0.12), calc(-50% + var(--dy, 0px) * 0.06)) rotate(var(--rot, 0deg)) scale(0.9);
+    }
+
+    18% {
+        opacity: 0.6;
+        transform: translate(calc(-50% + var(--dx, 0px) * 0.25), calc(-50% + var(--dy, 0px) * 0.18)) rotate(var(--rot, 0deg)) scale(0.75);
+    }
+
+    30% {
+        opacity: 0.95;
+        transform: translate(calc(-50% + var(--dx, 0px) * 0.36), calc(-50% + var(--dy, 0px) * 0.32)) rotate(var(--rot, 0deg)) scale(0.88);
+    }
+
+    44% {
+        opacity: 0.55;
+        transform: translate(calc(-50% + var(--dx, 0px) * 0.48), calc(-50% + var(--dy, 0px) * 0.46)) rotate(var(--rot, 0deg)) scale(0.7);
+    }
+
+    58% {
+        opacity: 0.9;
+        transform: translate(calc(-50% + var(--dx, 0px) * 0.62), calc(-50% + var(--dy, 0px) * 0.6)) rotate(var(--rot, 0deg)) scale(0.85);
+    }
+
+    74% {
+        opacity: 0.5;
+        transform: translate(calc(-50% + var(--dx, 0px) * 0.78), calc(-50% + var(--dy, 0px) * 0.76)) rotate(var(--rot, 0deg)) scale(0.65);
+    }
+
+    88% {
+        opacity: 0.8;
+        transform: translate(calc(-50% + var(--dx, 0px) * 0.92), calc(-50% + var(--dy, 0px) * 0.9)) rotate(var(--rot, 0deg)) scale(0.75);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(var(--rot, 0deg)) scale(0.4);
+    }
+}
+
+/* The 3D ball body — drops in, bounces TWICE (same height & speed as the
+   Pokémon), then opens. Sized like a real hand-held Pokéball. */
 .pokemon-reveal-ball {
     --ball-d: clamp(64px, 15vmin, 96px);
     position: absolute;
@@ -243,7 +331,7 @@
     height: var(--ball-d);
     transform: translate(-50%, -50%);
     transform-style: preserve-3d;
-    animation: reveal-ball-shake 0.9s ease-in-out both;
+    animation: reveal-ball-bounce 1.3s cubic-bezier(0.25, 0.7, 0.4, 1) both;
     border-radius: 50%;
     z-index: 6;
 }
@@ -252,27 +340,58 @@
     animation: none;
 }
 
-@keyframes reveal-ball-shake {
-
-    0%,
-    100% {
-        transform: translate(-50%, -50%) rotateX(10deg) rotateZ(0deg);
+@keyframes reveal-ball-bounce {
+    /* thrown in from above — accelerates downward like gravity */
+    0% {
+        transform: translate(-50%, calc(-50% - 60px)) rotateZ(-14deg);
+        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.35);
     }
 
-    18% {
-        transform: translate(-50%, -54%) rotateX(18deg) rotateZ(-9deg);
+    /* first landing */
+    15% {
+        transform: translate(-50%, -48%) rotateZ(-6deg);
+        animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
     }
 
-    36% {
-        transform: translate(-50%, -50%) rotateX(22deg) rotateZ(9deg);
+    /* first squash — compresses into the ground */
+    21% {
+        transform: translate(-50%, -40%) scaleX(1.22) scaleY(0.8) rotateZ(0deg);
+        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
-    54% {
-        transform: translate(-50%, -52%) rotateX(16deg) rotateZ(-6deg);
+    /* first bounce — decelerates to ~46px apex, same height as the Pokémon */
+    44% {
+        transform: translate(-50%, calc(-50% - 46px)) scaleX(0.97) scaleY(1.03) rotateZ(-6deg);
+        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.35);
     }
 
+    /* falling back down */
+    66% {
+        transform: translate(-50%, -47%) rotateZ(-3deg);
+        animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+    }
+
+    /* second squash */
     72% {
-        transform: translate(-50%, -50%) rotateX(20deg) rotateZ(6deg);
+        transform: translate(-50%, -43%) scaleX(1.18) scaleY(0.84) rotateZ(0deg);
+        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* small second hop */
+    86% {
+        transform: translate(-50%, calc(-50% - 24px)) scaleX(0.98) scaleY(1.02) rotateZ(-3deg);
+        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.35);
+    }
+
+    /* closing in on the platform */
+    96% {
+        transform: translate(-50%, -48%) rotateZ(0deg);
+        animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+    }
+
+    /* settle — ready for the latch release to fire the open sequence */
+    100% {
+        transform: translate(-50%, -50%) rotateZ(0deg);
     }
 }
 
@@ -408,33 +527,61 @@
     }
 }
 
-/* Opening: top shell folds up-and-away, bottom shell drops out */
+/* OPEN SEQUENCE — Phase 1 (0–0.15s): Tap & Latch. The instant the ball
+   settles, its center button flashes bright and presses in — the tactile
+   "click" that starts the release. */
+.pokemon-reveal-ball.release-latch .ball-btn {
+    animation: latch-pulse 0.15s ease-out both;
+}
+
+@keyframes latch-pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        background: radial-gradient(circle at 38% 30%, #FFFFFF 0%, #F4F4F4 55%, #D9D9D9 100%);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+    }
+
+    40% {
+        transform: translate(-50%, -50%) scale(0.8);
+        background: #FFFBDE;
+        box-shadow: 0 0 16px rgba(255, 240, 140, 0.95);
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        background: #FFFFFF;
+    }
+}
+
+/* Opening: top shell yanks up-and-away, bottom shell drops out —
+   snapping apart in a sudden burst the instant the ball opens. */
 .pokemon-reveal-ball.pokemon-reveal-open .ball-top {
-    animation: ball-top-open 0.5s cubic-bezier(0.5, 0, 1, 0.5) forwards;
+    animation: ball-top-open 0.22s cubic-bezier(0.5, 0, 1, 0.4) forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-bottom {
-    animation: ball-bottom-open 0.5s cubic-bezier(0.6, 0, 0.9, 0.5) forwards;
+    animation: ball-bottom-open 0.22s cubic-bezier(0.6, 0, 0.9, 0.45) forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-shade,
 .pokemon-reveal-ball.pokemon-reveal-open .ball-band,
 .pokemon-reveal-ball.pokemon-reveal-open .ball-btn,
 .pokemon-reveal-ball.pokemon-reveal-open .ball-gloss {
-    animation: ball-shell-fade 0.45s ease forwards;
+    animation: ball-shell-fade 0.2s ease forwards;
 }
 
 @keyframes ball-top-open {
     0% {
         transform: rotateX(0deg);
+        opacity: 1;
     }
 
-    55% {
+    30% {
         opacity: 1;
     }
 
     100% {
-        transform: translateY(-46px) rotateX(-150deg);
+        transform: translateY(-52px) rotateX(-150deg);
         opacity: 0;
     }
 }
@@ -442,10 +589,15 @@
 @keyframes ball-bottom-open {
     0% {
         transform: rotateX(0deg);
+        opacity: 1;
+    }
+
+    40% {
+        opacity: 1;
     }
 
     100% {
-        transform: translateY(30px) rotateX(40deg);
+        transform: translateY(36px) rotateX(45deg);
         opacity: 0;
     }
 }
@@ -460,39 +612,68 @@
     }
 }
 
-/* Pokémon: hidden inside the ball, then springs out with a squash-stretch */
+/* Pokémon materialization — OPEN SEQUENCE Phase 4 (0.65–1.2s). Hidden until
+   the plasma beam peaks, then a WHITE energy silhouette springs up to 115%
+   overshoot, dissolves through a flash of light, and leaves the full-color
+   sprite resting at 100%. The scale and the white->color morph run in sync. */
 .reveal-pop {
     position: absolute;
     left: 50%;
-    bottom: 0;
-    transform: translateX(-50%) scale(0);
-    transform-origin: bottom center;
+    top: 55%;
+    transform: translate(-50%, -50%) scale(0);
+    transform-origin: center;
     opacity: 0;
     z-index: 10;
 }
 
 .pokemon-reveal.reveal-ready .reveal-pop {
-    animation: reveal-pop-bounce 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+    animation:
+        reveal-pop-bounce 0.6s 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) both,
+        pokemon-materialize 0.85s 0.5s ease-in-out both;
 }
 
 @keyframes reveal-pop-bounce {
     0% {
         opacity: 0;
-        transform: translateX(-50%) scale(0) translateY(26px);
+        transform: translate(-50%, -50%) scale(0.3);
     }
 
-    58% {
-        opacity: 1;
-        transform: translateX(-50%) scale(1.18, 0.84);
+    12% {
+        opacity: 0.9;
+        transform: translate(-50%, -50%) scale(0.5);
     }
 
-    76% {
-        transform: translateX(-50%) scale(0.94, 1.06);
+    60% {
+        transform: translate(-50%, -50%) scale(1.15);
+    }
+
+    78% {
+        transform: translate(-50%, -50%) scale(0.96);
+    }
+
+    90% {
+        transform: translate(-50%, -50%) scale(1.05);
     }
 
     100% {
         opacity: 1;
-        transform: translateX(-50%) scale(1);
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* White energy silhouette that burns through a flash into full color */
+@keyframes pokemon-materialize {
+    0%,
+    52% {
+        filter: brightness(0) invert(1) drop-shadow(0 0 22px rgba(255, 255, 255, 0.9));
+    }
+
+    66% {
+        filter: brightness(2.4) invert(0) drop-shadow(0 0 18px rgba(255, 255, 255, 0.95));
+    }
+
+    100% {
+        filter: none;
     }
 }
 

@@ -5,6 +5,11 @@ let stepTransitionTimer = null;
 let stepTransitionId = 0;
 
 // Step 4 flourish: the caught Pokémon bursts out of its Pokéball.
+// Choreographed, audio-synced OPEN SEQUENCE (t = 0 when the ball settles):
+//   0.00s latch click + button press   (release-latch)
+//   0.15s shells split + white flash burst (pokemon-reveal-open / reveal-ready)
+//   0.35s plasma beam outpour + sparkle/ring particles
+//   0.65s white silhouette materializes -> flash dissolve -> full-color Pokémon
 function playPokemonReveal() {
     const stage = document.getElementById('pokemonReveal');
     const ball = document.getElementById('step4RevealBall');
@@ -12,23 +17,66 @@ function playPokemonReveal() {
 
     // Reset to the "waiting" state so re-entering step 4 replays cleanly.
     stage.classList.remove('reveal-ready');
+    ball.classList.remove('release-latch');
     ball.classList.remove('pokemon-reveal-open');
 
-    // Force a reflow so the shake animation always restarts from scratch.
+    // Force a reflow so the bounce animation always restarts from scratch.
     void stage.offsetWidth;
 
-    // Release the Pokémon only after the ball has "shaken".
+    // t=0 — the ball has finished bouncing; the latch release begins.
     setTimeout(() => {
         const step4 = document.getElementById('step4');
         if (step4 && !step4.classList.contains('active')) return;
+        ball.classList.add('release-latch');
+        playSound('pokeballOpen');
+    }, 1300);
+
+    // t=0.15s — shells snap open, flash bursts, energy pours out.
+    setTimeout(() => {
+        const step4 = document.getElementById('step4');
+        if (step4 && !step4.classList.contains('active')) return;
+        ball.classList.remove('release-latch');
         ball.classList.add('pokemon-reveal-open');
         stage.classList.add('reveal-ready');
-        playSound('pokeballOpen');
-    }, 900);
+        spawnReleaseSparkles();
+    }, 1450);
+}
+
+// Falling-star sparkle shower. Many tinytiny stars appear along the top
+// edge and drift down the full screen in slow motion — sky to ground.
+function spawnReleaseSparkles() {
+    const stage = document.getElementById('pokemonReveal');
+    if (!stage) return;
+
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    for (let i = 0; i < 80; i++) {
+        const s = document.createElement('span');
+        s.className = 'reveal-sparkle' + (i % 4 === 0 ? ' sparkle-star' : '');
+
+        s.style.left = (Math.random() * w).toFixed(1) + 'px';
+        s.style.top = '0px';
+        const sway = (Math.random() * 100 - 50);
+        const fall = h + 60 + Math.random() * 60;
+        s.style.setProperty('--dx', sway.toFixed(1) + 'px');
+        s.style.setProperty('--dy', fall.toFixed(1) + 'px');
+        s.style.animationDelay = (Math.random() * 1200).toFixed(0) + 'ms';
+
+        stage.appendChild(s);
+        setTimeout(() => s.remove(), 7600);
+    }
 }
 
 function showStep(stepNumber) {
     console.log('Showing step:', stepNumber);
+
+    // Oak's rules screen is a pre-login screen. While a team is signed in it
+    // must never be shown — a stray showStep(0) would look like an automatic
+    // flick back to the intro during the reveal or login flow.
+    if (stepNumber === 0 && typeof currentTeam !== 'undefined' && currentTeam && currentTeam.trim() !== '') {
+        return;
+    }
 
     const steps = document.querySelectorAll('.flow-step');
     // 'startcode' is the named start-key entry screen (was the old step 3).

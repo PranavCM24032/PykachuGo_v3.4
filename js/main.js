@@ -109,9 +109,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     prefillRegistrationForm();
     updatePowerLed();
 
-    // Always require a fresh manual login after a reload. Gameplay progress is
-    // still restored after the team submits the login form.
-    showStep(0);
+    // Fresh login is required after a reload (gameplay progress is restored on
+    // submit). First-time players start on Oak's rules screen; returning teams
+    // with a remembered trainer land straight on the (prefilled) login form so
+    // the Oak screen never re-appears mid-login.
+    const rememberedTeam = getTeamInfo();
+    showStep(rememberedTeam ? 1 : 0);
 
     // Auxiliary power button: short tap = sign in/out, long hold = CRT power.
     const powerButton = document.getElementById('power-button');
