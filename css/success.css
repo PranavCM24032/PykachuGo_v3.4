@@ -184,6 +184,318 @@
         transform: translateY(-45px) scaleX(0.98) scaleY(1.02);
     }
 }
+/* ── Pokémon release-from-pokéball (3D) ──────────────────────────────── */
+.pokemon-reveal {
+    position: relative;
+    width: clamp(150px, 30vh, 220px);
+    height: clamp(130px, 26vh, 215px);
+    perspective: 700px;
+}
+
+/* Radial flash fired the instant the ball bursts open */
+.reveal-flash {
+    position: absolute;
+    left: 50%;
+    top: 55%;
+    width: 170%;
+    height: 170%;
+    transform: translate(-50%, -50%) scale(0.2);
+    border-radius: 50%;
+    background: radial-gradient(circle,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(255, 215, 0, 0.55) 35%,
+            rgba(96, 165, 250, 0.15) 62%,
+            transparent 74%);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 8;
+}
+
+.pokemon-reveal.reveal-ready .reveal-flash {
+    animation: reveal-flash-burst 0.55s ease-out forwards;
+}
+
+@keyframes reveal-flash-burst {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.2);
+    }
+
+    25% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.5);
+    }
+}
+
+/* The 3D ball body — shakes like something is trying to break free…
+   Sized like a real hand-held Pokéball, clearly smaller than the
+   Pokémon it releases. */
+.pokemon-reveal-ball {
+    --ball-d: clamp(64px, 15vmin, 96px);
+    position: absolute;
+    left: 50%;
+    top: 55%;
+    width: var(--ball-d);
+    height: var(--ball-d);
+    transform: translate(-50%, -50%);
+    transform-style: preserve-3d;
+    animation: reveal-ball-shake 0.9s ease-in-out both;
+    border-radius: 50%;
+    z-index: 6;
+}
+
+.pokemon-reveal-ball.pokemon-reveal-open {
+    animation: none;
+}
+
+@keyframes reveal-ball-shake {
+
+    0%,
+    100% {
+        transform: translate(-50%, -50%) rotateX(10deg) rotateZ(0deg);
+    }
+
+    18% {
+        transform: translate(-50%, -54%) rotateX(18deg) rotateZ(-9deg);
+    }
+
+    36% {
+        transform: translate(-50%, -50%) rotateX(22deg) rotateZ(9deg);
+    }
+
+    54% {
+        transform: translate(-50%, -52%) rotateX(16deg) rotateZ(-6deg);
+    }
+
+    72% {
+        transform: translate(-50%, -50%) rotateX(20deg) rotateZ(6deg);
+    }
+}
+
+/* Two half-shells that split apart in 3D on release.
+   Each half is a TRUE semicircle whose radius equals half the ball
+   diameter, so the two halves lock into one perfect circle — the exact
+   silhouette of the favicon sphere, with no gaps at the rim. */
+.ball-half {
+    position: absolute;
+    left: 0;
+    width: var(--ball-d);
+    height: calc(var(--ball-d) / 2);
+    backface-visibility: hidden;
+}
+
+.ball-top {
+    top: 0;
+    background: radial-gradient(circle at 35% 25%,
+            #FF334B 0%,
+            #D60D28 50%,
+            #7A0010 100%);
+    border-radius: calc(var(--ball-d) / 2) calc(var(--ball-d) / 2) 0 0;
+    transform-origin: center bottom;
+}
+
+.ball-bottom {
+    bottom: 0;
+    background: radial-gradient(circle at 35% 65%,
+            #FFFFFF 0%,
+            #E2E8F0 60%,
+            #94A3B8 100%);
+    border-radius: 0 0 calc(var(--ball-d) / 2) calc(var(--ball-d) / 2);
+}
+
+/* Whole-sphere volume shading (favicon "sphereShade" overlay):
+   white specular top-left → transparent → soft shadow wrap near the rim */
+.ball-shade {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%,
+            rgba(255, 255, 255, 0.5) 0%,
+            rgba(0, 0, 0, 0) 55%,
+            rgba(0, 0, 0, 0.3) 100%);
+    opacity: 0.8;
+    z-index: 2;
+}
+
+/* Dark center rubber band */
+.ball-band {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 12%;
+    transform: translateY(-50%);
+    background: #090D16;
+    z-index: 3;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Classic white release button — a small white circle with a black rim,
+   proportioned to a real Pokéball (~26% of ball diameter) */
+.ball-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(var(--ball-d) * 0.26);
+    height: calc(var(--ball-d) * 0.26);
+    background: radial-gradient(circle at 38% 30%, #FFFFFF 0%, #F4F4F4 55%, #D9D9D9 100%);
+    border: calc(var(--ball-d) * 0.045) solid #202020;
+    border-radius: 50%;
+    z-index: 5;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), inset 0 -1px 3px rgba(0, 0, 0, 0.18);
+}
+
+/* Button specular highlight */
+.ball-btn::after {
+    content: '';
+    position: absolute;
+    top: 14%;
+    left: 18%;
+    width: 40%;
+    height: 30%;
+    background: #FFFFFF;
+    opacity: 0.75;
+    border-radius: 50%;
+    transform: rotate(-20deg);
+}
+
+/* Spherical gloss arch across the top hemisphere */
+.ball-gloss {
+    position: absolute;
+    top: 7%;
+    left: 14%;
+    width: 48%;
+    height: 26%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
+    border-radius: 50%;
+    transform: rotate(-18deg);
+    z-index: 4;
+    pointer-events: none;
+}
+
+/* Soft ellipse shadow grounding the floating ball */
+.ball-shadow {
+    position: absolute;
+    left: 50%;
+    top: 74%;
+    width: 74%;
+    height: 13%;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.42), transparent 70%);
+    border-radius: 50%;
+    z-index: 1;
+    filter: blur(2px);
+}
+
+.pokemon-reveal.reveal-ready .ball-shadow {
+    animation: ball-shadow-fade 0.5s ease forwards;
+}
+
+@keyframes ball-shadow-fade {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Opening: top shell folds up-and-away, bottom shell drops out */
+.pokemon-reveal-ball.pokemon-reveal-open .ball-top {
+    animation: ball-top-open 0.5s cubic-bezier(0.5, 0, 1, 0.5) forwards;
+}
+
+.pokemon-reveal-ball.pokemon-reveal-open .ball-bottom {
+    animation: ball-bottom-open 0.5s cubic-bezier(0.6, 0, 0.9, 0.5) forwards;
+}
+
+.pokemon-reveal-ball.pokemon-reveal-open .ball-shade,
+.pokemon-reveal-ball.pokemon-reveal-open .ball-band,
+.pokemon-reveal-ball.pokemon-reveal-open .ball-btn,
+.pokemon-reveal-ball.pokemon-reveal-open .ball-gloss {
+    animation: ball-shell-fade 0.45s ease forwards;
+}
+
+@keyframes ball-top-open {
+    0% {
+        transform: rotateX(0deg);
+    }
+
+    55% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-46px) rotateX(-150deg);
+        opacity: 0;
+    }
+}
+
+@keyframes ball-bottom-open {
+    0% {
+        transform: rotateX(0deg);
+    }
+
+    100% {
+        transform: translateY(30px) rotateX(40deg);
+        opacity: 0;
+    }
+}
+
+@keyframes ball-shell-fade {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Pokémon: hidden inside the ball, then springs out with a squash-stretch */
+.reveal-pop {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%) scale(0);
+    transform-origin: bottom center;
+    opacity: 0;
+    z-index: 10;
+}
+
+.pokemon-reveal.reveal-ready .reveal-pop {
+    animation: reveal-pop-bounce 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+}
+
+@keyframes reveal-pop-bounce {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) scale(0) translateY(26px);
+    }
+
+    58% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1.18, 0.84);
+    }
+
+    76% {
+        transform: translateX(-50%) scale(0.94, 1.06);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
+}
+
 .perfect-sparkle {
     position: absolute;
     pointer-events: none;

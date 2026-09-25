@@ -64,8 +64,26 @@
         <!-- Pokémon Stage Container -->
         <div
             class="step4-pokemon-stage relative z-10 flex w-full shrink-0 flex-col items-center justify-end pb-2 h-[clamp(140px,28vh,240px)]">
-            <img id="caughtPokemonImg" src="" alt="Caught Pokémon"
-                class="pokemon-success-glow relative z-10 size-[clamp(120px,25vh,200px)] object-contain drop-shadow-[0_0_20px_rgba(234,179,8,0.3)] transition-transform duration-300 hover:scale-105" />
+            <div id="pokemonReveal" class="pokemon-reveal relative z-10 shrink-0">
+                <!-- Release Flash -->
+                <div class="reveal-flash"></div>
+                <!-- 3D Pokéball: shakes, then splits open -->
+                <div id="step4RevealBall" class="pokemon-reveal-ball">
+                    <div class="ball-half ball-top"></div>
+                    <div class="ball-half ball-bottom"></div>
+                    <div class="ball-shade"></div>
+                    <div class="ball-band"></div>
+                    <div class="ball-btn"></div>
+                    <div class="ball-gloss"></div>
+                </div>
+                <!-- Ground shadow under the floating ball -->
+                <div class="ball-shadow"></div>
+                <!-- Pokémon pops out of the ball -->
+                <div class="reveal-pop">
+                    <img id="caughtPokemonImg" src="" alt="Caught Pokémon"
+                        class="pokemon-success-glow relative z-10 size-[clamp(120px,25vh,200px)] object-contain drop-shadow-[0_0_20px_rgba(234,179,8,0.3)] transition-transform duration-300 hover:scale-105" />
+                </div>
+            </div>
 
             <!-- Platform Base -->
             <div class="pokemon-platform absolute bottom-1">

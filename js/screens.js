@@ -4,6 +4,29 @@
 let stepTransitionTimer = null;
 let stepTransitionId = 0;
 
+// Step 4 flourish: the caught Pokémon bursts out of its Pokéball.
+function playPokemonReveal() {
+    const stage = document.getElementById('pokemonReveal');
+    const ball = document.getElementById('step4RevealBall');
+    if (!stage || !ball) return;
+
+    // Reset to the "waiting" state so re-entering step 4 replays cleanly.
+    stage.classList.remove('reveal-ready');
+    ball.classList.remove('pokemon-reveal-open');
+
+    // Force a reflow so the shake animation always restarts from scratch.
+    void stage.offsetWidth;
+
+    // Release the Pokémon only after the ball has "shaken".
+    setTimeout(() => {
+        const step4 = document.getElementById('step4');
+        if (step4 && !step4.classList.contains('active')) return;
+        ball.classList.add('pokemon-reveal-open');
+        stage.classList.add('reveal-ready');
+        playSound('pokeballOpen');
+    }, 900);
+}
+
 function showStep(stepNumber) {
     console.log('Showing step:', stepNumber);
 
@@ -94,6 +117,11 @@ function showStep(stepNumber) {
                 unlockCodeInput.focus();
             }, 600);
         }
+    }
+
+    if (stepNumber === 4) {
+        // Animate the caught Pokémon bursting out of a Pokéball.
+        if (typeof playPokemonReveal === 'function') playPokemonReveal();
     }
 
     if (stepNumber === 3) {

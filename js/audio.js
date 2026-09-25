@@ -162,6 +162,12 @@ function playSound(soundName, volume = 0.3) {
                 oscH.connect(gH); gH.connect(audioContext.destination);
                 oscH.start(now); oscH.stop(now + 0.5);
                 break;
+
+            case 'pokeballOpen':
+                createOsc(300, 'triangle', now, 0.12, 0.15);
+                createOsc(600, 'triangle', now + 0.12, 0.12, 0.12);
+                createOsc(1200, 'sine', now + 0.24, 0.2, 0.1);
+                break;
         }
 
         // Add Haptic Feedback
