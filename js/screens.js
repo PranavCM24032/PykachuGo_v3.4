@@ -168,6 +168,15 @@ function showStep(stepNumber) {
     }
 
     if (stepNumber === 4) {
+        // Reset the end-of-chain state so a repeat solve (or a re-entry via
+        // resume) always shows fresh: hide the completion modal and restore
+        // the "Scan Next Signal" CTA. The solve handler re-configures both
+        // for the current puzzle right after this runs.
+        const completionMessage = document.getElementById('completionMessage');
+        if (completionMessage) completionMessage.classList.add('hidden');
+        const nextBtn = document.getElementById('nextSignalBtn');
+        if (nextBtn) nextBtn.classList.remove('hidden');
+
         // Animate the caught Pokémon bursting out of a Pokéball.
         if (typeof playPokemonReveal === 'function') playPokemonReveal();
     }

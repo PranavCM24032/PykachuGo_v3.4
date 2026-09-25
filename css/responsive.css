@@ -44,6 +44,23 @@
         border-radius: 10px;
     }
 
+    /* Ultra-narrow header: shrink the avatar + signal dots and tighten the
+       gaps so the pykachu/go lockup keeps breathing room in the middle. */
+    .pokedex-shell > .grid {
+        gap: 6px;
+        padding-left: 2px;
+        padding-right: 2px;
+    }
+
+    .pokedex-shell > .grid > .justify-self-start {
+        width: 32px;
+        height: 32px;
+    }
+
+    .pokedex-shell > .grid > .justify-self-end {
+        transform: scale(0.85);
+    }
+
     .crt-container {
         margin: 4px;
         border-width: 3px;

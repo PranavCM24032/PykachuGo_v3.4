@@ -37,8 +37,18 @@
     }
 
     #step4 .step4-pokemon-stage {
-        height: clamp(110px, 24vh, 160px) !important;
+        height: clamp(130px, 28vh, 190px) !important;
         padding-bottom: 4px !important;
+    }
+
+    #step4 .pokemon-reveal {
+        width: clamp(150px, 32vh, 220px);
+        height: clamp(125px, 27vh, 195px);
+    }
+
+    #step4 .pokemon-success-glow {
+        width: clamp(120px, 26vh, 190px);
+        height: clamp(120px, 26vh, 190px);
     }
 
     #step4 .step4-success-content {
@@ -96,8 +106,8 @@
 .pokemon-platform {
     position: absolute;
     bottom: 5px;
-    width: clamp(100px, 20vh, 160px);
-    height: clamp(20px, 6vh, 45px);
+    width: clamp(150px, 34vh, 250px);
+    height: clamp(24px, 7vh, 55px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -170,6 +180,7 @@
     filter: drop-shadow(0 0 15px rgba(234, 179, 8, 0.8)) drop-shadow(0 0 30px rgba(255, 215, 0, 0.4));
     animation: pokemon-bounce-vertical 1.5s infinite ease-in-out;
     transform-origin: bottom center;
+    object-position: bottom;
     margin-bottom: -10px;
 }
 
@@ -187,8 +198,8 @@
 /* ── Pokémon release-from-pokéball (3D) ──────────────────────────────── */
 .pokemon-reveal {
     position: relative;
-    width: clamp(150px, 30vh, 220px);
-    height: clamp(130px, 26vh, 215px);
+    width: clamp(185px, 38vh, 285px);
+    height: clamp(165px, 34vh, 265px);
     perspective: 700px;
 }
 
@@ -250,40 +261,29 @@
 }
 
 .pokemon-reveal.reveal-ready .reveal-shockwave {
-    animation: reveal-shockwave 0.7s linear forwards;
+    animation: reveal-shockwave 0.8s ease-in-out forwards;
 }
 
-/* SUDDEN — the instant the ball pops open the wave SLAMS out to full size,
-   then lingers while it fades. No slow lead-in. */
+/* Smooth bloom: builds gently, peaks bright, then breathes away. */
 @keyframes reveal-shockwave {
     0% {
         opacity: 0;
         transform: translate(-50%, -50%) scale(0.1);
     }
 
-    8% {
+    28% {
         opacity: 1;
-        transform: translate(-50%, -50%) scale(1.8);
-    }
-
-    16% {
-        opacity: 0.95;
-        transform: translate(-50%, -50%) scale(4.5);
-    }
-
-    30% {
-        opacity: 0.7;
-        transform: translate(-50%, -50%) scale(7.5);
+        transform: translate(-50%, -50%) scale(2.6);
     }
 
     55% {
-        opacity: 0.45;
-        transform: translate(-50%, -50%) scale(10);
+        opacity: 0.65;
+        transform: translate(-50%, -50%) scale(7);
     }
 
     100% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(14);
+        transform: translate(-50%, -50%) scale(13);
     }
 }
 
@@ -591,21 +591,22 @@
     }
 }
 
-/* Opening: top shell yanks up-and-away, bottom shell drops out —
-   snapping apart in a sudden burst the instant the ball opens. */
+/* Opening: the two shells ease apart in a fluid arc — the top rolls up
+   and away while the bottom peels down and drops out. Gentle ease-out
+   keeps the burst from feeling abrupt. */
 .pokemon-reveal-ball.pokemon-reveal-open .ball-top {
-    animation: ball-top-open 0.22s cubic-bezier(0.5, 0, 1, 0.4) forwards;
+    animation: ball-top-open 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-bottom {
-    animation: ball-bottom-open 0.22s cubic-bezier(0.6, 0, 0.9, 0.45) forwards;
+    animation: ball-bottom-open 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-shade,
 .pokemon-reveal-ball.pokemon-reveal-open .ball-band,
 .pokemon-reveal-ball.pokemon-reveal-open .ball-btn,
 .pokemon-reveal-ball.pokemon-reveal-open .ball-gloss {
-    animation: ball-shell-fade 0.2s ease forwards;
+    animation: ball-shell-fade 0.22s ease forwards;
 }
 
 @keyframes ball-top-open {
@@ -614,12 +615,8 @@
         opacity: 1;
     }
 
-    30% {
-        opacity: 1;
-    }
-
     100% {
-        transform: translateY(-52px) rotateX(-150deg);
+        transform: translateY(-56px) rotateX(-158deg) rotateZ(-8deg);
         opacity: 0;
     }
 }
@@ -630,12 +627,8 @@
         opacity: 1;
     }
 
-    40% {
-        opacity: 1;
-    }
-
     100% {
-        transform: translateY(36px) rotateX(45deg);
+        transform: translateY(40px) rotateX(42deg) rotateZ(6deg);
         opacity: 0;
     }
 }
@@ -657,7 +650,7 @@
 .reveal-pop {
     position: absolute;
     left: 50%;
-    top: 55%;
+    top: 43%;
     transform: translate(-50%, -50%) scale(0);
     transform-origin: center;
     opacity: 0;

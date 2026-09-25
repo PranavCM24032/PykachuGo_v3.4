@@ -189,7 +189,10 @@ function doPost(e) {
               latestPuzzleTimestamp = rowTimestamp;
               currentPuzzle = pid;
             }
-            if (rowTimestamp >= latestScoreTimestamp) {
+            // Only SOLVED rows carry the current total score. Ignore mid-way
+            // (PUZZLE_ABANDONED) rows so their empty score cell can never
+            // clobber the team's real total back to 0 on a re-login.
+            if (rowTimestamp >= latestScoreTimestamp && rows[i][9] === 'SOLVED') {
               latestScoreTimestamp = rowTimestamp;
               score = Number(rows[i][10] || 0);
             }
