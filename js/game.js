@@ -373,6 +373,7 @@ function submitPuzzleAnswer() {
         flushPuzzleNotebook(currentPuzzle.id, true, {
             answer: answer,
             pointsEarned: pointsEarned,
+            points: pointsEarned,
             repeatSolve: !firstSolve,
             totalScore: currentTeamScore,
             solvedIds: Array.from(currentTeamSolvedPuzzles),
