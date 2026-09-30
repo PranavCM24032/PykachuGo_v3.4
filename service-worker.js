@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v1.7.9';
+const CACHE_NAME = 'pykachu-go-v1.8.0';
 const ASSETS = [
     'admin.html',
     'index.html',
@@ -38,6 +38,9 @@ const ASSETS = [
     'html/penalty.html',
     'html/hint.html',
     'html/meme.html',
+    'html/loader.html',
+    'css/loader.css',
+    'js/loader.js',
     'manifest.json',
     'data/puzzle.json',
     'data/teams.json',
@@ -63,7 +66,11 @@ const ASSETS = [
     'assets/img/pikachu.png',
     'assets/img/pykachu.png',
     'assets/img/go.png',
-    'assets/img/favicon.svg'
+    'assets/img/favicon.svg',
+    // Loader emblem art
+    'assets/img/logo1.png',
+    'assets/img/csi.jpg',
+    'assets/img/auron.png'
 ];
 
 self.addEventListener('install', (event) => {

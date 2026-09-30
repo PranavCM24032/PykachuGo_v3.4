@@ -96,6 +96,7 @@ html/                          Offline mirrors of the 4 overlay screens
   hint.html                    Hint overlay
   penalty.html                 Tab-switch blocking overlay
   meme.html                    YouTube meme overlay
+  loader.html                  Standalone splash page (full page, not a partial)
 css/                           Tailwind input + component/shell/style modules
 js/                            Game logic, scanner, Sheets client and meme player
   include.js                   Legacy partial loader — now a no-op stub
@@ -155,6 +156,27 @@ Player screens:
 | `step4` | Success screen: Pokémon reveal, points, **next location(s)** or completion |
 | `hint` / `penalty` | Hint reward overlay / tab-switch blocking overlay |
 | `meme` | Full-screen YouTube meme overlay |
+
+### The loader page
+
+`html/loader.html` is a **standalone splash page** (not one of the partials in
+`html/`): CSI and Auron in circles joined by a cross, the word *presents*, then
+`assets/img/logo1.png` exactly as the file is. `css/loader.css` is
+self-contained on purpose — no Tailwind, no build step — so the page paints
+before any of the app's CSS is parsed. `js/loader.js` is dependency-free:
+
+| Behaviour | Detail |
+|-----------|--------|
+| Progress | Tracks the three real images (`load` **and** `error` both count) instead of faking a bar |
+| Minimum visible time | 900 ms, so the emblem registers before the handoff |
+| Hard cap | 4 s. A stalled image, offline start or blocked font never traps the player |
+| Skip on repeat | `sessionStorage` marker, so returning to the loader in the same tab costs no wait |
+| Destination | `../index.html`, or `?next=<url>` to hand off anywhere |
+| Failure net | If the handoff doesn't happen, a *continue* link is appended after 8 s |
+
+All paths are relative (`../assets/img/...`), so it works both at a domain root
+and inside a GitHub Pages subpath. The page, its CSS/JS and the three images
+are all in the service-worker precache, so the splash also works fully offline.
 
 ### The step 4 catch reveal
 

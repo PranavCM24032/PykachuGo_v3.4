@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Loading &middot; Pykachu Go</title>
+    <meta name="description" content="CSI x Auron presents Pykachu Go.">
+    <meta name="theme-color" content="#0c111b">
+    <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;600&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="../css/loader.css">
+</head>
+
+<body>
+    <div class="loader-stage" id="loaderStage">
+        <!-- Row 1: CSI and Auron, each in a circle, joined by a cross -->
+        <div class="partner-row">
+            <span class="mark mark--csi">
+                <img id="markCsi" src="../assets/img/csi.jpg" alt="CSI" width="225" height="225">
+            </span>
+
+            <span class="cross" aria-hidden="true">&times;</span>
+
+            <span class="mark mark--auron">
+                <img id="markAuron" src="../assets/img/auron.png" alt="Auron" width="699" height="727">
+            </span>
+        </div>
+
+        <!-- Row 2: presents -->
+        <p class="presents">presents</p>
+
+        <!-- Row 3: the main logo, exactly as the file is -->
+        <img class="main-logo" id="mainLogo" src="../assets/img/logo1.png" alt="Pykachu Go" width="558" height="285">
+
+        <!-- Progress -->
+        <div class="progress" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100"
+            aria-valuenow="0" id="progressBar">
+            <span class="progress-fill" id="progressFill"></span>
+        </div>
+        <p class="progress-label" id="progressLabel">0%</p>
+
+        <noscript>
+            <p class="noscript">JavaScript is off &mdash; <a href="../index.html">open Pykachu Go</a> directly.</p>
+        </noscript>
+    </div>
+
+    <script src="../js/loader.js"></script>
+</body>
+
+</html>

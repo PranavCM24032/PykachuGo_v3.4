@@ -1,0 +1,194 @@
+/* ==========================================================================
+   Loader - CSI x Auron presents Pykachu Go
+   Self-contained on purpose: this page runs before any of the app's CSS is
+   parsed, so it must not depend on css/base.css, Tailwind, or a build step.
+   ========================================================================== */
+
+:root {
+    --screen: #0c111b;
+    --metal: #262a30;
+    --gold: #ffd633;
+    --gold-dim: #a3801f;
+    --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    --pixel: 'Press Start 2P', 'Courier New', monospace;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    background: var(--screen);
+    color: #e7edf5;
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    overflow: hidden;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* Faint CRT scanlines + a soft gold pool behind the emblem. Static, never
+   animated, so it costs nothing on a mid-range phone. */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(255, 214, 51, 0.09), transparent 62%),
+        repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+}
+
+.loader-stage {
+    position: relative;
+    width: min(92vw, 520px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(14px, 3.4vh, 26px);
+    transition: opacity 320ms ease, transform 320ms ease;
+}
+
+/* Row 1 ------------------------------------------------------------------ */
+.partner-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(10px, 3vw, 22px);
+}
+
+/* Both source images are opaque (no alpha channel), so the circle is a crop
+   of the artwork framed by a gold ring rather than a cut-out mask. */
+.mark {
+    display: block;
+    width: clamp(64px, 19vw, 104px);
+    height: clamp(64px, 19vw, 104px);
+    border-radius: 50%;
+    overflow: hidden;
+    background: #0a0d14;
+    border: 2px solid var(--gold-dim);
+    box-shadow: 0 0 0 1px rgba(255, 214, 51, 0.12), 0 6px 18px rgba(0, 0, 0, 0.55);
+    flex: none;
+}
+
+.mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.cross {
+    font-family: var(--pixel);
+    font-size: clamp(14px, 4.4vw, 22px);
+    color: var(--gold);
+    line-height: 1;
+    text-shadow: 0 0 12px rgba(255, 214, 51, 0.45);
+    flex: none;
+}
+
+/* Row 2 ------------------------------------------------------------------ */
+.presents {
+    margin: 0;
+    font-family: var(--pixel);
+    font-size: clamp(9px, 2.4vw, 12px);
+    letter-spacing: 0.5px;
+    color: #93a1b5;
+}
+
+/* Row 3 ------------------------------------------------------------------ */
+/* logo1.png shown exactly as the file is: natural aspect ratio, no crop, no
+   filter, no colour overlay. */
+.main-logo {
+    width: min(78vw, 420px);
+    height: auto;
+    display: block;
+}
+
+/* Progress --------------------------------------------------------------- */
+.progress {
+    width: min(78vw, 420px);
+    height: 10px;
+    margin-top: clamp(4px, 1.5vh, 12px);
+    background: var(--metal);
+    border: 2px solid #10141c;
+    overflow: hidden;
+}
+
+.progress-fill {
+    display: block;
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+    transition: width 180ms ease-out;
+}
+
+.progress-label {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--gold);
+}
+
+.noscript {
+    margin: 0;
+    font-size: 13px;
+    text-align: center;
+    color: #93a1b5;
+}
+
+.noscript a {
+    color: var(--gold);
+}
+
+/* Exit ------------------------------------------------------------------- */
+.loader-stage.is-done {
+    opacity: 0;
+    transform: scale(0.96);
+}
+
+.loader-stage.is-ready .main-logo {
+    animation: logo-in 520ms ease-out both;
+}
+
+@keyframes logo-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .loader-stage,
+    .progress-fill {
+        transition: none;
+    }
+
+    .loader-stage.is-ready .main-logo {
+        animation: none;
+    }
+}
+
+@media (max-height: 460px) {
+    .loader-stage {
+        gap: 10px;
+    }
+
+    .presents {
+        font-size: 8px;
+    }
+}
