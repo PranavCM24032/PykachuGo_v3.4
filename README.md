@@ -67,7 +67,7 @@ dashboard** livetracks every team.
 
 | Layer | Tech |
 |-------|------|
-| Frontend | Vanilla JS (no framework), HTML partials, Tailwind CSS (compiled) |
+| Frontend | Vanilla JS (no framework), single-page `index.html`, Tailwind CSS (compiled) |
 | Styling | Tailwind CSS 3 (`npm run build`) + hand-written CSS modules |
 | Backend | Google Apps Script (`scripts/GoogleAppsScript.gs`) |
 | Storage | Google Sheets workbook (1 spreadsheet, 4 tabs) + `localStorage` state |
@@ -91,19 +91,14 @@ tailwind.config.js             Tailwind config
 data/puzzle.json               Puzzle graph, answers, scores, hints and locations
 data/teams.json                Team roster used by the player login
 data/meme.json                 Meme QR IDs and YouTube clip settings
-html/                          Dynamically included screen partials
-  step0.html                   Rules briefing
-  step1.html                   Registration / login
-  step2.html                   QR scanner
+html/                          Offline mirrors of the 4 overlay screens
   startcode.html               Start-key entry
-  step3.html                   Puzzle + answer form
-  step4.html                   Success / completion screen
   hint.html                    Hint overlay
   penalty.html                 Tab-switch blocking overlay
   meme.html                    YouTube meme overlay
 css/                           Tailwind input + component/shell/style modules
 js/                            Game logic, scanner, Sheets client and meme player
-  include.js                   Async partial loader (step0..step4, startcode, ...)
+  include.js                   Legacy partial loader — now a no-op stub
   config.js                    Reads runtime config → CONFIG + sheet endpoints
   state.js                     Global game state, session id, unlock queue, epoch
   audio.js                     SFX + BGM
@@ -131,6 +126,15 @@ assets/
 .github/workflows/             static.yml (single Pages deployment)
 ```
 
+> **On `html/`:** the four files there are **not loaded at runtime**. The whole
+> UI lives inline in `index.html`; the `html/` copies exist only for offline
+> preview and future APK packaging, and must be kept byte-identical to their
+> `index.html` counterparts (`#startcode`, `#hintContainer`, `#penaltyOverlay`,
+> `#memePlayerContainer`). The flow steps (`#step0`–`#step4`) are **not**
+> mirrored — do not recreate `html/step*.html`. This replaces the old
+> `data-include` partial loading; `js/include.js` is retained only to fire the
+> `includes:ready` event other scripts still listen for.
+
 ---
 
 ## 🎯 Game flow
@@ -152,8 +156,22 @@ Player screens:
 | `hint` / `penalty` | Hint reward overlay / tab-switch blocking overlay |
 | `meme` | Full-screen YouTube meme overlay |
 
----
+### The step 4 catch reveal
 
+On solve, a 3D Pokéball drops in from off-screen and bounces **once**, the
+latch fires, the shells split, and the sprite materialises. The catch line is
+**voice-only** — `pokemonName` is never rendered on screen, so the player
+identifies the Pokémon from the sprite alone.
+
+`js/audio.js` speaks it as a small **3-voice chorus** rather than one
+utterance: staggered entrances (0 / 110 / 235 ms), a different OS voice and
+pitch per singer, tapering volume on the followers, and the preferred
+female voice (e.g. Zira) leading. This fires on every catch regardless of
+which Pokémon it is. `stopCatchVoice()` drops chorus members that have not
+entered yet, so leaving step 4 or logging out mid-reveal never leaves voices
+talking over the next screen.
+
+---
 ## 🔄 Client-side workflow (flowchart)
 
 Complete decision map of the client app. Every code-level condition is shown as
@@ -348,19 +366,22 @@ outgoing links.
   "questionCpp": "…",      // riddle in C++
   "answer": "-5",          // single correct answer (string compare)
   "nextPuzzleId": [2, 6],  // puzzle ids this one UNLOCKS (branching edge list)
-  "startCode": "START",    // presence marks a starting puzzle
+  "isStart": true,         // true = entry point a fresh team may start from
+  "startCode": "START",    // the key the player types on the startcode screen
   "locationClue": "CSE entrance - openspace",
   "level": 1,              // 1 | 2 | 3 (routes telemetry to L1/L2/L3 tab)
   "points": 10,
   "hint": "BODMAS",        // optional; null hides the hint button
-  "hintPenalty": 10,       // seconds the hint costs before it is shown
-  "pokemonId": 39          // PokeAPI sprite + cry to reveal on solve
+  "hintPenalty": 60,       // seconds the hint costs before it is shown
+  "pokemonName": "Jigglypuff"  // spoken (never rendered) on solve
 }
 ```
 
 Rules:
 
-- **Starting puzzles** have `startCode` — the ONLY thing a fresh team can unlock.
+- **Starting puzzles** have `isStart: true` — the ONLY things a fresh team can
+  unlock. `startCode` is the literal key the player types; it does not mark the
+  entry point by itself.
 - **Chains** are forward-linked: `nextPuzzleId` lists every puzzle this solve
   unlocks (branching allowed, e.g. `[2, 6]`, and even a loop back like
   puzzle 6 → `[7, 3]`).
@@ -433,24 +454,24 @@ The Admin dashboard's **LEADERBOARD** tab aggregates records by TID:
 
 ---
 
-## 🖼 PokeAPI assets (images, cries, badges)
+## 🖼 PokeAPI assets (images, badges)
 
-All Pokémon artwork, cries and gym badges come from the **PokeAPI** sprite/audio
-repos (no API key needed — they are static GitHub files loaded at runtime).
-`{pokemonId}` comes from the puzzle's `pokemonId` field; badges reuse the puzzle
-`id`.
+Pokémon artwork and gym badges come from the **PokeAPI** sprite repo (no API
+key needed — they are static GitHub files loaded at runtime). `{pokemonId}`
+comes from the puzzle's `pokemonId` field; badges use the puzzle's `badgeId`.
+There is no longer a PokeAPI cry download: the catch cry is **synthesized**
+with Web Audio oscillators in `js/audio.js`, and the spoken name uses the Web
+Speech API.
 
 | Asset | Where used | URL template |
 |-------|-----------|--------------|
 | Official artwork (caught Pokémon) | `js/data-loader.js`, `js/game.js` | `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{pokemonId}.png` |
-| Pokémon cry (pre-cached on load) | `js/data-loader.js` | `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/{pokemonId}.ogg` |
-| Gym badge (by puzzle id) | `js/data-loader.js`, `js/screens.js` | `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/{puzzleId}.png` |
+| Gym badge (by `badgeId`) | `js/data-loader.js`, `js/screens.js` | `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/{badgeId}.png` |
 
 Useful roots:
 
 - Main API & docs: <https://pokeapi.co>
 - Sprite repository: <https://github.com/PokeAPI/sprites>
-- Cries repository: <https://github.com/PokeAPI/cries>
 
 Extra external media:
 
@@ -823,7 +844,7 @@ pushing is a live content update.
 
 | Task | How |
 |------|-----|
-| **Add a puzzle** | Add an object to `data/puzzle.json`; link it via `nextPuzzleId`; set points/hints/pokemonId. |
+| **Add a puzzle** | Add an object to `data/puzzle.json`; link it via `nextPuzzleId`; set points/hints, `pokemonId` (sprite) and `pokemonName` (spoken). |
 | **Add / edit teams** | Edit `data/teams.json` (team, securityKey, tid, team_members). |
 | **Add a meme reward** | Push a `{ memeid, ytlink, starttime, endtime }` object to `data/meme.json`. |
 | **Reset the whole event** | Call the backend `RESET_ALL` (wipes all 4 tabs + bumps epoch; clients auto-wipe stale progress). |
