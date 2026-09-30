@@ -36,15 +36,15 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: clamp(140px, 28vh, 210px);
+    height: clamp(185px, 37vh, 280px);
     width: 100%;
     flex-shrink: 0;
     padding-bottom: 0;
 }
 
 #step4 .pokemon-reveal {
-    width: clamp(160px, 32vh, 240px);
-    height: clamp(140px, 28vh, 210px);
+    width: clamp(210px, 42vh, 320px);
+    height: clamp(185px, 37vh, 280px);
     --ball-d: clamp(56px, 13vmin, 76px);
     --plat-h: clamp(24px, 6vh, 42px);
     display: flex;
@@ -53,8 +53,8 @@
 }
 
 #step4 .pokemon-success-glow {
-    width: clamp(130px, 26vh, 195px);
-    height: clamp(130px, 26vh, 195px);
+    width: clamp(170px, 34vh, 260px);
+    height: clamp(170px, 34vh, 260px);
 }
 
 #step4 .step4-success-content {
@@ -79,20 +79,20 @@
     }
 
     #step4 .step4-pokemon-stage {
-        height: clamp(115px, 24vh, 160px) !important;
+        height: clamp(150px, 31vh, 210px) !important;
         padding-bottom: 0 !important;
     }
 
     #step4 .pokemon-reveal {
-        width: clamp(135px, 26vh, 180px);
-        height: clamp(115px, 24vh, 160px);
+        width: clamp(175px, 34vh, 235px);
+        height: clamp(150px, 31vh, 210px);
         --ball-d: clamp(46px, 11vmin, 60px);
         --plat-h: clamp(20px, 5vh, 30px);
     }
 
     #step4 .pokemon-success-glow {
-        width: clamp(105px, 22vh, 145px);
-        height: clamp(105px, 22vh, 145px);
+        width: clamp(140px, 29vh, 195px);
+        height: clamp(140px, 29vh, 195px);
     }
 
     #step4 .step4-success-content {
