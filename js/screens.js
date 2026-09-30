@@ -117,11 +117,11 @@ function playPokemonReveal() {
         document.dispatchEvent(new CustomEvent('pykachu:reveal-open'));
     }, 2010);
 
-    // t=3.2s — announcer speaks the catch name once the reveal has settled
+    // t=2.05s — catch fanfare chime & announcer speak in exact sync as the Pokémon emerges
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         speakCatch(pokemonName);
-    }, 3200);
+    }, 2050);
 }
 
 // Rising wisps: a handful of soft puffs of light drift up out of the opened

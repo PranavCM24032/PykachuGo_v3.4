@@ -276,13 +276,14 @@ function formatPokemonSpeechName(raw) {
 
 function speakCatch(pokemonName) {
     if (!soundEnabled || isMuted) return;
+    clearPendingCatchSpeech();
+
+    // Retro chime lands on the reveal tick immediately
+    playCatchChime();
+
     if (typeof window === 'undefined' || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
 
     const name = String(pokemonName || '').trim();
-    clearPendingCatchSpeech();
-
-    // Retro chime + the announcer line land on the same tick.
-    playCatchChime();
 
     // Format to clean Title Case so speech synthesis engines pronounce the
     // name as a word/name rather than spelling it letter-by-letter as an acronym
