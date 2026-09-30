@@ -165,7 +165,9 @@ identifies the Pokémon from the sprite alone.
 
 `js/audio.js` speaks it as a heavy male anime-announcer line — one deep
 bass voice, `Gotcha!! ... You caught ... <NAME>!!` — with the name
-shouted in caps at pitch 0.85 / rate 1.1 for a deep, energetic delivery. Google
+shouted in caps at pitch 0.78 / rate 1.05 for a deep, energetic delivery.
+Voices are scored (male keywords `+100`, female `-100`, English `+20`) and the
+highest scorer wins, so every browser settles on one consistent announcer. Google
 English male voices are preferred (Google UK English Male / Google US
 English), then any male voice (David / Mark / Guy / Christopher, etc.). A
 celebratory 8-bit "caught" jingle with airy sparkle dust and a faint crowd
@@ -769,7 +771,7 @@ and renders aggregated JSON.
 
 - `manifest.json` — standalone install, portrait, maskable icon.
 - `service-worker.js` — caches shell + data for offline reloads using cache
-  version `pykachu-go-v3.2`.
+  version `pykachu-go-v1.7.1`.
 - Requires HTTPS (GitHub Pages provides it). Bump `CACHE_NAME` in
   `service-worker.js` and the Admin dashboard `CONFIG.VERSION` when making a
   release that must replace offline assets and cached admin logs immediately.
@@ -863,6 +865,27 @@ pushing is a live content update.
 - [`assets/docs/PUZZLE_LINKING_SYSTEM.md`](assets/docs/PUZZLE_LINKING_SYSTEM.md) —
   full puzzle linking / progression design.
 - `assets/docs/*.docx` — original challenge brief & links.
+
+---
+
+## 📄 License
+
+This repository is proprietary work by Pranav Mohan Paunikar. See
+[`LICENSE.md`](LICENSE.md) for the ownership notice, the mandatory written
+permission process, and the unauthorized-use terms — the short version: academic
+study and faculty review only, no cloning, deploying, or running an event without
+written permission. A standard MIT `LICENSE` file is also present for the
+components you are explicitly cleared to reuse.
+
+## 🤝 Contributing
+
+Permission first, then the house rules (keep `index.html` and the `html/`
+mirrors in sync, bump `CACHE_NAME`, rebuild `css/tailwind.css`). See
+[`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
+
+- [Code of Conduct](.github/CODE_OF_CONDUCT.md)
+- [Security Policy](.github/SECURITY.md) — report vulnerabilities privately, never
+  as a public issue
 
 ---
 

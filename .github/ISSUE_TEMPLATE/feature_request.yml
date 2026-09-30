@@ -1,0 +1,77 @@
+name: Feature request
+description: Propose an improvement to the game or its tooling
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Pykachu Go is permission-gated proprietary work — see `LICENSE.md`.
+        Only the maintainer and authorised collaborators should file issues here.
+
+  - type: checkboxes
+    id: authorization
+    attributes:
+      label: Authorization
+      options:
+        - label: I am the maintainer or an authorised collaborator of this project.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What can't be done today, and who hits it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Be specific about the files involved (data/puzzle.json, js/game.js, css/success.css, ...).
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app?
+      options:
+        - Gameplay / puzzle flow
+        - PWA / offline / install
+        - Scanner / camera / deep links
+        - Reveal, audio, memes
+        - Anti-cheat / penalties
+        - Admin dashboard
+        - Backend / Sheets telemetry
+        - Docs / build tooling / CI
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - Players see it
+        - Organisers / admin only
+        - Maintainer-only (build, docs, refactor)
+    validations:
+      required: true
+
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Invariants to respect
+      description: Does it touch the html/ mirrors, service-worker CACHE_NAME / ASSETS, data/*.json schema, or the Sheets columns?
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

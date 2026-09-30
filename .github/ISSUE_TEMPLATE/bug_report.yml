@@ -1,0 +1,101 @@
+name: Bug report
+description: Something in the game is broken
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Pykachu Go is permission-gated proprietary work — see `LICENSE.md`.
+        Only the maintainer and authorised collaborators should file issues here.
+
+        **Never include** puzzle answers, team `securityKey` values, sheet exports,
+        or screenshots containing player data.
+
+  - type: checkboxes
+    id: authorization
+    attributes:
+      label: Authorization
+      options:
+        - label: I am the maintainer or an authorised collaborator of this project.
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you observe, and what did you expect instead?
+      placeholder: The step 4 reveal opens but the Pokémon sprite never appears.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Register team TEST1 with mission L1_ and Python
+        2. Scan XG01 and enter the start key
+        3. Submit the correct answer
+        4. Observe: the reveal stage stays empty
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app?
+      options:
+        - Boot / service worker / offline
+        - Rules and registration (step 0 / step 1)
+        - Scanner / QR / deep links (step 2 / startcode)
+        - Riddle, answer, hints (step 3)
+        - Reveal, scoring, next location (step 4)
+        - Penalty / anti-cheat blackout
+        - Meme overlay
+        - Admin dashboard
+        - Apps Script backend / Sheets data
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Page URL and screen
+      placeholder: https://<pages-url>/?linkid=XG01 — step 3
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Android Chrome 131, Pixel 8 — GitHub Pages, iOS 18 Safari
+    validations:
+      required: true
+
+  - type: input
+    id: cache-version
+    attributes:
+      label: CACHE_NAME from service-worker.js
+      description: Makes sure the report is against the deployed build.
+      placeholder: pykachu-go-v1.7.1
+    validations:
+      required: false
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors
+      description: Paste browser console output. Redact tokens.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+    validations:
+      required: false

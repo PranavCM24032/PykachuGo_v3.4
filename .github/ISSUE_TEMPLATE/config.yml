@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/PranavCM24032/PykachuGo_v3.4/blob/main/.github/SECURITY.md
+    about: Report privately by email — never open a public issue for a vulnerability.
+  - name: Permission to use / fork / run an event
+    url: https://github.com/PranavCM24032/PykachuGo_v3.4/blob/main/LICENSE.md
+    about: This project is proprietary; the required permission process is in LICENSE.md.
+  - name: Contribution & permission questions
+    url: https://github.com/PranavCM24032/PykachuGo_v3.4/blob/main/.github/CONTRIBUTING.md
+    about: Read the contributing guidelines before opening anything.
