@@ -870,14 +870,16 @@ pushing is a live content update.
 
 ## 📄 License
 
-Proprietary, all rights reserved © 2026 Pranav Mohan Paunikar. See
-[`LICENSE`](LICENSE) — it is the single complete license for this repository and
-covers ownership of the IP, the study-and-faculty-review-only grant, the
-prohibited acts (cloning, deploying, running an event), the mandatory written
-permission process with HOD / Forum Incharge / Principal sign-offs, the scope and
-termination of any granted permission, the contribution assignment clause, the
-no-warranty disclaimer, the ₹30,000-per-instance penalty and escalation / DMCA
-enforcement, and governing law.
+Proprietary, all rights reserved © 2026 Pranav Mohan Paunikar. [`LICENSE`](LICENSE) is
+the single, complete and exclusive license for this repository — it supersedes the
+former `LICENSE.md` and any MIT text. It covers definitions and scope, the
+limited study-and-faculty-review grant, prohibited acts (cloning, deploying,
+deriving, republishing, publishing answers), the mandatory written permission
+process with HOD / Forum Incharge / Principal sign-offs and the limits of any
+grant, confidentiality of live-event credentials, contribution assignment,
+third-party components and trademarks, no warranty, limitation of liability and
+indemnity, termination plus the ₹30,000-per-instance penalty, escalation and
+DMCA / court action, notices, and governing law.
 
 Short version: academic study and faculty review only — no cloning, deploying or
 running an event without written permission from the copyright holder.
