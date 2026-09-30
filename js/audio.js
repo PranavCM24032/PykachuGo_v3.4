@@ -261,6 +261,19 @@ function clearPendingCatchSpeech() {
     }
 }
 
+// Normalizes a Pokémon name to clean Title Case. If a name is passed in
+// ALL-CAPS (e.g. "JIGGLYPUFF"), browser SpeechSynthesis engines treat it as an
+// acronym / abbreviation and spell it letter-by-letter ("J-I-G-G-L-Y P-U-F-F").
+// Converting to Title Case forces the TTS engine to pronounce it as a proper name.
+function formatPokemonSpeechName(raw) {
+    if (!raw) return 'one';
+    const cleaned = String(raw).trim().replace(/[-_]+/g, ' ');
+    return cleaned
+        .split(/\s+/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+}
+
 function speakCatch(pokemonName) {
     if (!soundEnabled || isMuted) return;
     if (typeof window === 'undefined' || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
@@ -271,9 +284,10 @@ function speakCatch(pokemonName) {
     // Retro chime + the announcer line land on the same tick.
     playCatchChime();
 
-    // Stale cached puzzle data from before pokemonName existed must not
-    // silence the celebration — fall back to a generic catch line.
-    const line = name ? name.toUpperCase() : 'one';
+    // Format to clean Title Case so speech synthesis engines pronounce the
+    // name as a word/name rather than spelling it letter-by-letter as an acronym
+    // (which happens whenever text is ALL-CAPS like JIGGLYPUFF).
+    const line = name ? formatPokemonSpeechName(name) : 'one';
 
     const speakNow = () => {
         try {

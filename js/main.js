@@ -121,12 +121,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     prefillRegistrationForm();
     updatePowerLed();
 
-    // Fresh login is required after a reload (gameplay progress is restored on
-    // submit). First-time players start on Oak's rules screen; returning teams
-    // with a remembered trainer land straight on the (prefilled) login form so
-    // the Oak screen never re-appears mid-login.
-    const rememberedTeam = getTeamInfo();
-    showStep(rememberedTeam ? 1 : 0);
+    // Flow: Loader -> Step 0 (Oak's master rules) -> button click -> Step 1 (Login form)
+    showStep(0);
 
     // Tell the loader which screen we landed on. It holds the splash (and the
     // .booting gate) until this fires, so a remembered trainer never sees step0
