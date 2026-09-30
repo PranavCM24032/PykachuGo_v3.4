@@ -177,8 +177,10 @@ function doPost(e) {
         for (var i = 1; i < rows.length; i++) {
           if (rows[i][0] && String(rows[i][0]).trim().toUpperCase() === qTid.toUpperCase()) {
             var pid = Number(rows[i][3] || 0);
+            var rowStatus = String(rows[i][9] || '');
+            var isSolvedRow = rowStatus === 'SOLVED' || rowStatus === 'REPEAT_SOLVE';
             if (pid > 0) {
-              if (rows[i][9] === 'SOLVED') solved.push(pid);
+              if (isSolvedRow) solved.push(pid);
               if (isHintFlag(rows[i][6])) hintsUsed.push(pid);
             }
             unlocked = unlocked.concat(parseIdList(rows[i][11]));
@@ -189,10 +191,10 @@ function doPost(e) {
               latestPuzzleTimestamp = rowTimestamp;
               currentPuzzle = pid;
             }
-            // Only SOLVED rows carry the current total score. Ignore mid-way
-            // (PUZZLE_ABANDONED) rows so their empty score cell can never
+            // Only SOLVED / REPEAT_SOLVE rows carry the running total score.
+            // Ignore PUZZLE_ABANDONED rows so their empty score cell can never
             // clobber the team's real total back to 0 on a re-login.
-            if (rowTimestamp >= latestScoreTimestamp && rows[i][9] === 'SOLVED') {
+            if (rowTimestamp >= latestScoreTimestamp && isSolvedRow) {
               latestScoreTimestamp = rowTimestamp;
               score = Number(rows[i][10] || 0);
             }
@@ -390,12 +392,17 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
   // 🔒 A SOLVED row is sealed for further upgrades, but a REPEAT solve of an
   // already-solved puzzle must still be RECORDED as a brand-new row carrying
   // the negative (deduction) points — never merged into the sealed row.
+  var isRepeatSolve = false;
   if (existingStatus === 'SOLVED') {
     if (action !== 'SOLVED') return -1;
+    isRepeatSolve = true;
     isNewPuzzle = true;
     rowIdx = -1;
     existingStatus = '';
   }
+  // Client also sends repeatSolve:true when the sheet state was ambiguous
+  // (e.g. after a reset) but the client knows the puzzle was already solved.
+  if (data.repeatSolve === true) isRepeatSolve = true;
 
   // A mid-way row is recorded once. Only a later SOLVED may upgrade it;
   // another PUZZLE_ABANDONED (or anything else) must not rewrite it.
@@ -437,7 +444,9 @@ function applyLevelRow(rows, teamName, tid, mission, action, data, timestamp) {
   if (isHintFlag(data.hintUsed) || (typeof data.hintsUsed === 'number' && data.hintsUsed > 0)) record.hintUsed = '1';
 
   if (action === 'SOLVED') {
-    record.status = 'SOLVED';
+    // Repeat solves get their own distinguishable status so the admin panel
+    // can render them differently and the sheet is self-documenting.
+    record.status = isRepeatSolve ? 'REPEAT_SOLVE' : 'SOLVED';
     record.timestamp = timestamp;
     record.points = (String(record.points).trim() === '') ? 0 : Number(record.points);
 
@@ -516,6 +525,12 @@ function findPuzzleRow(rows, teamName, tid, puzzleId, nullPuzzleMatch) {
     var teamMatches = (tId && rowTid === tId) || (tName && rowTeam === tName);
 
     if (teamMatches) {
+      // REPEAT_SOLVE rows are permanent standalone records; they must NEVER be
+      // matched as the "existing" anchor row — otherwise a third repeat would
+      // overwrite the second repeat row instead of creating a new one.
+      var rowStatus = String(rows[i][9] || '');
+      if (rowStatus === 'REPEAT_SOLVE') continue;
+
       var rowPid = rows[i][3];
       var rowHasPid = rowPid !== '' && rowPid !== null && !isNaN(rowPid);
       if (puzzleId) {
