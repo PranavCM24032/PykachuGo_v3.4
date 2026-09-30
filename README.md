@@ -177,10 +177,22 @@ blurred golden beam, which fought the app's CRT/pixel theme, doubled up with
 the bloom and the sprite's own materialize glow, and grew straight through the
 reveal it was meant to sell.
 
-`js/audio.js` speaks it as a heavy male anime-announcer line — one deep
-bass voice, `Gotcha!! ... You caught ... <NAME>!!` — with the name
-shouted in caps at pitch 0.7 / rate 1.02 (pitch 0.35 / rate 0.95 on devices
-with no male voice) for a deep, unhurried delivery.
+`js/audio.js` speaks it as a male anime-announcer line — one male voice,
+`Gotcha! You caught <NAME>!` — with the name shouted in caps at pitch 0.92 /
+rate 1.08 (pitch 0.55 / rate 1.0 on devices with no male voice), which is
+deliberately close to neutral so it reads as a natural announcer rather than
+a slowed-down, muffled one.
+
+Three things were tuned in the field because they made the line sound *broken*
+on real phones, not merely the wrong gender:
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Line chopped into clipped, stuttering chunks | `speechSynthesis.cancel()` fired immediately before `speak()`. Android Chrome's engine is still tearing the previous utterance down and stutters on the new one. | `speakCatch()` no longer cancels; only a genuine abort (leaving step 4, logging out) goes through `stopCatchVoice()`. A separate `clearPendingCatchSpeech()` drops only the queued line. |
+| Deep but muffled / unnatural | Pitch was pushed to 0.7 for male voices and 0.35 for the female fallback — far enough down that the engine resamples into a growl and rate 0.95 dragged it out. | Near-neutral pitch (0.92 / 0.55) and a slightly brisk rate (1.08 / 1.0). |
+| Halting or clipped phrasing | `Gotcha!! ... You caught ... <NAME>!!` — punctuation runs and spaced ellipses make engines hesitate and clip. | Plain sentence: `Gotcha! You caught <NAME>!` |
+| Line starts late or never starts after a screen change | Android can leave the synthesis queue `paused` across navigations. | `speakNow()` calls `synth.resume()` when `synth.paused` is true. |
+
 Voice selection is tiered and deterministic: any voice whose name advertises a
 female voice (`female`, Zira, Samantha, Aria, Google US English, …) is
 **vetoed outright**, then explicit `male` names rank `+500`, known male voice
@@ -193,7 +205,7 @@ Three guards keep the announcer male on real phones:
 | Problem | Guard |
 |---------|-------|
 | Android Chrome reports an empty voice list until the engine warms up | The line waits (max 1.5 s) for `voiceschanged` instead of falling through to the browser's default — usually female — voice. `initAudio()` also resolves once at load. |
-| Devices that only ship female English voices | Pitch drops to 0.35 / rate 0.95, which reads as a deep announcer instead of a female robot. The line is never muted. |
+| Devices that only ship female English voices | Pitch drops to 0.55 / rate 1.0, which still reads as a deep announcer instead of a female robot. The line is never muted. |
 | Android swaps engines when Google TTS updates, silently changing the voice between sessions | The winning male voice name is remembered in `localStorage` (`pykachu.catchVoice`) and re-used whenever still installed; a vanished entry is forgotten and re-ranked. |
 
 The announcer voice is re-resolved immediately before every utterance, so a

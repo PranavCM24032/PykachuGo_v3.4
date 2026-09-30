@@ -243,12 +243,21 @@ function unlockCatchVoice() {
 }
 
 function stopCatchVoice() {
+    clearPendingCatchSpeech();
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch (e) { }
+    }
+}
+
+// Only clears the queued line, leaving anything already speaking alone.
+// cancel() is deliberately NOT used here: on Android Chrome a cancel()
+// immediately followed by speak() makes the engine stutter and clip the new
+// line into broken-sounding chunks. A real abort (leaving step 4, logging out)
+// still goes through stopCatchVoice().
+function clearPendingCatchSpeech() {
     if (catchSpeakTimer) {
         clearTimeout(catchSpeakTimer);
         catchSpeakTimer = null;
-    }
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-        try { window.speechSynthesis.cancel(); } catch (e) { }
     }
 }
 
@@ -257,7 +266,7 @@ function speakCatch(pokemonName) {
     if (typeof window === 'undefined' || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
 
     const name = String(pokemonName || '').trim();
-    stopCatchVoice();
+    clearPendingCatchSpeech();
 
     // Retro chime + the announcer line land on the same tick.
     playCatchChime();
@@ -266,20 +275,25 @@ function speakCatch(pokemonName) {
     // silence the celebration — fall back to a generic catch line.
     const line = name ? name.toUpperCase() : 'one';
 
-    // Speak the line now. If the device hasn't populated its voice list yet
-    // (Android Chrome often reports an empty list until the engine has warmed
-    // up), hold the line and wait for `voiceschanged` rather than handing the
-    // utterance to the browser's default voice — which is usually female.
     const speakNow = () => {
         try {
             const synth = window.speechSynthesis;
-            const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${line}!!`);
+            // Android sometimes leaves the queue paused after a screen change,
+            // which makes the line start late, stall, or never start at all.
+            if (synth.paused) {
+                try { synth.resume(); } catch (e) { }
+            }
+            // Plain, natural phrasing. Punctuation runs like "!!" and " ... "
+            // make TTS engines hesitate or clip, which is what read as a
+            // broken voice.
+            const utter = new SpeechSynthesisUtterance(`Gotcha! You caught ${line}!`);
             if (catchVoice) utter.voice = catchVoice;
             utter.lang = (catchVoice && catchVoice.lang) || 'en-US';
-            // A female voice at 0.7 still reads female; 0.35 is what makes a
-            // device with no male voice sound like a deep announcer instead.
-            utter.pitch = catchVoiceIsMale ? 0.7 : 0.35;
-            utter.rate = catchVoiceIsMale ? 1.02 : 0.95;
+            // Male voices already sit low, so stay near neutral - dropping to
+            // 0.7 (and 0.35 for a female fallback) sounded muffled and broken
+            // rather than deep. 0.55 is the floor that still reads as male.
+            utter.pitch = catchVoiceIsMale ? 0.92 : 0.55;
+            utter.rate = catchVoiceIsMale ? 1.08 : 1.0;
             utter.volume = 1.0;
             synth.speak(utter);
         } catch (e) {
@@ -319,8 +333,9 @@ function speakCatch(pokemonName) {
             window.speechSynthesis.addEventListener('voiceschanged', once, { once: true });
         }
     } else {
-        // A beat after cancel() stops Chrome/iOS from silently dropping the line.
-        catchSpeakTimer = setTimeout(speakNow, 180);
+        // Speak immediately. The old 180ms pause existed to survive a cancel()
+        // that no longer happens here, and the gap is audible before the line.
+        speakNow();
     }
 }
 
