@@ -108,40 +108,71 @@ function playCatchChime() {
     }
 }
 
+let catchSpeakTimer = null;
+
+// Chrome/iOS Safari only let speechSynthesis play after a direct user tap
+// and can silently drop a speak() fired right after cancel(), so:
+//  - the first tap anywhere primes the engine with a silent warm-up line,
+//  - each catch waits a beat before speaking.
+function unlockCatchVoice() {
+    if (typeof window === 'undefined' || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    if (window.__pykachuSpeechUnlocked) return;
+    window.__pykachuSpeechUnlocked = true;
+    try {
+        const warm = new SpeechSynthesisUtterance(' ');
+        warm.volume = 0;
+        window.speechSynthesis.speak(warm);
+    } catch (e) { }
+}
+
+function stopCatchVoice() {
+    if (catchSpeakTimer) {
+        clearTimeout(catchSpeakTimer);
+        catchSpeakTimer = null;
+    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch (e) { }
+    }
+}
+
 function speakCatch(pokemonName) {
     if (!soundEnabled || isMuted) return;
     if (typeof window === 'undefined' || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
 
     const name = String(pokemonName || '').trim();
-    if (!name) return;
+    stopCatchVoice();
 
-    try {
-        const synth = window.speechSynthesis;
-        // Cancel anything still queued from a previous catch.
-        stopCatchVoice();
+    // Retro chime + the announcer line land on the same tick.
+    playCatchChime();
 
-        // Retro chime + the announcer line land on the same tick.
-        playCatchChime();
-
-        if (!catchVoiceChecked || !catchVoice) {
-            refreshCatchVoice();
+    // Stale cached puzzle data from before pokemonName existed must not
+    // silence the celebration — fall back to a generic catch line.
+    const line = name ? name.toUpperCase() : 'one';
+    const speakNow = () => {
+        try {
+            const synth = window.speechSynthesis;
+            const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${line}!! ... Wo-hoo!!`);
+            if (catchVoice) utter.voice = catchVoice;
+            utter.lang = (catchVoice && catchVoice.lang) || 'en-US';
+            utter.pitch = 0.85;
+            utter.rate = 1.1;
+            utter.volume = 1.0;
+            synth.speak(utter);
+        } catch (e) {
+            console.warn('Catch announcement failed:', e);
         }
-        if (!window.__pykachuVoicesBound) {
-            window.__pykachuVoicesBound = true;
-            synth.addEventListener('voiceschanged', refreshCatchVoice);
-        }
+    };
 
-        const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${name.toUpperCase()}!! ... Wo-hoo!!`);
-        if (catchVoice) utter.voice = catchVoice;
-        utter.lang = (catchVoice && catchVoice.lang) || 'en-US';
-        utter.pitch = 0.85;
-        utter.rate = 1.1;
-        utter.volume = 1.0;
-
-        synth.speak(utter);
-    } catch (e) {
-        console.warn('Catch announcement failed:', e);
+    if (!catchVoiceChecked || !catchVoice) {
+        refreshCatchVoice();
     }
+    if (!window.__pykachuVoicesBound) {
+        window.__pykachuVoicesBound = true;
+        window.speechSynthesis.addEventListener('voiceschanged', refreshCatchVoice);
+    }
+
+    // A beat after cancel() stops Chrome/iOS from silently dropping the line.
+    catchSpeakTimer = setTimeout(speakNow, 180);
 }
 
 function initAudio() {
@@ -153,10 +184,11 @@ function initAudio() {
             if (audioContext && audioContext.state === 'suspended') {
                 audioContext.resume().catch(() => {});
             }
+            unlockCatchVoice();
         };
 
-        document.addEventListener('pointerdown', unlockAudio, { passive: true, once: true });
-        document.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
+        document.addEventListener('pointerdown', unlockAudio, { passive: true });
+        document.addEventListener('touchstart', unlockAudio, { passive: true });
     } catch (e) {
         console.warn('Web Audio API not supported:', e);
         soundEnabled = false;
