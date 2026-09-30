@@ -13,22 +13,16 @@ let soundEnabled = true;
 let catchVoice = null;
 let catchVoiceChecked = false;
 
-// Resolves the English announcer voice. Chrome populates getVoices() async,
-// so this re-runs on voiceschanged until voices actually show up. Prefer a
-// deep male Google English voice for that heavy bass-announcer sound, then
-// any male voice, then anything English.
+// Resolves the catch voice. Chrome populates getVoices() async, so this
+// re-runs on voiceschanged until voices actually show up. One consistent
+// voice per browser: simply the first English voice the browser exposes.
 function refreshCatchVoice() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     const voices = window.speechSynthesis.getVoices();
     if (!voices || !voices.length) return;
     const english = voices.filter((v) => /^en(-|_)?/i.test(v.lang || ''));
     if (!english.length) return;
-    const pick = (re) => english.find((v) => re.test(v.name));
-    catchVoice =
-        pick(/Google UK English Male/) ||
-        pick(/Google US English/) ||
-        pick(/Male|David|Mark|Guy|Christopher|James|Brian|Ryan|Antonio|Daniel|Jeff/i) ||
-        english[0] || null;
+    catchVoice = english[0] || null;
     catchVoiceChecked = true;
 }
 
@@ -151,6 +145,12 @@ function speakCatch(pokemonName) {
     const speakNow = () => {
         try {
             const synth = window.speechSynthesis;
+            // Re-resolve right before entering in case the voice list only
+            // just loaded — never fall back to a default female robot voice
+            // when a real male voice is sitting in getVoices().
+            if (!catchVoice && window.speechSynthesis.getVoices().length) {
+                refreshCatchVoice();
+            }
             const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${line}!!`);
             if (catchVoice) utter.voice = catchVoice;
             utter.lang = (catchVoice && catchVoice.lang) || 'en-US';
