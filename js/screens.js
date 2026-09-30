@@ -109,6 +109,10 @@ function playPokemonReveal() {
         ball.classList.add('pokemon-reveal-open');
         stage.classList.add('reveal-ready');
         spawnReleaseSparkles();
+        // Exact frame the ball opens. The end-of-chain confetti celebration
+        // listens for this instead of running on a timer of its own, so it
+        // always lands with the reveal no matter how the fall is retimed.
+        document.dispatchEvent(new CustomEvent('pykachu:reveal-open'));
     }, 2010);
 
     // t=3.2s — announcer speaks the catch name once the reveal has settled

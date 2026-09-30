@@ -521,13 +521,17 @@ function runCelebration(canvas, screen) {
         useWorker: true
     });
 
-    // 1. SCREEN FLASH EFFECT
+    // 1. SCREEN WASH — warm gold, not a full-white strobe. This now fires on
+    // the exact frame the Pokéball opens, and a pure-white flash there would
+    // white out the very reveal it is meant to celebrate.
     screen.style.transition = 'none';
-    screen.style.backgroundColor = 'white';
-    setTimeout(() => {
-        screen.style.transition = 'background-color 2s ease';
-        screen.style.backgroundColor = '';
-    }, 100);
+    screen.style.backgroundColor = 'rgba(253, 224, 71, 0.2)';
+    requestAnimationFrame(() => {
+        screen.style.transition = 'background-color 1.4s ease';
+        screen.style.backgroundColor = 'rgba(253, 224, 71, 0)';
+        // Hand the screen back to the stylesheet once the wash has faded
+        setTimeout(() => { screen.style.backgroundColor = ''; }, 1500);
+    });
 
     // 2. FOUNTAIN EFFECT (Vibrant Multi-color)
     const end = Date.now() + (15 * 1000);

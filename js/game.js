@@ -350,6 +350,12 @@ function submitPuzzleAnswer() {
             // The user may have logged out inside this 500ms window.
             if (!isLoggedIn() || currentPuzzle !== solvedPuzzle) return;
 
+            // Arm the end-of-chain celebration BEFORE showStep(4): the reveal
+            // starts inside showStep(4) and signals 'pykachu:reveal-open' at
+            // the frame the ball splits open, so confetti fires in sync with the
+            // reveal instead of drifting on a timer of its own.
+            if (isEnd) armFinalCelebration();
+
             showStep(4);
             playSound('hologram');
 
@@ -377,7 +383,6 @@ function submitPuzzleAnswer() {
                 }
 
                 setTimeout(() => flushSessionBuffer(), 100);
-                setTimeout(() => triggerFinalCelebration(), 1500);
             } else {
                 if (nextBtn) nextBtn.classList.remove('hidden');
             }
@@ -460,6 +465,45 @@ function continueToQRScan() {
     document.getElementById('unlockCode').value = '';
     urlLockedPuzzle = null;
     showStep(2);
+}
+
+// ==============================
+// FINAL CELEBRATION SYNC
+// ==============================
+// The confetti used to fire on a blind 1500ms timer after showStep(4), so it
+// regularly landed in the middle of the Pokéball falling — disconnected from
+// the reveal. It is now driven by the reveal itself: playPokemonReveal()
+// dispatches 'pykachu:reveal-open' on the exact frame the shells split, and
+// this fires the celebration on that beat.
+//
+// The fallback only exists for the case where the reveal never runs at all
+// (missing #pokemonReveal / #step4RevealBall markup, or the reveal being
+// cancelled by a second showStep(4)). Every armed listener self-cleans, so a
+// stale listener can never hijack a later reveal.
+const REVEAL_OPEN_FALLBACK_MS = 2900;
+
+function armFinalCelebration() {
+    if (typeof triggerFinalCelebration !== 'function') return;
+
+    let fired = false;
+    let fallbackTimer = null;
+
+    const fire = () => {
+        if (fired) return;
+        fired = true;
+        clearTimeout(fallbackTimer);
+        document.removeEventListener('pykachu:reveal-open', onRevealOpen);
+        // Never fire confetti over a screen the player has already left.
+        const step4 = document.getElementById('step4');
+        const stillOnStep4 = !!step4 && step4.classList.contains('active');
+        const stillSignedIn = typeof isLoggedIn !== 'function' || isLoggedIn();
+        if (!stillOnStep4 || !stillSignedIn) return;
+        triggerFinalCelebration();
+    };
+    const onRevealOpen = () => fire();
+
+    fallbackTimer = setTimeout(fire, REVEAL_OPEN_FALLBACK_MS);
+    document.addEventListener('pykachu:reveal-open', onRevealOpen);
 }
 
 function backToStep2() {
