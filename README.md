@@ -157,26 +157,37 @@ Player screens:
 | `hint` / `penalty` | Hint reward overlay / tab-switch blocking overlay |
 | `meme` | Full-screen YouTube meme overlay |
 
-### The loader page
+### The loader
 
-`html/loader.html` is a **standalone splash page** (not one of the partials in
-`html/`): CSI and Auron in circles joined by a cross, the word *presents*, then
-`assets/img/logo1.png` exactly as the file is. `css/loader.css` is
-self-contained on purpose — no Tailwind, no build step — so the page paints
-before any of the app's CSS is parsed. `js/loader.js` is dependency-free:
+CSI and Auron in circles joined by a cross, the word *presents*, then
+`assets/img/logo1.png` exactly as the file is. It shows **inside the Pokédex
+screen before `step0`** for ~1.5s.
+
+| Piece | Role |
+|-------|------|
+| `#appLoader` in `index.html` | The splash itself: `position:absolute; inset:0; z-index:90` inside `#screen`, covering `step0` on first paint |
+| `css/loader.css` | Self-contained (no Tailwind, no build step) so it paints before the app's CSS is parsed. All sizes container-relative — `%` + `aspect-ratio` + capped `vw` clamps — so it fits the shell frame and a full page alike |
+| `js/loader.js` | In-app mode when `#appLoader` exists; standalone mode otherwise |
+
+It is deliberately **not** a `.flow-step`. `showStep()` queries `.flow-step`
+and hard-removes every `active` state it finds, so making the splash one would
+mean teaching the step state machine about a screen that isn't a step. As a
+plain overlay, `step0` is simply already active underneath and is revealed when
+the splash fades.
 
 | Behaviour | Detail |
 |-----------|--------|
-| Progress | Tracks the three real images (`load` **and** `error` both count) instead of faking a bar |
-| Minimum visible time | 900 ms, so the emblem registers before the handoff |
-| Hard cap | 4 s. A stalled image, offline start or blocked font never traps the player |
-| Skip on repeat | `sessionStorage` marker, so returning to the loader in the same tab costs no wait |
-| Destination | `../index.html`, or `?next=<url>` to hand off anywhere |
-| Failure net | If the handoff doesn't happen, a *continue* link is appended after 8 s |
+| Duration | ~1.5s, extended only if the page or the emblem art is still loading, and hard-capped at 4s |
+| Layout preserved | `logo1.png` keeps its exact 558:285 ratio (measured 1.958 at every viewport); the two marks are true circles via `aspect-ratio: 1` |
+| Cannot brick the app | A CSS-only `loader-bailout` animation hides the splash after 6s if `loader.js` never runs |
+| Standalone page | `html/loader.html` still works on its own: progress tracks the three real images (`load` **and** `error` count), then it hands off to `../index.html` or `?next=<url>`, with a `sessionStorage` skip and a 4s cap |
 
-All paths are relative (`../assets/img/...`), so it works both at a domain root
-and inside a GitHub Pages subpath. The page, its CSS/JS and the three images
-are all in the service-worker precache, so the splash also works fully offline.
+Every path is relative (`../assets/img/...` on the standalone page), so it works
+both at a domain root and inside a GitHub Pages subpath. The page, its CSS/JS
+and the three images are all in the service-worker precache, so the splash also
+works fully offline. Note `csi.jpg` and `auron.png` are opaque 24-bit RGB with
+no alpha channel, so the circles are a *crop* framed by a gold ring — swapping in
+transparent versions would look cleaner.
 
 ### The step 4 catch reveal
 

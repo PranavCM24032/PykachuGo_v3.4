@@ -1,7 +1,12 @@
 /* ==========================================================================
    Loader - CSI x Auron presents Pykachu Go
-   Self-contained on purpose: this page runs before any of the app's CSS is
-   parsed, so it must not depend on css/base.css, Tailwind, or a build step.
+   Two jobs, one stylesheet:
+     1. #appLoader  the splash inside the Pokedex screen, shown before step0
+     2. html/loader.html  a standalone page wrapping the same markup
+   Every size is container-relative (%, aspect-ratio, clamp with vw caps) so it
+   looks right inside the small shell frame as well as on a full page. It does
+   not depend on css/base.css or Tailwind, because it has to paint before the
+   app's CSS has finished parsing.
    ========================================================================== */
 
 :root {
@@ -17,13 +22,29 @@
     box-sizing: border-box;
 }
 
-html,
-body {
-    height: 100%;
-    margin: 0;
+/* The splash surface: dark CRT screen, faint scanlines and a soft gold pool
+   behind the emblem. Static, never animated, so it costs nothing on a phone.
+   Shared by the in-app overlay and the standalone page. */
+.loader-surface {
+    position: relative;
+    isolation: isolate;
 }
 
-body {
+.loader-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(255, 214, 51, 0.09), transparent 62%),
+        repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+}
+
+/* ---- Standalone page (html/loader.html) --------------------------------- */
+body.loader-surface {
+    height: 100%;
+    margin: 0;
     background: var(--screen);
     color: #e7edf5;
     font-family: var(--mono);
@@ -35,26 +56,38 @@ body {
     -webkit-text-size-adjust: 100%;
 }
 
-/* Faint CRT scanlines + a soft gold pool behind the emblem. Static, never
-   animated, so it costs nothing on a mid-range phone. */
-body::before {
-    content: '';
-    position: fixed;
+/* ---- In-app splash, above step0 ----------------------------------------- */
+#appLoader {
+    position: absolute;
     inset: 0;
-    pointer-events: none;
-    background:
-        radial-gradient(circle at 50% 42%, rgba(255, 214, 51, 0.09), transparent 62%),
-        repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--screen);
+    /* Belt and braces: if js/loader.js never runs (script blocked, parse error),
+       the splash hides itself after 6s instead of bricking the app behind it. */
+    animation: loader-bailout 1ms linear 6s forwards;
 }
 
+@keyframes loader-bailout {
+    to {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+}
+
+/* ---- Shared content column ---------------------------------------------- */
 .loader-stage {
     position: relative;
-    width: min(92vw, 520px);
+    width: min(100%, 460px);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(14px, 3.4vh, 26px);
-    transition: opacity 320ms ease, transform 320ms ease;
+    gap: clamp(10px, 2.6vh, 22px);
+    transition: opacity 300ms ease, transform 300ms ease;
 }
 
 /* Row 1 ------------------------------------------------------------------ */
@@ -62,15 +95,16 @@ body::before {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: clamp(10px, 3vw, 22px);
+    gap: clamp(8px, 3%, 20px);
 }
 
-/* Both source images are opaque (no alpha channel), so the circle is a crop
-   of the artwork framed by a gold ring rather than a cut-out mask. */
+/* Both source images are opaque (no alpha channel), so the circle is a crop of
+   the artwork framed by a gold ring rather than a cut-out mask.
+   aspect-ratio keeps it perfectly round in any container width. */
 .mark {
     display: block;
-    width: clamp(64px, 19vw, 104px);
-    height: clamp(64px, 19vw, 104px);
+    width: clamp(44px, 24%, 100px);
+    aspect-ratio: 1 / 1;
     border-radius: 50%;
     overflow: hidden;
     background: #0a0d14;
@@ -88,7 +122,7 @@ body::before {
 
 .cross {
     font-family: var(--pixel);
-    font-size: clamp(14px, 4.4vw, 22px);
+    font-size: clamp(13px, 4.4vw, 20px);
     color: var(--gold);
     line-height: 1;
     text-shadow: 0 0 12px rgba(255, 214, 51, 0.45);
@@ -99,7 +133,7 @@ body::before {
 .presents {
     margin: 0;
     font-family: var(--pixel);
-    font-size: clamp(9px, 2.4vw, 12px);
+    font-size: clamp(8px, 2.4vw, 12px);
     letter-spacing: 0.5px;
     color: #93a1b5;
 }
@@ -108,19 +142,25 @@ body::before {
 /* logo1.png shown exactly as the file is: natural aspect ratio, no crop, no
    filter, no colour overlay. */
 .main-logo {
-    width: min(78vw, 420px);
+    width: min(72%, 400px);
     height: auto;
     display: block;
 }
 
 /* Progress --------------------------------------------------------------- */
+/* Standalone page only: there the bar tracks real image loads. Inside the app
+   the bar is a simple 1.5s sweep and the percentage is pointless noise. */
 .progress {
-    width: min(78vw, 420px);
+    width: min(72%, 400px);
     height: 10px;
-    margin-top: clamp(4px, 1.5vh, 12px);
     background: var(--metal);
     border: 2px solid #10141c;
     overflow: hidden;
+}
+
+#appLoader .progress {
+    margin-top: clamp(2px, 1.2vh, 10px);
+    height: 6px;
 }
 
 .progress-fill {
@@ -129,6 +169,26 @@ body::before {
     height: 100%;
     background: linear-gradient(90deg, var(--gold-dim), var(--gold));
     transition: width 180ms ease-out;
+}
+
+#appLoader .progress-fill {
+    width: 0%;
+    transition: none;
+    animation: loader-sweep var(--loader-ms, 1500ms) cubic-bezier(0.32, 0.72, 0.35, 1) forwards;
+}
+
+@keyframes loader-sweep {
+    from {
+        width: 0%;
+    }
+
+    to {
+        width: 100%;
+    }
+}
+
+#appLoader .progress-label {
+    display: none;
 }
 
 .progress-label {
@@ -149,12 +209,7 @@ body::before {
     color: var(--gold);
 }
 
-/* Exit ------------------------------------------------------------------- */
-.loader-stage.is-done {
-    opacity: 0;
-    transform: scale(0.96);
-}
-
+/* Entrance + exit --------------------------------------------------------- */
 .loader-stage.is-ready .main-logo {
     animation: logo-in 520ms ease-out both;
 }
@@ -171,24 +226,29 @@ body::before {
     }
 }
 
+#appLoader.is-done .loader-stage {
+    opacity: 0;
+    transform: scale(0.97);
+}
+
+#appLoader.is-done {
+    opacity: 0;
+    transition: opacity 300ms ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
 
     .loader-stage,
-    .progress-fill {
+    .progress-fill,
+    #appLoader {
         transition: none;
     }
 
     .loader-stage.is-ready .main-logo {
         animation: none;
     }
-}
 
-@media (max-height: 460px) {
-    .loader-stage {
-        gap: 10px;
-    }
-
-    .presents {
-        font-size: 8px;
+    #appLoader .progress-fill {
+        animation: none;
     }
 }
