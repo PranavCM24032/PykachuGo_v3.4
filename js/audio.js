@@ -12,6 +12,9 @@ let soundEnabled = true;
 // without support, and respects the same mute/soundEnabled switches.
 let catchVoice = null;
 let catchVoiceChecked = false;
+// False when the device exposes no male English voice at all — the announcer
+// then drops to a deep pitch so it reads as a male announcer regardless.
+let catchVoiceIsMale = false;
 
 // TTS pitch/rate cannot turn a female voice into a male one, so the VOICE
 // itself has to be right. Anything whose name advertises a female voice is
@@ -38,6 +41,13 @@ const CATCH_MALE_VOICE_NAMES = [
 // -10000 = vetoed (female), so a vetoed voice can never outrank anything.
 const CATCH_FEMALE_VETO = -10000;
 
+// Remembered announcer. Some devices expose a *different* voice list on a
+// later run (Android swaps engines when Google TTS updates, eSpeak voices come
+// and go), so the male voice we found last time is re-used by name whenever it
+// is still installed. Without this a device can silently switch announcers —
+// and switch to a female one — between sessions.
+const CATCH_VOICE_STORE_KEY = 'pykachu.catchVoice';
+
 function scoreCatchVoice(v) {
     const name = (v.name || '').toLowerCase();
     if (CATCH_FEMALE_VOICE_NAMES.some((k) => name.includes(k))) return CATCH_FEMALE_VETO;
@@ -50,25 +60,67 @@ function scoreCatchVoice(v) {
     else if (/^en[-_]gb/i.test(v.lang || '')) score += 4;
     if (v.localService) score += 2;
     if (name.includes('natural')) score += 1;
+    // Android exposes both a natural male voice ("Google UK English Male")
+    // and the eSpeak compatibility engine ("en-us-x-usa#male_1-local").
+    // Both are male, but eSpeak buzzes, so it only wins when it's all there is.
+    if (/espeak|-x-[a-z]+#/.test(name)) score -= 40;
     return score;
 }
 
+// True when the voice's own name claims to be male. Used to decide whether we
+// still need the deep-pitch fallback.
+function isMaleLabelledVoice(v) {
+    const name = (v && v.name ? v.name.toLowerCase() : '');
+    if (CATCH_FEMALE_VOICE_NAMES.some((k) => name.includes(k))) return false;
+    return name.includes('male') || CATCH_MALE_VOICE_NAMES.some((k) => name.includes(k));
+}
+
+function readStoredCatchVoiceName() {
+    try {
+        return window.localStorage.getItem(CATCH_VOICE_STORE_KEY) || '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function storeCatchVoiceName(voice) {
+    try {
+        if (voice && voice.name) window.localStorage.setItem(CATCH_VOICE_STORE_KEY, voice.name);
+    } catch (e) {
+        // Private mode / storage disabled - ranking still works, just no memory
+    }
+}
+
 // Picks one consistent announcer per browser. Deterministic: ties fall back to
-// the order the OS reported, so the same device always speaks with the same
-// voice. Returns null only when the platform has no voices at all.
+// the order the OS reported. Returns { voice, isMale } - isMale false means the
+// device has no male English voice, so the caller must drop the pitch.
+// Returns null voice only when the platform has no voices at all.
 function pickCatchVoice(voices) {
     if (!voices || !voices.length) return null;
     const english = voices.filter((v) => /^en/i.test(v.lang || ''));
     const pool = english.length ? english : voices;
+
+    // 1. A previously remembered male announcer, if still installed
+    const stored = readStoredCatchVoiceName().toLowerCase();
+    if (stored) {
+        const remembered = pool.find((v) => (v.name || '').toLowerCase() === stored);
+        if (remembered) return { voice: remembered, isMale: true };
+    }
 
     const ranked = pool
         .map((v, i) => ({ v, i, s: scoreCatchVoice(v) }))
         .filter((e) => e.s !== CATCH_FEMALE_VETO)
         .sort((a, b) => (b.s - a.s) || (a.i - b.i));
 
-    // Every English voice on the device is female-labelled: still speak, using
-    // the best remaining voice with a low pitch, rather than muting the line.
-    return (ranked[0] && ranked[0].v) || pool[0] || null;
+    // 2. Best non-vetoed voice (male-labelled ones win on score)
+    if (ranked.length) {
+        const voice = ranked[0].v;
+        return { voice, isMale: isMaleLabelledVoice(voice) };
+    }
+
+    // 3. Every English voice on this device is female-labelled: still speak,
+    // rather than muting the line, and let the caller deepen the pitch.
+    return { voice: pool[0] || null, isMale: false };
 }
 
 // Re-resolves the catch voice. Chrome populates getVoices() async, so this
@@ -79,10 +131,27 @@ function refreshCatchVoice() {
     const voices = window.speechSynthesis.getVoices();
     if (!voices || !voices.length) return;
 
-    catchVoice = pickCatchVoice(voices);
+    const picked = pickCatchVoice(voices);
+    if (!picked) return;
+
+    catchVoice = picked.voice;
+    catchVoiceIsMale = picked.isMale;
     catchVoiceChecked = !!catchVoice;
+
+    // Only remember a male announcer. Storing a female one would lock the
+    // device into the voice we were trying to avoid.
+    if (catchVoiceIsMale) storeCatchVoiceName(catchVoice);
+    else if (readStoredCatchVoiceName()) {
+        // The remembered male voice has been uninstalled - forget it.
+        try { window.localStorage.removeItem(CATCH_VOICE_STORE_KEY); } catch (e) { }
+    }
+
     if (typeof console !== 'undefined' && console.info) {
-        console.info('[pykachu] catch voice:', catchVoice ? `${catchVoice.name} / ${catchVoice.lang}` : 'none');
+        console.info(
+            '[pykachu] catch voice:',
+            catchVoice ? `${catchVoice.name} / ${catchVoice.lang}` : 'none',
+            catchVoiceIsMale ? '(male)' : '(no male voice on this device - deep pitch fallback)'
+        );
     }
 }
 
@@ -196,18 +265,21 @@ function speakCatch(pokemonName) {
     // Stale cached puzzle data from before pokemonName existed must not
     // silence the celebration — fall back to a generic catch line.
     const line = name ? name.toUpperCase() : 'one';
+
+    // Speak the line now. If the device hasn't populated its voice list yet
+    // (Android Chrome often reports an empty list until the engine has warmed
+    // up), hold the line and wait for `voiceschanged` rather than handing the
+    // utterance to the browser's default voice — which is usually female.
     const speakNow = () => {
         try {
             const synth = window.speechSynthesis;
-            // Always re-resolve right before speaking: Chrome often returns a
-            // partial voice list on the first call, and a voice cached from
-            // that half-list is exactly how a female announcer slips through.
-            refreshCatchVoice();
             const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${line}!!`);
             if (catchVoice) utter.voice = catchVoice;
             utter.lang = (catchVoice && catchVoice.lang) || 'en-US';
-            utter.pitch = 0.7;
-            utter.rate = 1.02;
+            // A female voice at 0.7 still reads female; 0.35 is what makes a
+            // device with no male voice sound like a deep announcer instead.
+            utter.pitch = catchVoiceIsMale ? 0.7 : 0.35;
+            utter.rate = catchVoiceIsMale ? 1.02 : 0.95;
             utter.volume = 1.0;
             synth.speak(utter);
         } catch (e) {
@@ -215,22 +287,56 @@ function speakCatch(pokemonName) {
         }
     };
 
-    if (!catchVoiceChecked || !catchVoice) {
-        refreshCatchVoice();
-    }
-    if (!window.__pykachuVoicesBound) {
-        window.__pykachuVoicesBound = true;
-        window.speechSynthesis.addEventListener('voiceschanged', refreshCatchVoice);
-    }
+    // Always re-resolve right before speaking: Chrome often returns a partial
+    // voice list on the first call, and a voice cached from that half-list is
+    // exactly how a female announcer slips through.
+    refreshCatchVoice();
 
-    // A beat after cancel() stops Chrome/iOS from silently dropping the line.
-    catchSpeakTimer = setTimeout(speakNow, 180);
+    if (!catchVoice) {
+        // No voices resolved at all: hold the line and wait for the engine to
+        // publish its list (Android reports an empty list until it warms up)
+        // instead of handing the utterance to the browser default voice.
+        let spoken = false;
+        const cleanupVoiceWait = () => {
+            clearTimeout(voiceWaitTimer);
+            if (typeof window.speechSynthesis.removeEventListener === 'function') {
+                window.speechSynthesis.removeEventListener('voiceschanged', once);
+            }
+        };
+        const once = () => {
+            if (spoken) return;
+            spoken = true;
+            cleanupVoiceWait();
+            refreshCatchVoice();
+            speakNow();
+        };
+
+        // Tracked by catchSpeakTimer so leaving step 4 mid-wait cancels it
+        // instead of speaking over the next screen.
+        const voiceWaitTimer = setTimeout(once, 1500);
+        catchSpeakTimer = voiceWaitTimer;
+        if (typeof window.speechSynthesis.addEventListener === 'function') {
+            window.speechSynthesis.addEventListener('voiceschanged', once, { once: true });
+        }
+    } else {
+        // A beat after cancel() stops Chrome/iOS from silently dropping the line.
+        catchSpeakTimer = setTimeout(speakNow, 180);
+    }
 }
 
 function initAudio() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         console.log('Audio system initialized');
+
+        // Warm the announcer voice as early as possible. Android Chrome fills
+        // getVoices() asynchronously, so a first resolve at page load usually
+        // returns nothing and the real list only arrives on voiceschanged.
+        if (!catchVoiceChecked) refreshCatchVoice();
+        if (typeof window !== 'undefined' && window.speechSynthesis &&
+            typeof window.speechSynthesis.addEventListener === 'function') {
+            window.speechSynthesis.addEventListener('voiceschanged', refreshCatchVoice);
+        }
 
         const unlockAudio = () => {
             if (audioContext && audioContext.state === 'suspended') {

@@ -179,15 +179,27 @@ reveal it was meant to sell.
 
 `js/audio.js` speaks it as a heavy male anime-announcer line — one deep
 bass voice, `Gotcha!! ... You caught ... <NAME>!!` — with the name
-shouted in caps at pitch 0.7 / rate 1.02 for a deep, unhurried delivery.
+shouted in caps at pitch 0.7 / rate 1.02 (pitch 0.35 / rate 0.95 on devices
+with no male voice) for a deep, unhurried delivery.
 Voice selection is tiered and deterministic: any voice whose name advertises a
 female voice (`female`, Zira, Samantha, Aria, Google US English, …) is
 **vetoed outright**, then explicit `male` names rank `+500`, known male voice
-names rank `+300`, and English/local-service tie-breaks are small. The
-announcer voice is re-resolved immediately before every utterance, so a
-half-loaded voice list on first paint can no longer lock in a female robot
-voice for the whole session (the selected voice is also logged to the console
-as `[pykachu] catch voice:`). This fires on every catch regardless of
+names rank `+300`, and English/local-service tie-breaks are small. Android's
+buzzy eSpeak compatibility engine (`en-us-x-usa#male_1-local`) is penalised
+`-40` so the natural "Google UK English Male" wins when both are installed.
+
+Three guards keep the announcer male on real phones:
+
+| Problem | Guard |
+|---------|-------|
+| Android Chrome reports an empty voice list until the engine warms up | The line waits (max 1.5 s) for `voiceschanged` instead of falling through to the browser's default — usually female — voice. `initAudio()` also resolves once at load. |
+| Devices that only ship female English voices | Pitch drops to 0.35 / rate 0.95, which reads as a deep announcer instead of a female robot. The line is never muted. |
+| Android swaps engines when Google TTS updates, silently changing the voice between sessions | The winning male voice name is remembered in `localStorage` (`pykachu.catchVoice`) and re-used whenever still installed; a vanished entry is forgotten and re-ranked. |
+
+The announcer voice is re-resolved immediately before every utterance, so a
+half-loaded voice list can no longer lock in a female robot voice for the whole
+session, and the selected voice is logged to the console as
+`[pykachu] catch voice: …`. This fires on every catch regardless of
 which Pokémon it is. `stopCatchVoice()` cancels any queued or in-flight
 speech, so leaving step 4 or logging out mid-reveal never leaves a voice
 talking over the next screen.
