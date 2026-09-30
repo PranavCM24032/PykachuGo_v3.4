@@ -166,6 +166,17 @@ flash and fired a full-opacity shockwave, which read as a shock instead of a
 peaceful reveal. The catch line is **voice-only** — `pokemonName` is never
 rendered on screen, so the player identifies the Pokémon from the sprite alone.
 
+The energy escaping the ball is expressed as a **seam flare plus rising
+wisps**, not a light column. `.reveal-seam` is a soft warm ellipse along the
+ball's equator — exactly where the shells split — and `spawnReleaseWisps()`
+adds five soft puffs (each with its own drift, rise, size and delay) that
+float up out of the open ball. Both sit *below* the sprite in z-order
+(9 vs 10) and neither grows tall, so the Pokémon is never washed out and the
+completion card on the last puzzle is never covered. This replaced the
+blurred golden beam, which fought the app's CRT/pixel theme, doubled up with
+the bloom and the sprite's own materialize glow, and grew straight through the
+reveal it was meant to sell.
+
 `js/audio.js` speaks it as a heavy male anime-announcer line — one deep
 bass voice, `Gotcha!! ... You caught ... <NAME>!!` — with the name
 shouted in caps at pitch 0.7 / rate 1.02 for a deep, unhurried delivery.

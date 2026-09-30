@@ -31,7 +31,8 @@ function cancelPokemonReveal() {
     // step 4 (shells split but no sprite, or vice versa).
     if (stage) stage.classList.remove('reveal-ready');
     if (ball) ball.classList.remove('release-latch', 'pokemon-reveal-open');
-    document.querySelectorAll('#pokemonReveal .reveal-sparkle').forEach((n) => n.remove());
+    document.querySelectorAll('#pokemonReveal .reveal-sparkle, #pokemonReveal .reveal-wisp')
+        .forEach((n) => n.remove());
     // Chorus members that haven't entered yet would keep talking over the
     // next screen, so drop any pending entrances with the rest of the reveal.
     if (typeof stopCatchVoice === 'function') stopCatchVoice();
@@ -47,8 +48,8 @@ function scheduleReveal(fn, ms) {
 // The ball drifts in from above, rests on the platform, then plays the
 // audio-synced OPEN SEQUENCE (t = 0 when the ball settles):
 //   0.00s  latch click + button press            (release-latch)
-//   0.21s  shells swing open + warm bloom rises  (pokemon-reveal-open / reveal-ready)
-//   0.45s  plasma beam + sparkle/ring particles
+//   0.21s  shells swing open + seam flare + bloom (pokemon-reveal-open / reveal-ready)
+//   0.35s  rising wisps + sparkle/ring particles
 //   1.00s  white silhouette materializes -> flash dissolve -> full-color Pokémon
 // Pacing is deliberately unhurried: the old version slammed the ball in and
 // flashed a white shockwave, which read as a shock rather than a reveal.
@@ -102,12 +103,13 @@ function playPokemonReveal() {
         playSound('pokeballOpen');
     }, 1800);
 
-    // t=2.01s — shells swing open, warm bloom and beam rise, Pokémon emerges
+    // t=2.01s — shells swing open, seam flare and bloom rise, Pokémon emerges
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         ball.classList.remove('release-latch');
         ball.classList.add('pokemon-reveal-open');
         stage.classList.add('reveal-ready');
+        spawnReleaseWisps();
         spawnReleaseSparkles();
         // Exact frame the ball opens. The end-of-chain confetti celebration
         // listens for this instead of running on a timer of its own, so it
@@ -120,6 +122,30 @@ function playPokemonReveal() {
         if (!stillCurrent()) return;
         speakCatch(pokemonName);
     }, 3200);
+}
+
+// Rising wisps: a handful of soft puffs of light drift up out of the opened
+// ball. This replaced the tall light column — wisps read as energy escaping
+// the ball while passing BEHIND the sprite (z-index 9 vs 10), so the Pokémon
+// is never washed out. Each puff gets its own drift, rise, size and delay so
+// no two reveals look identical.
+function spawnReleaseWisps() {
+    const stage = document.getElementById('pokemonReveal');
+    if (!stage) return;
+
+    for (let i = 0; i < 5; i++) {
+        const wisp = document.createElement('span');
+        wisp.className = 'reveal-wisp';
+        wisp.style.setProperty('--wisp-size', (14 + Math.random() * 14).toFixed(1) + 'px');
+        wisp.style.setProperty('--wisp-drift', (Math.random() * 34 - 17).toFixed(1) + 'px');
+        wisp.style.setProperty('--wisp-rise', (70 + Math.random() * 60).toFixed(1) + 'px');
+        wisp.style.setProperty('--wisp-delay', (i * 0.13 + Math.random() * 0.08).toFixed(2) + 's');
+        wisp.style.setProperty('--wisp-dur', (1.1 + Math.random() * 0.5).toFixed(2) + 's');
+
+        stage.appendChild(wisp);
+        // Cleared past the longest delay + duration so nothing lingers
+        sparkleTimers.push(setTimeout(() => wisp.remove(), 2200));
+    }
 }
 
 // Falling-star sparkle shower. Many tinytiny stars appear along the top

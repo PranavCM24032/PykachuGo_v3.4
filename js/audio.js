@@ -695,7 +695,7 @@ function playSound(soundName, volume = 0.3) {
                 // layer kept soft so the reveal reads calm, not explosive:
                 //   L1 @0.00s spring latch click   (matches button press)
                 //   L2 @0.15s pneumatic vent+pop    (matches shells splitting)
-                //   L3 @0.35s rising beam hum+sizzle (matches plasma outpour)
+                //   L3 @0.35s rising hum+sizzle (matches the light escaping the ball)
                 //   L4 @0.65s low thud + creature cry (matches materialization)
 
                 // L1 — soft mechanical latch tick (sine, not a hard square clack)
@@ -762,7 +762,7 @@ function playSound(soundName, volume = 0.3) {
                 hum.connect(humG); humG.connect(audioContext.destination);
                 hum.start(t3); hum.stop(t3 + 0.72);
 
-                // high-frequency electrical sizzle riding the beam
+                // high-frequency electrical sizzle riding the hum
                 const snLen = 0.5;
                 const sBuf = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * snLen), audioContext.sampleRate);
                 const sd = sBuf.getChannelData(0);
@@ -779,7 +779,7 @@ function playSound(soundName, volume = 0.3) {
                 sSrc.connect(hp); hp.connect(sG); sG.connect(audioContext.destination);
                 sSrc.start(t3);
 
-                // shimmering chime arpeggio during the beam
+                // shimmering chime arpeggio during the release
                 [1320, 1760, 2200].forEach((f, k) => {
                     const ch = audioContext.createOscillator();
                     const chG = audioContext.createGain();

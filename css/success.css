@@ -268,53 +268,93 @@
     overflow: visible;
 }
 
-/* Warm plasma light rising out of the opened Pokéball — golden, slow, and
-   soft-edged instead of a hard white blast. */
-.reveal-beam {
+/* SEAM LIGHT — a warm flare along the equator, exactly where the ball splits.
+   The light now comes from the seam itself instead of a column rising above
+   the ball, so it can never wash over the Pokémon being revealed and never
+   reaches the completion card on short screens. */
+.reveal-seam {
     position: absolute;
     left: 50%;
-    bottom: calc(var(--plat-h) * 0.46 + var(--ball-d) * 0.35);
-    width: clamp(28px, 7vmin, 44px);
-    height: 0;
-    transform: translateX(-50%);
-    background: linear-gradient(to top,
-        rgba(255, 252, 235, 0.85) 0%,
-        rgba(253, 224, 71, 0.45) 40%,
-        rgba(234, 179, 8, 0.16) 72%,
-        transparent 100%);
-    border-radius: 50% 50% 0 0;
-    filter: blur(6px);
+    bottom: calc(var(--plat-h) * 0.5 + var(--ball-d) * 0.46);
+    width: calc(var(--ball-d) * 1.3);
+    height: calc(var(--ball-d) * 0.12);
+    transform: translate(-50%, 50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center,
+            rgba(255, 248, 222, 0.8) 0%,
+            rgba(253, 224, 71, 0.42) 38%,
+            rgba(234, 179, 8, 0.12) 66%,
+            transparent 78%);
+    filter: blur(2px);
     opacity: 0;
     pointer-events: none;
-    z-index: 7;
+    z-index: 11;
 }
 
-.pokemon-reveal.reveal-ready .reveal-beam {
-    animation: reveal-beam-burst 1.1s cubic-bezier(0.3, 0.7, 0.35, 1) forwards;
+.pokemon-reveal.reveal-ready .reveal-seam {
+    animation: reveal-seam 0.7s ease-out forwards;
 }
 
-@keyframes reveal-beam-burst {
+/* Stretches out along the seam, thins as it dies — a seam of light, not a pop */
+@keyframes reveal-seam {
     0% {
-        height: 0;
         opacity: 0;
-        transform: translateX(-50%) scaleX(0.6);
+        transform: translate(-50%, 50%) scaleX(0.3) scaleY(0.55);
     }
-    38% {
-        height: clamp(120px, 26vh, 200px);
-        opacity: 0.75;
-        transform: translateX(-50%) scaleX(1.05);
-        filter: blur(5px) drop-shadow(0 0 18px rgba(253, 224, 71, 0.45));
+
+    24% {
+        opacity: 0.7;
+        transform: translate(-50%, 50%) scaleX(1.02) scaleY(1);
     }
-    70% {
-        height: clamp(150px, 30vh, 230px);
-        opacity: 0.5;
-        transform: translateX(-50%) scaleX(1.15);
+
+    58% {
+        opacity: 0.34;
+        transform: translate(-50%, 50%) scaleX(1.3) scaleY(0.75);
     }
+
     100% {
-        height: clamp(160px, 32vh, 245px);
         opacity: 0;
-        transform: translateX(-50%) scaleX(1.25);
-        filter: blur(10px);
+        transform: translate(-50%, 50%) scaleX(1.6) scaleY(0.35);
+    }
+}
+
+/* RISING WISPS — a few soft puffs of light drifting up out of the opened
+   ball. JS sets --wisp-drift / --wisp-rise / --wisp-delay / --wisp-size per
+   puff, so every reveal takes a slightly different path. They sit BELOW the
+   sprite (z-index 9 vs 10) and pass behind it. */
+.reveal-wisp {
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--plat-h) * 0.5 + var(--ball-d) * 0.4);
+    width: var(--wisp-size, 18px);
+    height: var(--wisp-size, 18px);
+    margin-left: calc(var(--wisp-size, 18px) / -2);
+    border-radius: 50%;
+    background: radial-gradient(circle,
+            rgba(255, 248, 222, 0.62) 0%,
+            rgba(253, 224, 71, 0.3) 42%,
+            rgba(234, 179, 8, 0.09) 62%,
+            transparent 74%);
+    filter: blur(3px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9;
+    animation: reveal-wisp var(--wisp-dur, 1.4s) var(--wisp-delay, 0s) ease-out forwards;
+}
+
+@keyframes reveal-wisp {
+    0% {
+        opacity: 0;
+        transform: translate3d(0, 6px, 0) scale(0.3);
+    }
+
+    20% {
+        opacity: 0.6;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate3d(var(--wisp-drift, 0px), calc(-1 * var(--wisp-rise, 90px)), 0) scale(1.15);
     }
 }
 
