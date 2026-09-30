@@ -248,6 +248,270 @@ function initAudio() {
 }
 
 // Upgraded playSound to handle synth notes OR external files (cries/music)
+// ── Final celebration sting ───────────────────────────────────────────
+// The end-of-chain confetti blast gets a 10-second instrumental victory cue,
+// fully synthesised so it costs no bytes and works offline:
+//   0.00s  sharp confetti-cannon pop (noise crack + sub thump)
+//   0.05s  crowd cheer swell, peaks ~0.6s, fades by 2.6s
+//   0.15s  enthusiastic applause, dense then thinning out to 7.0s
+//   0.20s  brass fanfare melody (detuned saws through a formant filter)
+//   5.85s  timpani build into the final cadence
+//   7.81s  chord + cymbal swell
+//  10.00s  master fade to silence — seamless end, no audible cut
+// Purely instrumental: no SpeechSynthesis, so nothing can read as voiceover.
+
+const CELEBRATION_TOTAL_SECONDS = 10;
+const celebrationNoiseBuffers = new Map();
+
+function getCelebrationNoiseBuffer(ctx, seconds, tag) {
+    const key = `${tag}:${seconds}`;
+    if (celebrationNoiseBuffers.has(key)) return celebrationNoiseBuffers.get(key);
+    const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    celebrationNoiseBuffers.set(key, buf);
+    return buf;
+}
+
+// A single clap, pre-filtered and pre-shaped while filling the buffer
+// (state-variable bandpass + fast decay). Baking the filter in means each
+// applause grain only costs a BufferSource at play time, which keeps ~120 of
+// them cheap enough for a mid-range phone.
+function buildClapBuffer(ctx) {
+    const sr = ctx.sampleRate;
+    const len = Math.max(1, Math.floor(sr * 0.035));
+    const buf = ctx.createBuffer(1, len, sr);
+    const d = buf.getChannelData(0);
+    // Chamberlin state-variable filter: f = 2*sin(pi*fc/sr), stable well below 1.
+    const fc = 2100;
+    const f = 2 * Math.sin((Math.PI * fc) / sr);
+    const damp = 1.1;
+    let low = 0, band = 0;
+    for (let i = 0; i < len; i++) {
+        const x = Math.random() * 2 - 1;
+        const high = x - low - damp * band;
+        band += f * high;
+        low += f * band;
+        const t = i / len;
+        // 1ms attack, quick decay — a hand-clap, not a click
+        const env = t < 0.03 ? t / 0.03 : Math.pow(1 - (t - 0.03) / 0.97, 2.6);
+        d[i] = band * env;
+    }
+    return buf;
+}
+
+function getCelebrationClap(ctx) {
+    const key = 'clap:2100:35ms';
+    if (celebrationNoiseBuffers.has(key)) return celebrationNoiseBuffers.get(key);
+    const buf = buildClapBuffer(ctx);
+    celebrationNoiseBuffers.set(key, buf);
+    return buf;
+}
+
+function scheduleFinalCelebrationSting(ctx, startTime, volume) {
+    const master = ctx.createGain();
+    master.gain.value = Math.max(0, Math.min(1, volume == null ? 1 : volume));
+    master.connect(ctx.destination);
+
+    // Everything is wrapped in one master fade so the cue can never click or
+    // be cut off mid-note: full level until 9s, then a smooth 1s fade out.
+    const t0 = startTime + 0.02;
+    master.gain.setValueAtTime(1, t0);
+    master.gain.setValueAtTime(1, t0 + 9);
+    master.gain.linearRampToValueAtTime(0, t0 + CELEBRATION_TOTAL_SECONDS);
+
+    // ── 1. Confetti cannon pop: bright crack over a short sub thump ──────
+    const crack = ctx.createBufferSource();
+    crack.buffer = getCelebrationNoiseBuffer(ctx, 0.3, 'crack');
+    const crackHp = ctx.createBiquadFilter();
+    crackHp.type = 'highpass';
+    crackHp.frequency.value = 1800;
+    const crackG = ctx.createGain();
+    crackG.gain.setValueAtTime(0.0001, t0);
+    crackG.gain.exponentialRampToValueAtTime(0.5, t0 + 0.004);
+    crackG.gain.exponentialRampToValueAtTime(0.001, t0 + 0.14);
+    crack.connect(crackHp); crackHp.connect(crackG); crackG.connect(master);
+    crack.start(t0); crack.stop(t0 + 0.2);
+
+    const pop = ctx.createOscillator();
+    const popG = ctx.createGain();
+    pop.type = 'sine';
+    pop.frequency.setValueAtTime(190, t0);
+    pop.frequency.exponentialRampToValueAtTime(52, t0 + 0.18);
+    popG.gain.setValueAtTime(0.0001, t0);
+    popG.gain.exponentialRampToValueAtTime(0.42, t0 + 0.006);
+    popG.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+    pop.connect(popG); popG.connect(master);
+    pop.start(t0); pop.stop(t0 + 0.24);
+
+    // ── 2. Crowd cheer: three bandpass layers over looping noise ─────────
+    const cheerG = ctx.createGain();
+    cheerG.gain.setValueAtTime(0.0001, t0 + 0.05);
+    cheerG.gain.exponentialRampToValueAtTime(0.3, t0 + 0.6);
+    cheerG.gain.setValueAtTime(0.3, t0 + 1.3);
+    cheerG.gain.exponentialRampToValueAtTime(0.001, t0 + 2.6);
+    cheerG.connect(master);
+
+    // Slow wobble on the mid layer: a real crowd never holds a steady level.
+    const cheerLfo = ctx.createOscillator();
+    const cheerLfoG = ctx.createGain();
+    cheerLfo.type = 'sine';
+    cheerLfo.frequency.value = 5.5;
+    cheerLfoG.gain.value = 0.09;
+    cheerLfo.connect(cheerLfoG);
+    cheerLfo.start(t0 + 0.05); cheerLfo.stop(t0 + 2.7);
+
+    [[420, 1.0, 0.9], [1050, 0.85, 0.6], [2400, 1.4, 0.32]].forEach(([fc, q, lvl], i) => {
+        const src = ctx.createBufferSource();
+        src.buffer = getCelebrationNoiseBuffer(ctx, 3, 'crowd');
+        src.loop = true;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = fc;
+        bp.Q.value = q;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        src.connect(bp); bp.connect(g); g.connect(cheerG);
+        if (i === 1) cheerLfoG.connect(g.gain);
+        src.start(t0 + 0.05 + i * 0.013);
+        src.stop(t0 + 2.7);
+    });
+
+    // ── 3. Applause: dense claps thinning out, no voice-like formants ─────
+    const clapBuf = getCelebrationClap(ctx);
+    const applauseG = ctx.createGain();
+    applauseG.gain.value = 0.9;
+    applauseG.connect(master);
+
+    // Eight fixed levels keep the grains varied without a Gain node each.
+    const clapBuses = [];
+    for (let i = 0; i < 8; i++) {
+        const bus = ctx.createGain();
+        bus.gain.value = 0.22 + i * 0.11;
+        bus.connect(applauseG);
+        clapBuses.push(bus);
+    }
+
+    let grain = 0;
+    let cursor = t0 + 0.15;
+    const applauseEnd = t0 + 7;
+    while (cursor < applauseEnd) {
+        // Denser at the start, thinning out as the crowd settles
+        const progress = (cursor - t0) / 7;
+        cursor += 0.012 + progress * 0.075 + Math.random() * 0.03;
+        const src = ctx.createBufferSource();
+        src.buffer = clapBuf;
+        src.playbackRate.value = 0.85 + Math.random() * 0.45;
+        src.connect(clapBuses[grain % clapBuses.length]);
+        src.start(cursor);
+        grain++;
+    }
+    // Fade the applause bus so the tail doesn't cut off with the cue
+    applauseG.gain.setValueAtTime(0.9, t0);
+    applauseG.gain.setValueAtTime(0.9, applauseEnd - 0.4);
+    applauseG.gain.linearRampToValueAtTime(0, applauseEnd + 0.3);
+
+    // ── 4. Brass fanfare: detuned saws through a formant-ish lowpass ─────
+    // [frequency, start seconds, duration seconds] — three phrases: a call,
+    // an answer, then the final cadence into a held C-major chord.
+    const fanfare = [
+        [523.25, 0.20, 0.30], [523.25, 0.50, 0.16], [523.25, 0.66, 0.16],
+        [783.99, 0.82, 0.42], [659.25, 1.24, 0.30], [783.99, 1.54, 0.30],
+        [1046.50, 1.84, 1.30],
+        [880.00, 3.30, 0.34], [783.99, 3.64, 0.30], [659.25, 3.94, 0.30],
+        [587.33, 4.24, 0.46], [659.25, 4.70, 0.30], [783.99, 5.00, 0.70],
+        [1046.50, 5.85, 0.34], [987.77, 6.19, 0.26], [1046.50, 6.45, 0.34],
+        [783.99, 6.79, 0.30], [659.25, 7.09, 0.30], [783.99, 7.39, 0.42],
+        [1046.50, 7.81, 1.70]
+    ];
+
+    const brassG = ctx.createGain();
+    brassG.gain.value = 0.34;
+    brassG.connect(master);
+
+    const playBrassNote = (freq, at, dur, level) => {
+        const g = ctx.createGain();
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(900, at);
+        lp.frequency.linearRampToValueAtTime(2400, at + 0.09);
+        lp.frequency.linearRampToValueAtTime(1500, at + dur);
+        lp.Q.value = 1.1;
+
+        // Two slightly detuned saws: the beating is what makes it read as a
+        // brass section rather than a synth blip.
+        const a = ctx.createOscillator();
+        const b = ctx.createOscillator();
+        a.type = 'sawtooth'; b.type = 'sawtooth';
+        a.frequency.value = freq;
+        b.frequency.value = freq * 1.006;
+
+        // Vibrato on longer notes — brass players never hold a dead note.
+        let vib = null;
+        let vibG = null;
+        if (dur >= 0.6) {
+            vib = ctx.createOscillator();
+            vibG = ctx.createGain();
+            vib.type = 'sine';
+            vib.frequency.value = 5.2;
+            vibG.gain.setValueAtTime(0, at);
+            vibG.gain.linearRampToValueAtTime(freq * 0.006, at + Math.min(0.35, dur * 0.5));
+            vib.connect(vibG);
+            vibG.connect(a.frequency);
+            vibG.connect(b.frequency);
+            vib.start(at); vib.stop(at + dur + 0.05);
+        }
+
+        // Brass bite on the attack, smooth release at the end of the note.
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(level, at + 0.035);
+        g.gain.exponentialRampToValueAtTime(level * 0.72, at + Math.min(0.22, dur * 0.6));
+        g.gain.setValueAtTime(level * 0.72, at + dur - 0.09);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+
+        a.connect(lp); b.connect(lp); lp.connect(g); g.connect(brassG);
+        a.start(at); b.start(at);
+        a.stop(at + dur + 0.02); b.stop(at + dur + 0.02);
+    };
+
+    fanfare.forEach(([f, at, dur]) => playBrassNote(f, t0 + at, dur, 0.5));
+
+    // Held root-position chord under the final cadence for a proper finish
+    [[261.63, 0.26], [659.25, 0.3], [783.99, 0.28], [1046.50, 0.24]]
+        .forEach(([f, lvl]) => playBrassNote(f, t0 + 7.81, 1.75, lvl));
+
+    // ── 5. Timpani: one hit on the pop, a roll building the cadence ──────
+    const timpani = (at, level) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, at);
+        osc.frequency.exponentialRampToValueAtTime(58, at + 0.24);
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(level, at + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+        osc.connect(g); g.connect(master);
+        osc.start(at); osc.stop(at + 0.32);
+    };
+    timpani(t0, 0.34);
+    for (let i = 0; i < 8; i++) timpani(t0 + 5.85 + i * 0.085, 0.12 + i * 0.028);
+    timpani(t0 + 7.81, 0.5);
+
+    // ── 6. Cymbal shimmer under the cadence, closed as the cue ends ──────
+    const cym = ctx.createBufferSource();
+    cym.buffer = getCelebrationNoiseBuffer(ctx, 2.5, 'cymbal');
+    const cymHp = ctx.createBiquadFilter();
+    cymHp.type = 'highpass';
+    cymHp.frequency.value = 5200;
+    const cymG = ctx.createGain();
+    cymG.gain.setValueAtTime(0.0001, t0 + 7.75);
+    cymG.gain.exponentialRampToValueAtTime(0.16, t0 + 7.85);
+    cymG.gain.exponentialRampToValueAtTime(0.001, t0 + 9.6);
+    cym.connect(cymHp); cymHp.connect(cymG); cymG.connect(master);
+    cym.start(t0 + 7.75); cym.stop(t0 + 9.7);
+}
+
 function playSound(soundName, volume = 0.3) {
     if (!soundEnabled || isMuted || !audioContext) return;
 
@@ -579,6 +843,10 @@ function playSound(soundName, volume = 0.3) {
                 an.start(t4); an.stop(t4 + 0.32);
                 break;
             }
+
+            case 'finalCelebration':
+                scheduleFinalCelebrationSting(audioContext, now, volume);
+                break;
         }
 
         // Add Haptic Feedback

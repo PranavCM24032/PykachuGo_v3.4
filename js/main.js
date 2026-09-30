@@ -590,9 +590,14 @@ function runCelebration(canvas, screen) {
                 colors: colors,
                 gravity: 1.2
             });
-            playSound('success'); // Additional success sounds for impact
         }, delay);
     };
+
+    // The 10-second instrumental victory cue lands with the first blast:
+    // cannon pop at second 0, crowd cheer + applause, brass fanfare resolving
+    // and fading out seamlessly at 10s. Previously each burst fired a short
+    // generic 'success' blip, which fought the fanfare and had no ending.
+    playSound('finalCelebration', 1);
 
     burst(0, 0.5);   // Center
     burst(400, 0.2); // Left

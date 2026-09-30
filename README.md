@@ -181,6 +181,29 @@ which Pokémon it is. `stopCatchVoice()` cancels any queued or in-flight
 speech, so leaving step 4 or logging out mid-reveal never leaves a voice
 talking over the next screen.
 
+### The end-of-chain celebration cue
+
+The final puzzle's confetti blast is driven by `playSound('finalCelebration')`
+in `js/audio.js` — a 10-second **instrumental** victory cue, synthesised on the
+fly (no audio files, so it works offline and costs nothing to load). It is
+fired from `runCelebration()` on the same tick as the first confetti burst, and
+nothing speaks: no SpeechSynthesis, so it can never read as voiceover.
+
+| Time | Layer |
+|------|-------|
+| 0.00s | Confetti cannon pop — highpassed noise crack + 190→52 Hz sub thump |
+| 0.05s | Crowd cheer — three bandpass noise layers (420/1050/2400 Hz) with a 5.5 Hz level wobble, swelling to 0.6s and fading by 2.6s |
+| 0.15s | Applause — ~120 pre-filtered clap grains (state-variable bandpass baked into the buffer), dense then thinning out to 7.0s |
+| 0.20s | Brass fanfare — 24 detuned sawtooth notes through a swept lowpass, with vibrato on notes ≥ 0.6s, in three phrases (call → answer → cadence) |
+| 5.85s | Timpani build — eight rising hits into the final cadence |
+| 7.75s | Cymbal shimmer + held C-major chord (C4/E5/G5/C6) |
+| 9.00s | Master fade — everything reaches silence at exactly 10.0s |
+
+Applause grains only cost a `BufferSource` each because the filter and envelope
+are baked into the shared clap buffer, which keeps the whole cue at ~280 audio
+nodes — cheap enough for a mid-range phone. Everything routes through one master
+gain so the cue always ends cleanly rather than being cut off mid-note.
+
 ---
 ## 🔄 Client-side workflow (flowchart)
 
