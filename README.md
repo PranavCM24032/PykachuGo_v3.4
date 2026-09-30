@@ -163,13 +163,17 @@ latch fires, the shells split, and the sprite materialises. The catch line is
 **voice-only** — `pokemonName` is never rendered on screen, so the player
 identifies the Pokémon from the sprite alone.
 
-`js/audio.js` speaks it as a small **3-voice chorus** rather than one
-utterance: staggered entrances (0 / 110 / 235 ms), a different OS voice and
-pitch per singer, tapering volume on the followers, and the preferred
-female voice (e.g. Zira) leading. This fires on every catch regardless of
-which Pokémon it is. `stopCatchVoice()` drops chorus members that have not
-entered yet, so leaving step 4 or logging out mid-reveal never leaves voices
-talking over the next screen.
+`js/audio.js` speaks it as a retro-anime **announcer line** sung by a small
+**3-voice chorus**: all three enter at the same instant, each on its own OS
+voice and pitch around an energetic setting (lead pitch 1.25 / rate 1.1, per
+the classic 90s narrator recipe), with tapering volume on the followers.
+Chrome's Google US English voice is preferred when present. A short 8-bit
+"caught" jingle fires on the same tick, shaped by a 300Hz–3kHz bandpass to
+sound like 90s CRT TV audio (the filter colours the jingle — Web Speech
+output cannot be routed through the Web Audio graph). This fires on every
+catch regardless of which Pokémon it is. `stopCatchVoice()` drops chorus
+members that have not entered yet, so leaving step 4 or logging out
+mid-reveal never leaves voices talking over the next screen.
 
 ---
 ## 🔄 Client-side workflow (flowchart)
