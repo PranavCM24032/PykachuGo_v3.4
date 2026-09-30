@@ -370,18 +370,26 @@ function initAudio() {
 
 // Upgraded playSound to handle synth notes OR external files (cries/music)
 // ── Final celebration sting ───────────────────────────────────────────
-// The end-of-chain confetti blast gets a 10-second instrumental victory cue,
-// fully synthesised so it costs no bytes and works offline:
-//   0.00s  sharp confetti-cannon pop (noise crack + sub thump)
-//   0.05s  crowd cheer swell, peaks ~0.6s, fades by 2.6s
-//   0.15s  enthusiastic applause, dense then thinning out to 7.0s
-//   0.20s  brass fanfare melody (detuned saws through a formant filter)
-//   5.85s  timpani build into the final cadence
-//   7.81s  chord + cymbal swell
-//  10.00s  master fade to silence — seamless end, no audible cut
+// The end-of-chain confetti blast gets a 15-second instrumental victory cue,
+// fully synthesised so it costs no bytes and works offline. The cue is locked
+// to the confetti choreography in js/main.js — fountains for 15s plus a star
+// burst every 1.5s — so every visual hit gets an audio hit on the same frame:
+//   0.00s  cannon pop + timpani        -> centre burst
+//   0.40s  accent                       -> left burst
+//   0.80s  accent                       -> right burst
+//   1.20s  accent + cymbal wash         -> centre burst, fountains begin
+//   0.15s  applause: dense, thinning, re-surging for the finale (ends 14.2s)
+//   0.20s  brass fanfare, three phrases (starts 0.2s / 3.3s / 8.6s)
+//   1.5s .. 9.0s  soft timpani taps on each 1.5s star burst
+//   5.85s  timpani roll into the second phrase
+//  12.84s  timpani roll into the finale
+//  13.35s  crowd re-surge + cymbal swell -> the last star burst, which is also
+//          exactly where the confetti stops
+//  13.50s  final brass cadence + held C-major chord
+//  13.60s  master fade to silence at 15.0s — seamless end, no audible cut
 // Purely instrumental: no SpeechSynthesis, so nothing can read as voiceover.
 
-const CELEBRATION_TOTAL_SECONDS = 10;
+const CELEBRATION_TOTAL_SECONDS = 15;
 const celebrationNoiseBuffers = new Map();
 
 function getCelebrationNoiseBuffer(ctx, seconds, tag) {
@@ -439,65 +447,80 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
     // be cut off mid-note: full level until 9s, then a smooth 1s fade out.
     const t0 = startTime + 0.02;
     master.gain.setValueAtTime(1, t0);
-    master.gain.setValueAtTime(1, t0 + 9);
+    master.gain.setValueAtTime(1, t0 + 13.6);
     master.gain.linearRampToValueAtTime(0, t0 + CELEBRATION_TOTAL_SECONDS);
 
     // ── 1. Confetti cannon pop: bright crack over a short sub thump ──────
-    const crack = ctx.createBufferSource();
-    crack.buffer = getCelebrationNoiseBuffer(ctx, 0.3, 'crack');
-    const crackHp = ctx.createBiquadFilter();
-    crackHp.type = 'highpass';
-    crackHp.frequency.value = 1800;
-    const crackG = ctx.createGain();
-    crackG.gain.setValueAtTime(0.0001, t0);
-    crackG.gain.exponentialRampToValueAtTime(0.5, t0 + 0.004);
-    crackG.gain.exponentialRampToValueAtTime(0.001, t0 + 0.14);
-    crack.connect(crackHp); crackHp.connect(crackG); crackG.connect(master);
-    crack.start(t0); crack.stop(t0 + 0.2);
+    // One accent per confetti burst. The main.js choreography fires four
+    // 150-particle blasts at 0ms / 400ms / 800ms / 1200ms, so without these
+    // three follow-ups the screen kept bursting in silence.
+    const cannonPop = (at, level) => {
+        const crack = ctx.createBufferSource();
+        crack.buffer = getCelebrationNoiseBuffer(ctx, 0.3, 'crack');
+        const crackHp = ctx.createBiquadFilter();
+        crackHp.type = 'highpass';
+        crackHp.frequency.value = 1800;
+        const crackG = ctx.createGain();
+        crackG.gain.setValueAtTime(0.0001, at);
+        crackG.gain.exponentialRampToValueAtTime(0.5 * level, at + 0.004);
+        crackG.gain.exponentialRampToValueAtTime(0.001, at + 0.14);
+        crack.connect(crackHp); crackHp.connect(crackG); crackG.connect(master);
+        crack.start(at); crack.stop(at + 0.2);
 
-    const pop = ctx.createOscillator();
-    const popG = ctx.createGain();
-    pop.type = 'sine';
-    pop.frequency.setValueAtTime(190, t0);
-    pop.frequency.exponentialRampToValueAtTime(52, t0 + 0.18);
-    popG.gain.setValueAtTime(0.0001, t0);
-    popG.gain.exponentialRampToValueAtTime(0.42, t0 + 0.006);
-    popG.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
-    pop.connect(popG); popG.connect(master);
-    pop.start(t0); pop.stop(t0 + 0.24);
+        const pop = ctx.createOscillator();
+        const popG = ctx.createGain();
+        pop.type = 'sine';
+        pop.frequency.setValueAtTime(190, at);
+        pop.frequency.exponentialRampToValueAtTime(52, at + 0.18);
+        popG.gain.setValueAtTime(0.0001, at);
+        popG.gain.exponentialRampToValueAtTime(0.42 * level, at + 0.006);
+        popG.gain.exponentialRampToValueAtTime(0.001, at + 0.22);
+        pop.connect(popG); popG.connect(master);
+        pop.start(at); pop.stop(at + 0.24);
+    };
+    cannonPop(t0, 1);            // centre blast
+    cannonPop(t0 + 0.4, 0.42);   // left blast
+    cannonPop(t0 + 0.8, 0.46);   // right blast
+    cannonPop(t0 + 1.2, 0.62);   // centre blast again
 
     // ── 2. Crowd cheer: three bandpass layers over looping noise ─────────
-    const cheerG = ctx.createGain();
-    cheerG.gain.setValueAtTime(0.0001, t0 + 0.05);
-    cheerG.gain.exponentialRampToValueAtTime(0.3, t0 + 0.6);
-    cheerG.gain.setValueAtTime(0.3, t0 + 1.3);
-    cheerG.gain.exponentialRampToValueAtTime(0.001, t0 + 2.6);
-    cheerG.connect(master);
+    // Used twice: the opening roar, then a re-surge under the finale at the
+    // moment the last star burst goes off.
+    const crowdSwell = (startAt, peakAt, holdUntil, endAt, peak) => {
+        const cheerG = ctx.createGain();
+        cheerG.gain.setValueAtTime(0.0001, startAt);
+        cheerG.gain.exponentialRampToValueAtTime(peak, peakAt);
+        cheerG.gain.setValueAtTime(peak, holdUntil);
+        cheerG.gain.exponentialRampToValueAtTime(0.001, endAt);
+        cheerG.connect(master);
 
-    // Slow wobble on the mid layer: a real crowd never holds a steady level.
-    const cheerLfo = ctx.createOscillator();
-    const cheerLfoG = ctx.createGain();
-    cheerLfo.type = 'sine';
-    cheerLfo.frequency.value = 5.5;
-    cheerLfoG.gain.value = 0.09;
-    cheerLfo.connect(cheerLfoG);
-    cheerLfo.start(t0 + 0.05); cheerLfo.stop(t0 + 2.7);
+        // Slow wobble on the mid layer: a real crowd never holds a steady level.
+        const cheerLfo = ctx.createOscillator();
+        const cheerLfoG = ctx.createGain();
+        cheerLfo.type = 'sine';
+        cheerLfo.frequency.value = 5.5;
+        cheerLfoG.gain.value = 0.09;
+        cheerLfo.connect(cheerLfoG);
+        cheerLfo.start(startAt); cheerLfo.stop(endAt + 0.1);
 
-    [[420, 1.0, 0.9], [1050, 0.85, 0.6], [2400, 1.4, 0.32]].forEach(([fc, q, lvl], i) => {
-        const src = ctx.createBufferSource();
-        src.buffer = getCelebrationNoiseBuffer(ctx, 3, 'crowd');
-        src.loop = true;
-        const bp = ctx.createBiquadFilter();
-        bp.type = 'bandpass';
-        bp.frequency.value = fc;
-        bp.Q.value = q;
-        const g = ctx.createGain();
-        g.gain.value = lvl;
-        src.connect(bp); bp.connect(g); g.connect(cheerG);
-        if (i === 1) cheerLfoG.connect(g.gain);
-        src.start(t0 + 0.05 + i * 0.013);
-        src.stop(t0 + 2.7);
-    });
+        [[420, 1.0, 0.9], [1050, 0.85, 0.6], [2400, 1.4, 0.32]].forEach(([fc, q, lvl], i) => {
+            const src = ctx.createBufferSource();
+            src.buffer = getCelebrationNoiseBuffer(ctx, Math.ceil(endAt - startAt + 0.4), 'crowd');
+            src.loop = true;
+            const bp = ctx.createBiquadFilter();
+            bp.type = 'bandpass';
+            bp.frequency.value = fc;
+            bp.Q.value = q;
+            const g = ctx.createGain();
+            g.gain.value = lvl;
+            src.connect(bp); bp.connect(g); g.connect(cheerG);
+            if (i === 1) cheerLfoG.connect(g.gain);
+            src.start(startAt + i * 0.013);
+            src.stop(endAt + 0.1);
+        });
+    };
+    crowdSwell(t0 + 0.05, t0 + 0.6, t0 + 1.3, t0 + 2.6, 0.3);   // opening roar
+    crowdSwell(t0 + 13.35, t0 + 13.6, t0 + 13.9, t0 + 14.9, 0.26); // finale surge
 
     // ── 3. Applause: dense claps thinning out, no voice-like formants ─────
     const clapBuf = getCelebrationClap(ctx);
@@ -516,11 +539,16 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
 
     let grain = 0;
     let cursor = t0 + 0.15;
-    const applauseEnd = t0 + 7;
+    // Applause now runs the full length of the confetti and re-surges for the
+    // finale, instead of dying at 7s and leaving the last 8 seconds silent.
+    const applauseEnd = t0 + 14.2;
     while (cursor < applauseEnd) {
-        // Denser at the start, thinning out as the crowd settles
-        const progress = (cursor - t0) / 7;
-        cursor += 0.012 + progress * 0.075 + Math.random() * 0.03;
+        const progress = (cursor - t0) / 14.2;
+        // Dense at the start, thinning as the crowd settles, then dense again
+        // for the final chord.
+        const finale = cursor > t0 + 12.6;
+        const gap = finale ? 0.022 : 0.012 + progress * 0.075;
+        cursor += gap + Math.random() * 0.03;
         const src = ctx.createBufferSource();
         src.buffer = clapBuf;
         src.playbackRate.value = 0.85 + Math.random() * 0.45;
@@ -528,14 +556,13 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
         src.start(cursor);
         grain++;
     }
-    // Fade the applause bus so the tail doesn't cut off with the cue
-    applauseG.gain.setValueAtTime(0.9, t0);
-    applauseG.gain.setValueAtTime(0.9, applauseEnd - 0.4);
-    applauseG.gain.linearRampToValueAtTime(0, applauseEnd + 0.3);
+    // The master fade closes the cue, so the applause bus just holds level.
 
     // ── 4. Brass fanfare: detuned saws through a formant-ish lowpass ─────
-    // [frequency, start seconds, duration seconds] — three phrases: a call,
-    // an answer, then the final cadence into a held C-major chord.
+    // [frequency, start seconds, duration seconds] — three phrases: a call at
+    // 0.2s, an answer at 3.3s, then a rising build at 8.6s that resolves on the
+    // final cadence at 13.5s, exactly where the last confetti star burst goes
+    // off and the fountains stop.
     const fanfare = [
         [523.25, 0.20, 0.30], [523.25, 0.50, 0.16], [523.25, 0.66, 0.16],
         [783.99, 0.82, 0.42], [659.25, 1.24, 0.30], [783.99, 1.54, 0.30],
@@ -543,8 +570,12 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
         [880.00, 3.30, 0.34], [783.99, 3.64, 0.30], [659.25, 3.94, 0.30],
         [587.33, 4.24, 0.46], [659.25, 4.70, 0.30], [783.99, 5.00, 0.70],
         [1046.50, 5.85, 0.34], [987.77, 6.19, 0.26], [1046.50, 6.45, 0.34],
-        [783.99, 6.79, 0.30], [659.25, 7.09, 0.30], [783.99, 7.39, 0.42],
-        [1046.50, 7.81, 1.70]
+        [880.00, 6.79, 0.30], [783.99, 7.09, 0.30], [1046.50, 7.39, 0.90],
+        [880.00, 8.60, 0.34], [1046.50, 8.94, 0.30], [1174.66, 9.24, 0.30],
+        [1318.51, 9.54, 0.40], [1174.66, 10.14, 0.26], [1318.51, 10.40, 0.26],
+        [1396.91, 10.66, 0.34], [1318.51, 11.14, 0.30], [1046.50, 11.44, 0.30],
+        [1174.66, 11.74, 0.30], [1318.51, 12.04, 0.66], [1567.98, 12.84, 0.62],
+        [1318.51, 13.50, 1.45]
     ];
 
     const brassG = ctx.createGain();
@@ -598,9 +629,10 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
 
     fanfare.forEach(([f, at, dur]) => playBrassNote(f, t0 + at, dur, 0.5));
 
-    // Held root-position chord under the final cadence for a proper finish
-    [[261.63, 0.26], [659.25, 0.3], [783.99, 0.28], [1046.50, 0.24]]
-        .forEach(([f, lvl]) => playBrassNote(f, t0 + 7.81, 1.75, lvl));
+    // Held root-position chord under the final cadence for a proper finish,
+    // ringing out to the moment the confetti stops.
+    [[261.63, 0.26], [659.25, 0.3], [783.99, 0.28], [1046.50, 0.24], [1318.51, 0.18]]
+        .forEach(([f, lvl]) => playBrassNote(f, t0 + 13.5, 1.45, lvl));
 
     // ── 5. Timpani: one hit on the pop, a roll building the cadence ──────
     const timpani = (at, level) => {
@@ -616,21 +648,32 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
         osc.start(at); osc.stop(at + 0.32);
     };
     timpani(t0, 0.34);
+    // Accents on the three follow-up confetti blasts.
+    timpani(t0 + 0.4, 0.16);
+    timpani(t0 + 0.8, 0.17);
+    timpani(t0 + 1.2, 0.24);
+    // Soft taps on every 1.5s star burst so the ongoing confetti keeps a pulse.
+    for (let s = 1.5; s <= 9; s += 1.5) timpani(t0 + s, 0.1);
     for (let i = 0; i < 8; i++) timpani(t0 + 5.85 + i * 0.085, 0.12 + i * 0.028);
-    timpani(t0 + 7.81, 0.5);
+    for (let i = 0; i < 8; i++) timpani(t0 + 12.84 + i * 0.085, 0.14 + i * 0.03);
+    timpani(t0 + 13.5, 0.5);
 
-    // ── 6. Cymbal shimmer under the cadence, closed as the cue ends ──────
-    const cym = ctx.createBufferSource();
-    cym.buffer = getCelebrationNoiseBuffer(ctx, 2.5, 'cymbal');
-    const cymHp = ctx.createBiquadFilter();
-    cymHp.type = 'highpass';
-    cymHp.frequency.value = 5200;
-    const cymG = ctx.createGain();
-    cymG.gain.setValueAtTime(0.0001, t0 + 7.75);
-    cymG.gain.exponentialRampToValueAtTime(0.16, t0 + 7.85);
-    cymG.gain.exponentialRampToValueAtTime(0.001, t0 + 9.6);
-    cym.connect(cymHp); cymHp.connect(cymG); cymG.connect(master);
-    cym.start(t0 + 7.75); cym.stop(t0 + 9.7);
+    // ── 6. Cymbal shimmer: a wash under the fountains, then the big swell ──
+    const cymbal = (startAt, peakAt, peak, decayEnd) => {
+        const cym = ctx.createBufferSource();
+        cym.buffer = getCelebrationNoiseBuffer(ctx, Math.ceil(decayEnd - startAt + 0.2), 'cymbal');
+        const cymHp = ctx.createBiquadFilter();
+        cymHp.type = 'highpass';
+        cymHp.frequency.value = 5200;
+        const cymG = ctx.createGain();
+        cymG.gain.setValueAtTime(0.0001, startAt);
+        cymG.gain.exponentialRampToValueAtTime(peak, peakAt);
+        cymG.gain.exponentialRampToValueAtTime(0.001, decayEnd);
+        cym.connect(cymHp); cymHp.connect(cymG); cymG.connect(master);
+        cym.start(startAt); cym.stop(decayEnd + 0.1);
+    };
+    cymbal(t0 + 1.2, t0 + 1.3, 0.07, t0 + 3.2);   // fountain wash
+    cymbal(t0 + 13.35, t0 + 13.5, 0.16, t0 + CELEBRATION_TOTAL_SECONDS); // finale
 }
 
 function playSound(soundName, volume = 0.3) {
