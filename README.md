@@ -870,12 +870,17 @@ pushing is a live content update.
 
 ## 📄 License
 
-This repository is proprietary work by Pranav Mohan Paunikar. See
-[`LICENSE.md`](LICENSE.md) for the ownership notice, the mandatory written
-permission process, and the unauthorized-use terms — the short version: academic
-study and faculty review only, no cloning, deploying, or running an event without
-written permission. A standard MIT `LICENSE` file is also present for the
-components you are explicitly cleared to reuse.
+Proprietary, all rights reserved © 2026 Pranav Mohan Paunikar. See
+[`LICENSE`](LICENSE) — it is the single complete license for this repository and
+covers ownership of the IP, the study-and-faculty-review-only grant, the
+prohibited acts (cloning, deploying, running an event), the mandatory written
+permission process with HOD / Forum Incharge / Principal sign-offs, the scope and
+termination of any granted permission, the contribution assignment clause, the
+no-warranty disclaimer, the ₹30,000-per-instance penalty and escalation / DMCA
+enforcement, and governing law.
+
+Short version: academic study and faculty review only — no cloning, deploying or
+running an event without written permission from the copyright holder.
 
 ## 🤝 Contributing
 

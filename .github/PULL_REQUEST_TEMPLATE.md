@@ -1,6 +1,6 @@
 # Pull request
 
-> Pykachu Go is permission-gated proprietary work (`LICENSE.md`). PRs are
+> Pykachu Go is permission-gated proprietary work (`LICENSE`). PRs are
 > reviewed for authorised collaborators only.
 
 ## What changed

@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Pykachu Go is permission-gated proprietary work — see `LICENSE.md`.
+        Pykachu Go is permission-gated proprietary work — see `LICENSE`.
         Only the maintainer and authorised collaborators should file issues here.
 
   - type: checkboxes

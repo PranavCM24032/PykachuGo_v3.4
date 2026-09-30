@@ -8,7 +8,7 @@ is below.
 Pykachu Go is proprietary work by **Pranav Mohan Paunikar**. It is published for
 individual academic study and faculty review only. Any fork, clone, deployment,
 or event run with this software needs **prior written permission** from the
-copyright holder — see [`LICENSE.md`](../LICENSE.md) for the full process and the
+copyright holder — see [`LICENSE`](../LICENSE) for the full process and the
 required sign-offs.
 
 Because of that:

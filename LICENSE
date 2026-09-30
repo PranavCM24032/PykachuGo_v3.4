@@ -1,21 +1,208 @@
-MIT License
+# PROPRIETARY SOFTWARE LICENSE & INTELLECTUAL PROPERTY NOTICE
 
-Copyright (c) 2026 Pranav Mohan Paunikar
+**Project:** PYKACHU GO ("Decode the code. Capture Pikachu.")
+**Copyright (c) 2026 Pranav Mohan Paunikar. All Rights Reserved.**
+**Licensor / Copyright Holder:** Pranav Mohan Paunikar
+**Contact for all permission, licensing and enforcement notices:** pranavpaunikar.ml24@sbjit.edu.in
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+> This is the single, complete and exclusive license for this repository. It
+> supersedes and replaces any other license, grant, or notice previously
+> published with it — including any MIT text, `LICENSE.md`, or README wording.
+> Where this document and any other statement conflict, **this document wins**.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+---
+
+## 0. SUMMARY (PLAIN ENGLISH)
+
+This project is published publicly **only so that it can be read, studied and
+reviewed** — for individual academic study and for faculty review. **Viewing,
+cloning or downloading this repository grants you no right to use, run, modify,
+copy, redistribute or build on it.** Running a game, treasure hunt or event with
+this software, or rebuilding it from this repository, requires **prior written
+permission** from the copyright holder. Please read Sections 2–4 before you do
+anything with this code.
+
+---
+
+## 1. OWNERSHIP OF INTELLECTUAL PROPERTY
+
+All software code, source code, architecture, designs, README files,
+documentation (including `assets/docs/PUZZLE_LINKING_SYSTEM.md`, the setup guides
+and the templates under `.github/`), user interfaces, graphics, animations,
+game mechanics, puzzle structures, riddles, answers, scoring rules, location
+clues, easter eggs, assets, naming, and the concepts contained within this
+repository are the exclusive intellectual property of **Pranav Mohan Paunikar**
+(the "Copyright Holder"), protected by copyright law and by the laws of
+intellectual property generally.
+
+No rights are granted by implication, estoppel, conduct, silence, or by the fact
+that this repository is publicly visible, forkable, or cached by a browser or
+service worker.
+
+### 1.1 Trademarks and third-party material
+
+"Pokémon", "Pokédex", "Pokéball" and related names and designs are trademarks of
+their respective owners (Nintendo, Creatures Inc. / GAME FREAK Inc. and The
+Pokémon Company International). This project is a non-commercial, educational
+work and is not affiliated with, endorsed by, sponsored by, or connected to any
+of them. Third-party assets remain the property of their owners and are used
+only as attributed in `README.md` (for example sprites from the **PokeAPI**
+sprite repository and clips played through the **YouTube** IFrame API). Those
+assets are **not** licensed by this document and are not covered by Section 1.
+
+---
+
+## 2. GRANT OF USE — STUDY AND FACULTY REVIEW ONLY
+
+Permission is granted, free of charge, to **view and read** this repository and
+its documentation for **individual academic study and faculty review**. That is
+the entire grant. Specifically, no permission is granted to:
+
+* use the software, in whole or in part, for any purpose other than reading,
+  studying and academic/faculty review;
+* host, execute, deploy, publish, or operate the application, on any hosting
+  service, device, network, or offline medium;
+* organise, host, run, manage, or monetise any game, treasure hunt, campus
+  event, competition, or teaching activity using this software, its puzzle
+  structure, its documentation, or its core mechanics;
+* modify, adapt, translate, refactor, extract, or create derivative works from
+  the source code, designs, or assets;
+* redistribute, sublicense, resell, rent, lease, lend, or commercially exploit
+  the software or any part of it;
+* remove, obscure, or alter any copyright, licence, attribution or
+  intellectual-property notice in the source, documentation, or assets.
+
+---
+
+## 3. PROHIBITED ACTS
+
+Under no circumstances may any individual, student, team, organisation,
+department, or institution:
+
+1. **Clone, copy, download, fork, or mirror** the repository or its README in
+   order to replicate, rebuild, or deploy the project.
+2. **Organise, host, execute, or manage** any game, treasure hunt, or event
+   using this software, its README, its puzzle structure, or its core mechanics.
+3. **Modify, extract, reuse, or commercially exploit** any part of the
+   repository, source code, design, or assets, in whole or in part.
+4. **Publish puzzle answers, solution keys, or cheat workarounds** for a live or
+   upcoming event, or help others bypass the anti-cheat systems in
+   `js/security.js`.
+5. **Expose or abuse** live credentials, deployment URLs, spreadsheet
+   identifiers, tokens, team rosters, security keys, or player telemetry.
+
+Using this repository or its documentation to clone the project or to organise a
+similar event without written permission constitutes **severe academic
+malpractice, copyright infringement, and intellectual property theft**.
+
+---
+
+## 4. MANDATORY WRITTEN PERMISSION PROCESS
+
+No person, team, organisation, or institution may use, host, reuse, fork, or
+integrate any part of this project or its documentation without **prior written
+permission**. To request permission, submit a formal request by email to:
+
+> **pranavpaunikar.ml24@sbjit.edu.in** — subject line: "PYKACHU GO — Permission Request"
+
+Your request **must** include:
+
+1. Full name of the requestor.
+2. Department name.
+3. College name and full college address.
+4. An attached **official permission letter** containing:
+   * explicit signature and approval seal of your **Head of Department (HOD)**;
+   * explicit signature and approval seal of your **Forum Incharge / Event
+     Coordinator**;
+   * explicit signature and approval seal of your **College Principal**.
+
+Silence, oral agreements, or a lack of response do **NOT** constitute permission.
+You must wait for an official written reply granting clearance, sent directly
+from the copyright holder after verification of the signed documents. **No work
+may begin before that reply arrives.**
+
+### 4.1 Scope of a granted permission
+
+Any permission that is granted is limited to the specific event, dates, and
+scope described in the copyright holder's written reply. It is non-exclusive,
+non-transferable, revocable, and confers no rights to sub-license, publish, or
+reuse the material afterwards. Attribution to the copyright holder is required in
+all public material. A separate written agreement must be obtained for any
+commercial, paid, or public distribution.
+
+---
+
+## 5. CONTRIBUTIONS
+
+This project is permission-gated: contributions are accepted only from the
+copyright holder and from collaborators holding written permission under
+Section 4. If you submit any contribution, pull request, patch, or suggestion,
+you **assign** to the Copyright Holder all right, title and interest in that
+contribution (including copyright and any intellectual-property rights) and you
+confirm that:
+
+* you have the authority to submit it and that it is your original work;
+* you accept these terms and grant no licence to any third party over it;
+* it does not contain third-party copyrighted material you do not own;
+* it will be licensed under this document, with no separate terms.
+
+---
+
+## 6. NO WARRANTY, NO SUPPORT, NO LIABILITY
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, ACCURACY, AND NON-INFRINGEMENT. The copyright holder
+provides **no support, maintenance, hosting, or service level** for this
+material. In no event shall the copyright holder be liable for any claim,
+damages, or other liability (including lost profits, lost data, event
+cancellations, or academic consequences) arising from any use or inability to use
+the material, even if advised of the possibility of such damages.
+
+---
+
+## 7. UNAUTHORISED USE — PENALTY, TERMINATION AND ENFORCEMENT
+
+Any use outside individual academic study and faculty review — including cloning
+the project, using this README to organise an event, or deploying the
+application — is **strictly prohibited**, constitutes direct copyright
+infringement and severe academic malpractice, and **immediately terminates** any
+permission previously granted. On termination you must cease all use and delete
+every copy you hold.
+
+By viewing, accessing, cloning, or downloading this repository you explicitly
+acknowledge and agree that:
+
+* any unauthorised deployment, cloning, or event organisation using this project
+  will result in a **mandatory penalty of ₹30,000/- (Rupees Thirty Thousand
+  Only) per unauthorised instance or event**, payable immediately to the
+  copyright holder;
+* any violation will be formally escalated to the **College Administration,
+  Department Head (HOD), and Disciplinary Committee** for official academic
+  misconduct and malpractice proceedings;
+* **direct legal action, court proceedings, and official Copyright Infringement
+  / DMCA takedown actions** will be initiated immediately against violating
+  parties;
+* the copyright holder may also require deletion of all copies, public
+  retraction of the material, and remediation of any published work.
+
+---
+
+## 8. GOVERNING LAW
+
+This licence is governed by the laws of India. The courts at the place of
+residence of the copyright holder shall have exclusive jurisdiction over any
+dispute arising out of or in connection with this licence. Any delay or failure
+to enforce a provision is not a waiver of that provision.
+
+---
+
+## 9. ACCEPTANCE
+
+**© PRANAV MOHAN PAUNIKAR. ALL RIGHTS RESERVED.**
+**BY VIEWING, CLONING, OR ACCESSING THIS REPOSITORY, YOU FULLY AGREE TO ALL
+TERMS, CONDITIONS, AND PENALTIES OUTLINED ABOVE.**
+
+If any provision is found unenforceable, the remainder stays in force; the
+unforceable provision will be enforced to the maximum extent permitted by law
+without affecting the Copyright Holder's other rights.
