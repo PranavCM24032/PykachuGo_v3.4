@@ -20,16 +20,36 @@ function refreshCatchVoice() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     const voices = window.speechSynthesis.getVoices();
     if (!voices || !voices.length) return;
-    const english = voices.filter((v) => /^en(-|_)?/i.test(v.lang || ''));
-    if (!english.length) return;
-    catchVoice = english[0] || null;
-    catchVoiceChecked = true;
-}
 
-function stopCatchVoice() {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-        try { window.speechSynthesis.cancel(); } catch (e) { }
-    }
+    const english = voices.filter((v) => /^en(-|_)?/i.test(v.lang || ''));
+    const pool = english.length ? english : voices;
+
+    const maleKeywords = [
+        'male', 'david', 'mark', 'guy', 'george', 'james', 'daniel', 'richard',
+        'alex', 'fred', 'oliver', 'ryan', 'tom', 'chris', 'brian', 'andrew',
+        'eddie', 'matthew', 'steven', 'john', 'paul', 'peter', 'sean', 'lee',
+        'aaron', 'charles', 'william', 'thomas', 'google uk english male'
+    ];
+    const femaleKeywords = [
+        'female', 'zira', 'susan', 'hazel', 'catherine', 'linda', 'heera',
+        'victoria', 'samantha', 'karen', 'moira', 'fiona', 'tessa', 'stephanie',
+        'alva', 'ayanda', 'agnes', 'allison', 'ava', 'helena', 'jennifer',
+        'kathy', 'siri', 'cortana', 'google us english', 'google uk english female'
+    ];
+
+    const scoreVoice = (v) => {
+        const name = (v.name || '').toLowerCase();
+        let score = 0;
+        if (/^en(-|_)?/i.test(v.lang || '')) score += 20;
+        if (/^en[-_]us/i.test(v.lang || '')) score += 10;
+        if (maleKeywords.some((k) => name.includes(k))) score += 100;
+        if (femaleKeywords.some((k) => name.includes(k))) score -= 100;
+        return score;
+    };
+
+    const sorted = [...pool].sort((a, b) => scoreVoice(b) - scoreVoice(a));
+    catchVoice = sorted[0] || null;
+    catchVoiceChecked = true;
 }
 
 // Celebratory 8-bit "caught!" jingle + a soft crowd-cheer swell, fired the
@@ -154,8 +174,8 @@ function speakCatch(pokemonName) {
             const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${line}!!`);
             if (catchVoice) utter.voice = catchVoice;
             utter.lang = (catchVoice && catchVoice.lang) || 'en-US';
-            utter.pitch = 0.85;
-            utter.rate = 1.1;
+            utter.pitch = 0.78;
+            utter.rate = 1.05;
             utter.volume = 1.0;
             synth.speak(utter);
         } catch (e) {
@@ -333,6 +353,30 @@ function playSound(soundName, volume = 0.3) {
                 oscH.connect(gH); gH.connect(audioContext.destination);
                 oscH.start(now); oscH.stop(now + 0.5);
                 break;
+
+            case 'pokeballDrop': {
+                const tImpact = now;
+                const thud = audioContext.createOscillator();
+                const thudG = audioContext.createGain();
+                thud.type = 'sine';
+                thud.frequency.setValueAtTime(160, tImpact);
+                thud.frequency.exponentialRampToValueAtTime(50, tImpact + 0.12);
+                thudG.gain.setValueAtTime(0.35, tImpact);
+                thudG.gain.exponentialRampToValueAtTime(0.001, tImpact + 0.14);
+                thud.connect(thudG); thudG.connect(audioContext.destination);
+                thud.start(tImpact); thud.stop(tImpact + 0.15);
+
+                const clink = audioContext.createOscillator();
+                const clinkG = audioContext.createGain();
+                clink.type = 'triangle';
+                clink.frequency.setValueAtTime(1450, tImpact);
+                clink.frequency.exponentialRampToValueAtTime(600, tImpact + 0.08);
+                clinkG.gain.setValueAtTime(0.18, tImpact);
+                clinkG.gain.exponentialRampToValueAtTime(0.001, tImpact + 0.1);
+                clink.connect(clinkG); clinkG.connect(audioContext.destination);
+                clink.start(tImpact); clink.stop(tImpact + 0.11);
+                break;
+            }
 
             case 'pokeballOpen': {
                 // OPEN SEQUENCE audio — synced 4-layer choreography:

@@ -81,28 +81,39 @@ function playPokemonReveal() {
         return !!step4 && step4.classList.contains('active');
     };
 
-    // t=0 — the ball has finished its single bounce; the latch release begins.
+    // t=0.825s — ball SMACKS the platform on first contact (55% of 1.5s)
+    scheduleReveal(() => {
+        if (!stillCurrent()) return;
+        playSound('pokeballDrop');
+    }, 825);
+
+    // t=1.245s — second contact, lighter (83% of 1.5s)
+    scheduleReveal(() => {
+        if (!stillCurrent()) return;
+        playSound('pokeballDrop');
+    }, 1245);
+
+    // t=1.65s — ball has settled; latch release begins
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         ball.classList.add('release-latch');
         playSound('pokeballOpen');
-    }, 1150);
+    }, 1650);
 
-    // t=0.15s — shells snap open, flash bursts, energy pours out.
+    // t=1.85s — shells snap open, beam erupts, Pokémon starts emerging
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         ball.classList.remove('release-latch');
         ball.classList.add('pokemon-reveal-open');
         stage.classList.add('reveal-ready');
         spawnReleaseSparkles();
-    }, 1300);
+    }, 1850);
 
-    // t=0.85s — the open-sequence cry finishes here, so the announcer
-    // speaks the catch name cleanly on top of the settled reveal.
+    // t=2.9s — announcer speaks the catch name once the reveal has settled
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         speakCatch(pokemonName);
-    }, 2100);
+    }, 2900);
 }
 
 // Falling-star sparkle shower. Many tinytiny stars appear along the top

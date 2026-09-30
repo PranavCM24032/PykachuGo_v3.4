@@ -44,6 +44,8 @@
     #step4 .pokemon-reveal {
         width: clamp(150px, 32vh, 220px);
         height: clamp(125px, 27vh, 195px);
+        --ball-d: clamp(52px, 13vmin, 72px);
+        --plat-h: clamp(22px, 6vh, 40px);
     }
 
     #step4 .pokemon-success-glow {
@@ -105,14 +107,17 @@
 
 .pokemon-platform {
     position: absolute;
-    bottom: 5px;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
     width: clamp(150px, 34vh, 250px);
-    height: clamp(24px, 7vh, 55px);
+    height: var(--plat-h, clamp(28px, 7vh, 52px));
     display: flex;
     align-items: center;
     justify-content: center;
     perspective: 500px;
-    z-index: 5;
+    z-index: 2;
+    pointer-events: none;
 }
 
 .platform-ring {
@@ -123,12 +128,12 @@
     transition: all 0.3s ease;
 }
 
-/* Base platform rings stay STATIC — no shrink/spread pulse. */
 .ring-blue {
     width: 110%;
     height: 110%;
     border-color: #3b82f6;
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.6), inset 0 0 10px rgba(59, 130, 246, 0.4);
+    animation: platform-ring-blue-impact 1.0s ease-out both;
 }
 
 .ring-yellow {
@@ -136,6 +141,7 @@
     height: 75%;
     border-color: #eab308;
     box-shadow: 0 0 20px rgba(234, 179, 8, 0.7), inset 0 0 12px rgba(234, 179, 8, 0.5);
+    animation: platform-ring-yellow-impact 1.0s ease-out both;
 }
 
 .ring-core {
@@ -147,8 +153,77 @@
     animation: core-pulse 1.5s infinite ease-in-out;
 }
 
-@keyframes core-pulse {
+@keyframes platform-ring-blue-impact {
+    0%, 52% {
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.6), inset 0 0 10px rgba(59, 130, 246, 0.4);
+        border-color: #3b82f6;
+        transform: rotateX(75deg) scale(1);
+    }
+    /* first SMACK at 55% */
+    56% {
+        box-shadow: 0 0 45px rgba(96, 165, 250, 1), 0 0 70px rgba(59, 130, 246, 0.9), inset 0 0 25px rgba(255, 255, 255, 1);
+        border-color: #eff6ff;
+        transform: rotateX(75deg) scale(1.14);
+    }
+    62% {
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.7), inset 0 0 12px rgba(59, 130, 246, 0.5);
+        border-color: #93c5fd;
+        transform: rotateX(75deg) scale(1.03);
+    }
+    /* second lighter contact at 83% */
+    84% {
+        box-shadow: 0 0 30px rgba(96, 165, 250, 0.9), 0 0 50px rgba(59, 130, 246, 0.75), inset 0 0 18px rgba(255, 255, 255, 0.85);
+        border-color: #bfdbfe;
+        transform: rotateX(75deg) scale(1.07);
+    }
+    90% {
+        box-shadow: 0 0 18px rgba(59, 130, 246, 0.65), inset 0 0 11px rgba(59, 130, 246, 0.45);
+        border-color: #60a5fa;
+        transform: rotateX(75deg) scale(1.01);
+    }
+    100% {
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.6), inset 0 0 10px rgba(59, 130, 246, 0.4);
+        border-color: #3b82f6;
+        transform: rotateX(75deg) scale(1);
+    }
+}
 
+@keyframes platform-ring-yellow-impact {
+    0%, 52% {
+        box-shadow: 0 0 20px rgba(234, 179, 8, 0.7), inset 0 0 12px rgba(234, 179, 8, 0.5);
+        border-color: #eab308;
+        transform: rotateX(75deg) scale(1);
+    }
+    /* first SMACK */
+    56% {
+        box-shadow: 0 0 55px rgba(253, 224, 71, 1), 0 0 80px rgba(234, 179, 8, 0.95), inset 0 0 28px rgba(255, 255, 255, 1);
+        border-color: #fefce8;
+        transform: rotateX(75deg) scale(1.18);
+    }
+    62% {
+        box-shadow: 0 0 28px rgba(234, 179, 8, 0.8), inset 0 0 16px rgba(234, 179, 8, 0.6);
+        border-color: #fde047;
+        transform: rotateX(75deg) scale(1.04);
+    }
+    /* second lighter contact */
+    84% {
+        box-shadow: 0 0 40px rgba(253, 224, 71, 0.95), 0 0 60px rgba(234, 179, 8, 0.85), inset 0 0 22px rgba(255, 255, 255, 0.9);
+        border-color: #fef08a;
+        transform: rotateX(75deg) scale(1.10);
+    }
+    90% {
+        box-shadow: 0 0 22px rgba(234, 179, 8, 0.75), inset 0 0 13px rgba(234, 179, 8, 0.55);
+        border-color: #facc15;
+        transform: rotateX(75deg) scale(1.02);
+    }
+    100% {
+        box-shadow: 0 0 20px rgba(234, 179, 8, 0.7), inset 0 0 12px rgba(234, 179, 8, 0.5);
+        border-color: #eab308;
+        transform: rotateX(75deg) scale(1);
+    }
+}
+
+@keyframes core-pulse {
     0%,
     100% {
         transform: rotateX(75deg) scale(1.6);
@@ -163,61 +238,115 @@
 
 .pokemon-success-glow {
     filter: drop-shadow(0 0 15px rgba(234, 179, 8, 0.8)) drop-shadow(0 0 30px rgba(255, 215, 0, 0.4));
-    animation: pokemon-bounce-vertical 1.5s infinite ease-in-out;
+    animation: pokemon-bounce-vertical 1.8s infinite ease-in-out;
     transform-origin: bottom center;
     object-position: bottom;
-    margin-bottom: -10px;
+    margin-bottom: 0;
 }
 
 @keyframes pokemon-bounce-vertical {
-
     0%,
     100% {
-        transform: translateY(0) scaleX(1.05) scaleY(0.95);
+        transform: translateY(0) scaleX(1.03) scaleY(0.97);
     }
 
     50% {
-        transform: translateY(-45px) scaleX(0.98) scaleY(1.02);
+        transform: translateY(-20px) scaleX(0.98) scaleY(1.02);
     }
 }
 /* ── Pokémon release-from-pokéball (3D) ──────────────────────────────── */
 .pokemon-reveal {
+    --ball-d: clamp(66px, 15vmin, 88px);
+    --plat-h: clamp(30px, 8vh, 56px);
     position: relative;
-    width: clamp(185px, 38vh, 285px);
-    height: clamp(165px, 34vh, 265px);
-    perspective: 700px;
+    width: clamp(190px, 40vh, 290px);
+    height: clamp(170px, 35vh, 275px);
+    perspective: 800px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: visible;
+}
+
+/* Plasma light beam bursting upward out of the opened Pokéball */
+.reveal-beam {
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--plat-h) * 0.46 + var(--ball-d) * 0.35);
+    width: clamp(28px, 7vmin, 44px);
+    height: 0;
+    transform: translateX(-50%);
+    background: linear-gradient(to top,
+        rgba(255, 255, 255, 1) 0%,
+        rgba(255, 255, 255, 0.85) 35%,
+        rgba(255, 255, 255, 0.4) 70%,
+        transparent 100%);
+    border-radius: 50% 50% 0 0;
+    filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 7;
+}
+
+.pokemon-reveal.reveal-ready .reveal-beam {
+    animation: reveal-beam-burst 0.85s cubic-bezier(0.18, 0.85, 0.3, 1) forwards;
+}
+
+@keyframes reveal-beam-burst {
+    0% {
+        height: 0;
+        opacity: 0;
+        transform: translateX(-50%) scaleX(0.4);
+    }
+    28% {
+        height: clamp(140px, 30vh, 220px);
+        opacity: 1;
+        transform: translateX(-50%) scaleX(1.4);
+        filter: blur(3px) drop-shadow(0 0 25px rgba(255, 255, 255, 0.9));
+    }
+    65% {
+        height: clamp(170px, 34vh, 260px);
+        opacity: 0.85;
+        transform: translateX(-50%) scaleX(1.8);
+    }
+    100% {
+        height: clamp(180px, 36vh, 280px);
+        opacity: 0;
+        transform: translateX(-50%) scaleX(2.2);
+        filter: blur(8px);
+    }
 }
 
 /* White gradient shockwave pulse expanding from the ball's center */
 .reveal-shockwave {
     position: absolute;
     left: 50%;
-    top: 55%;
-    width: 120px;
-    height: 120px;
+    bottom: calc(var(--plat-h) * 0.46 + var(--ball-d) * 0.48);
+    width: 130px;
+    height: 130px;
     border-radius: 50%;
     background: radial-gradient(circle,
-            rgba(255, 255, 255, 0.9) 0%,
-            rgba(255, 255, 255, 0.45) 28%,
-            rgba(255, 255, 255, 0.12) 55%,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(255, 255, 255, 0.6) 30%,
+            rgba(255, 255, 255, 0.15) 58%,
             transparent 72%);
     opacity: 0;
     pointer-events: none;
     z-index: 11;
-    transform: translate(-50%, -50%) scale(0.1);
+    transform: translate(-50%, 50%) scale(0.1);
 }
 
 .reveal-ring {
     position: absolute;
     left: 50%;
-    top: 75%;
-    width: 70px;
-    height: 22px;
-    border: 2px solid rgba(255, 255, 255, 0.85);
+    bottom: calc(var(--plat-h) * 0.46 + var(--ball-d) * 0.4);
+    width: 80px;
+    height: 24px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
     border-radius: 50%;
     opacity: 0;
     pointer-events: none;
-    transform: translate(-50%, -50%) scale(0.2);
+    transform: translate(-50%, 50%) scale(0.2);
     z-index: 8;
 }
 
@@ -232,7 +361,7 @@
 @keyframes reveal-ring {
     0% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.2);
+        transform: translate(-50%, 50%) scale(0.2);
     }
 
     18% {
@@ -241,7 +370,7 @@
 
     100% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(2.4);
+        transform: translate(-50%, 50%) scale(2.4);
     }
 }
 
@@ -253,22 +382,22 @@
 @keyframes reveal-shockwave {
     0% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.1);
+        transform: translate(-50%, 50%) scale(0.1);
     }
 
     28% {
         opacity: 1;
-        transform: translate(-50%, -50%) scale(2.6);
+        transform: translate(-50%, 50%) scale(2.6);
     }
 
     55% {
         opacity: 0.65;
-        transform: translate(-50%, -50%) scale(7);
+        transform: translate(-50%, 50%) scale(7);
     }
 
     100% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(13);
+        transform: translate(-50%, 50%) scale(13);
     }
 }
 
@@ -343,18 +472,20 @@
     }
 }
 
-/* The 3D ball body — drops in from above, bounces ONCE, then opens.
-   Sized like a real hand-held Pokéball. Total: 1.15s. */
+/* Ball sits exactly on the platform ring surface.
+   --plat-h is the platform div height; the ring center is at 50% of that.
+   We position the ball bottom edge at the ring center so it visually
+   rests right on the glowing ring. */
 .pokemon-reveal-ball {
-    --ball-d: clamp(64px, 15vmin, 96px);
     position: absolute;
     left: 50%;
-    top: 55%;
+    bottom: calc(var(--plat-h) * 0.5);
     width: var(--ball-d);
     height: var(--ball-d);
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
+    transform-origin: center bottom;
     transform-style: preserve-3d;
-    animation: reveal-ball-bounce 1.15s cubic-bezier(0.25, 0.7, 0.4, 1) both;
+    animation: reveal-ball-drop 1.5s ease-in both;
     border-radius: 50%;
     z-index: 6;
 }
@@ -363,53 +494,50 @@
     animation: none;
 }
 
-@keyframes reveal-ball-bounce {
-    /* thrown in from completely off the TOP of the screen (-70vh keeps it
-       outside the viewport, so #step4's overflow-hidden clips it away until
-       it actually falls in) — accelerates downward like gravity */
+/* Physics: ball enters from far above, accelerates under gravity,
+   SMACKS the platform center with a hard squash, bounces up 65px
+   (big enough to see clearly), lands again with a lighter squash,
+   then settles perfectly on the ring center. */
+@keyframes reveal-ball-drop {
+    /* start: far above the screen, spinning slightly */
     0% {
-        transform: translate(-50%, calc(-50% - 70vh)) rotateZ(-16deg);
-        animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
+        transform: translateX(-50%) translateY(-90vh) rotateZ(-18deg);
+        animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.3);
     }
 
-    /* enters the screen, still falling fast */
-    12% {
-        transform: translate(-50%, calc(-50% - 22vh)) rotateZ(-10deg);
-        animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.5);
+    /* mid-fall: still coming in fast */
+    38% {
+        transform: translateX(-50%) translateY(-28vh) rotateZ(-8deg);
+        animation-timing-function: cubic-bezier(0.6, 0.04, 0.98, 0.335);
     }
 
-    /* lands on the platform */
-    26% {
-        transform: translate(-50%, -50%) rotateZ(-5deg);
-        animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+    /* FIRST CONTACT: ball bottom hits the ring center — hard squash */
+    55% {
+        transform: translateX(-50%) translateY(0) rotateZ(0deg) scaleX(1.32) scaleY(0.72);
+        animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
     }
 
-    /* impact squash — compresses into the ground */
-    33% {
-        transform: translate(-50%, -42%) scaleX(1.26) scaleY(0.76) rotateZ(0deg);
-        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    /* BOUNCE UP: spring back — clear visible bounce of 65px */
+    70% {
+        transform: translateX(-50%) translateY(-65px) rotateZ(3deg) scaleX(0.94) scaleY(1.08);
+        animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
     }
 
-    /* THE bounce — springs back up to its apex and falls again */
-    58% {
-        transform: translate(-50%, calc(-50% - 78px)) scaleX(0.95) scaleY(1.05) rotateZ(5deg);
-        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.35);
+    /* SECOND CONTACT: lands again with a lighter squash */
+    83% {
+        transform: translateX(-50%) translateY(0) rotateZ(0deg) scaleX(1.12) scaleY(0.9);
+        animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
     }
 
-    82% {
-        transform: translate(-50%, -49%) rotateZ(-2deg);
-        animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+    /* micro bounce — tiny settle wobble */
+    91% {
+        transform: translateX(-50%) translateY(-10px) rotateZ(-1deg) scaleX(0.98) scaleY(1.03);
+        animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
     }
 
-    /* soft landing squash (same bounce, just the settle) */
-    88% {
-        transform: translate(-50%, -46%) scaleX(1.09) scaleY(0.91) rotateZ(0deg);
-        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    /* settled — ready for the latch release to fire the open sequence */
+    /* SETTLED: resting perfectly on the ring */
     100% {
-        transform: translate(-50%, -50%) rotateZ(0deg);
+        transform: translateX(-50%) translateY(0) rotateZ(0deg) scaleX(1) scaleY(1);
     }
 }
 
@@ -517,50 +645,56 @@
     pointer-events: none;
 }
 
-/* Soft ellipse shadow grounding the floating ball */
+/* Ellipse shadow grows as ball falls, squashes on impact, shrinks on bounce, settles */
 .ball-shadow {
     position: absolute;
     left: 50%;
-    top: 74%;
-    width: 74%;
-    height: 13%;
+    bottom: calc(var(--plat-h) * 0.5);
+    width: calc(var(--ball-d) * 1.1);
+    height: calc(var(--ball-d) * 0.22);
     transform: translateX(-50%);
-    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.42), transparent 70%);
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.28) 55%, transparent 75%);
     border-radius: 50%;
-    z-index: 1;
-    filter: blur(2px);
-}
-
-/* Ground shadow starts tiny (ball is off-screen far above) and swells as the
-   ball falls toward the platform. Runs off the same 1.15s clock as the drop. */
-.ball-shadow {
-    animation: ball-shadow-drop 1.15s ease-in-out both;
+    z-index: 3;
+    filter: blur(3px);
+    pointer-events: none;
+    animation: ball-shadow-drop 1.5s ease-in both;
 }
 
 @keyframes ball-shadow-drop {
     0% {
         opacity: 0;
-        transform: translateX(-50%) scale(0.25);
+        transform: translateX(-50%) scale(0.1);
+        animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.3);
     }
 
-    26% {
+    38% {
+        opacity: 0.4;
+        transform: translateX(-50%) scale(0.5);
+        animation-timing-function: cubic-bezier(0.6, 0.04, 0.98, 0.335);
+    }
+
+    /* impact: shadow spreads wide as ball squashes */
+    55% {
         opacity: 1;
-        transform: translateX(-50%) scale(1);
+        transform: translateX(-50%) scaleX(1.4) scaleY(0.9);
     }
 
-    33% {
+    /* ball bouncing up: shadow shrinks */
+    70% {
+        opacity: 0.5;
+        transform: translateX(-50%) scale(0.65);
+    }
+
+    /* second contact */
+    83% {
         opacity: 1;
-        transform: translateX(-50%) scale(1.18) scaleY(0.8);
+        transform: translateX(-50%) scaleX(1.15) scaleY(0.92);
     }
 
-    58% {
-        opacity: 0.6;
-        transform: translateX(-50%) scale(0.75);
-    }
-
-    88% {
-        opacity: 1;
-        transform: translateX(-50%) scale(1.1) scaleY(0.85);
+    91% {
+        opacity: 0.7;
+        transform: translateX(-50%) scale(0.8);
     }
 
     100% {
@@ -570,7 +704,7 @@
 }
 
 .pokemon-reveal.reveal-ready .ball-shadow {
-    animation: ball-shadow-fade 0.5s ease forwards;
+    animation: ball-shadow-fade 0.6s ease forwards;
 }
 
 @keyframes ball-shadow-fade {
@@ -583,11 +717,9 @@
     }
 }
 
-/* OPEN SEQUENCE — Phase 1 (0–0.15s): Tap & Latch. The instant the ball
-   settles, its center button flashes bright and presses in — the tactile
-   "click" that starts the release. */
+/* OPEN SEQUENCE — Phase 1: Button pulse on platform */
 .pokemon-reveal-ball.release-latch .ball-btn {
-    animation: latch-pulse 0.15s ease-out both;
+    animation: latch-pulse 0.2s ease-out both;
 }
 
 @keyframes latch-pulse {
@@ -597,56 +729,72 @@
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
     }
 
-    40% {
-        transform: translate(-50%, -50%) scale(0.8);
+    50% {
+        transform: translate(-50%, -50%) scale(0.78);
         background: #FFFBDE;
-        box-shadow: 0 0 16px rgba(255, 240, 140, 0.95);
+        box-shadow: 0 0 18px rgba(255, 240, 140, 1), 0 0 30px rgba(234, 179, 8, 0.8);
     }
 
     100% {
         transform: translate(-50%, -50%) scale(1);
         background: #FFFFFF;
+        box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
     }
 }
 
-/* Opening: the two shells ease apart in a fluid arc — the top rolls up
-   and away while the bottom peels down and drops out. Gentle ease-out
-   keeps the burst from feeling abrupt. */
+/* Opening: top shell SNAPS open dramatically (hinge from bottom edge)
+   then fades. Bottom shell tips forward and fades away. */
 .pokemon-reveal-ball.pokemon-reveal-open .ball-top {
-    animation: ball-top-open 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: ball-top-open 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-bottom {
-    animation: ball-bottom-open 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: ball-bottom-open 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) 0.06s forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-shade,
 .pokemon-reveal-ball.pokemon-reveal-open .ball-band,
 .pokemon-reveal-ball.pokemon-reveal-open .ball-btn,
 .pokemon-reveal-ball.pokemon-reveal-open .ball-gloss {
-    animation: ball-shell-fade 0.22s ease forwards;
+    animation: ball-shell-fade 0.28s 0.06s ease forwards;
 }
 
 @keyframes ball-top-open {
     0% {
-        transform: rotateX(0deg);
+        transform: translateY(0) rotateX(0deg);
         opacity: 1;
     }
-
+    /* rapid swing: top half hinges backwards from the equator */
+    45% {
+        transform: translateY(-4px) rotateX(-120deg);
+        opacity: 1;
+    }
+    75% {
+        transform: translateY(-8px) rotateX(-148deg) rotateZ(-5deg);
+        opacity: 0.6;
+    }
     100% {
-        transform: translateY(-56px) rotateX(-158deg) rotateZ(-8deg);
+        transform: translateY(-12px) rotateX(-158deg) rotateZ(-8deg);
         opacity: 0;
     }
 }
 
 @keyframes ball-bottom-open {
     0% {
-        transform: rotateX(0deg);
+        transform: translateY(0) rotateX(0deg);
         opacity: 1;
     }
-
+    /* tips forward slightly and drops */
+    40% {
+        transform: translateY(4px) rotateX(28deg);
+        opacity: 1;
+    }
+    75% {
+        transform: translateY(8px) rotateX(34deg);
+        opacity: 0.5;
+    }
     100% {
-        transform: translateY(40px) rotateX(42deg) rotateZ(6deg);
+        transform: translateY(12px) rotateX(38deg);
         opacity: 0;
     }
 }
@@ -661,64 +809,61 @@
     }
 }
 
-/* Pokémon materialization — OPEN SEQUENCE Phase 4 (0.65–1.2s). Hidden until
-   the plasma beam peaks, then a WHITE energy silhouette springs up to 115%
-   overshoot, dissolves through a flash of light, and leaves the full-color
-   sprite resting at 100%. The scale and the white->color morph run in sync. */
+/* Pokémon rises out of the opened ball — starts inside the ball at scale(0),
+   springs upward with overshoot, then settles floating above the platform. */
 .reveal-pop {
     position: absolute;
     left: 50%;
-    top: 43%;
-    transform: translate(-50%, -50%) scale(0);
-    transform-origin: center;
+    /* bottom: sits right on the ring surface, same as the ball */
+    bottom: calc(var(--plat-h) * 0.5);
+    transform: translateX(-50%) scale(0);
+    transform-origin: center bottom;
     opacity: 0;
     z-index: 10;
 }
 
 .pokemon-reveal.reveal-ready .reveal-pop {
     animation:
-        reveal-pop-bounce 0.6s 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) both,
-        pokemon-materialize 0.85s 0.5s ease-in-out both;
+        reveal-pokemon-emerge 0.75s 0.12s cubic-bezier(0.34, 1.4, 0.64, 1) both,
+        pokemon-materialize 0.85s 0.12s ease-in-out both;
 }
 
-@keyframes reveal-pop-bounce {
+@keyframes reveal-pokemon-emerge {
+    /* starts compressed inside the ball centre */
     0% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.3);
+        transform: translateX(-50%) translateY(0) scale(0.05);
     }
-
-    12% {
-        opacity: 0.9;
-        transform: translate(-50%, -50%) scale(0.5);
+    /* flashes visible immediately */
+    8% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(-5px) scale(0.35);
     }
-
+    /* overshoots upward — springs out energetically */
     60% {
-        transform: translate(-50%, -50%) scale(1.15);
+        opacity: 1;
+        transform: translateX(-50%) translateY(-18px) scale(1.12);
     }
-
-    78% {
-        transform: translate(-50%, -50%) scale(0.96);
+    /* pulls back: slight gravity settling */
+    80% {
+        transform: translateX(-50%) translateY(4px) scale(0.97);
     }
-
-    90% {
-        transform: translate(-50%, -50%) scale(1.05);
-    }
-
+    /* final hover position */
     100% {
         opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
+        transform: translateX(-50%) translateY(0) scale(1);
     }
 }
 
-/* White energy silhouette that burns through a flash into full color */
+/* White energy silhouette dissolves through flash into rich color */
 @keyframes pokemon-materialize {
     0%,
-    52% {
-        filter: brightness(0) invert(1) drop-shadow(0 0 22px rgba(255, 255, 255, 0.9));
+    48% {
+        filter: brightness(0) invert(1) drop-shadow(0 0 25px rgba(255, 255, 255, 0.95));
     }
 
-    66% {
-        filter: brightness(2.4) invert(0) drop-shadow(0 0 18px rgba(255, 255, 255, 0.95));
+    68% {
+        filter: brightness(2.2) invert(0) drop-shadow(0 0 20px rgba(255, 255, 255, 0.9));
     }
 
     100% {
