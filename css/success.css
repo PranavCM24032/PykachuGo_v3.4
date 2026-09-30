@@ -14,47 +14,89 @@
     display: none;
 }
 
-/* Keep the revealed destination clear of the success heading and CTA. */
+/* Step 4: True vertical centering & balanced stage dimensions */
+#step4 {
+    height: 100%;
+    min-height: 0;
+}
+
+#step4 .step4-success-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 0;
+    gap: clamp(8px, 1.8vh, 14px);
+    padding: clamp(6px, 1.5vh, 14px) clamp(12px, 3vw, 24px);
+}
+
+#step4 .step4-pokemon-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: clamp(140px, 28vh, 210px);
+    width: 100%;
+    flex-shrink: 0;
+    padding-bottom: 0;
+}
+
+#step4 .pokemon-reveal {
+    width: clamp(160px, 32vh, 240px);
+    height: clamp(140px, 28vh, 210px);
+    --ball-d: clamp(56px, 13vmin, 76px);
+    --plat-h: clamp(24px, 6vh, 42px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+#step4 .pokemon-success-glow {
+    width: clamp(130px, 26vh, 195px);
+    height: clamp(130px, 26vh, 195px);
+}
+
 #step4 .step4-success-content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(8px, 1.5vh, 12px);
+    gap: clamp(6px, 1.2vh, 10px);
 }
 
 #step4 #locationCard:not(.hidden),
 #step4 #nextLocationList:not(.hidden) {
-    margin-top: clamp(2px, 0.6vh, 6px);
+    margin-top: clamp(2px, 0.5vh, 4px);
     flex-shrink: 0;
 }
 
 /* The location card is added after a solve, so reserve room for it on short screens. */
 @media (max-height: 640px) {
     #step4 .step4-success-layout {
-        gap: 8px;
-        padding-top: 8px;
-        padding-bottom: 8px;
+        gap: 6px;
+        padding-top: 4px;
+        padding-bottom: 4px;
     }
 
     #step4 .step4-pokemon-stage {
-        height: clamp(130px, 28vh, 190px) !important;
-        padding-bottom: 4px !important;
+        height: clamp(115px, 24vh, 160px) !important;
+        padding-bottom: 0 !important;
     }
 
     #step4 .pokemon-reveal {
-        width: clamp(150px, 32vh, 220px);
-        height: clamp(125px, 27vh, 195px);
-        --ball-d: clamp(52px, 13vmin, 72px);
-        --plat-h: clamp(22px, 6vh, 40px);
+        width: clamp(135px, 26vh, 180px);
+        height: clamp(115px, 24vh, 160px);
+        --ball-d: clamp(46px, 11vmin, 60px);
+        --plat-h: clamp(20px, 5vh, 30px);
     }
 
     #step4 .pokemon-success-glow {
-        width: clamp(120px, 26vh, 190px);
-        height: clamp(120px, 26vh, 190px);
+        width: clamp(105px, 22vh, 145px);
+        height: clamp(105px, 22vh, 145px);
     }
 
     #step4 .step4-success-content {
-        gap: 6px;
+        gap: 4px;
     }
 
     #step4 #locationCard:not(.hidden),
@@ -256,11 +298,11 @@
 }
 /* ── Pokémon release-from-pokéball (3D) ──────────────────────────────── */
 .pokemon-reveal {
-    --ball-d: clamp(66px, 15vmin, 88px);
-    --plat-h: clamp(30px, 8vh, 56px);
+    --ball-d: clamp(56px, 13vmin, 76px);
+    --plat-h: clamp(24px, 6vh, 42px);
     position: relative;
-    width: clamp(190px, 40vh, 290px);
-    height: clamp(170px, 35vh, 275px);
+    width: clamp(160px, 32vh, 240px);
+    height: clamp(140px, 28vh, 210px);
     perspective: 800px;
     display: flex;
     align-items: flex-end;
