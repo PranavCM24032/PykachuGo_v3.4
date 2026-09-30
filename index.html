@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="booting">
 
 <head>
     <meta charset="UTF-8">
@@ -278,34 +278,13 @@
                 <!-- Celebration Canvas -->
                 <canvas id="celebrationCanvas" class="absolute inset-0 pointer-events-none z-[100]"></canvas>
 
-                <!-- Splitter loader: CSI x Auron presents Pykachu Go. Sits above
-                     step0 on first paint and is removed by js/loader.js after
-                     ~1.5s. Deliberately NOT a .flow-step, so showStep() never
-                     has to know about it. -->
-                <div id="appLoader" class="loader-surface" role="status" aria-label="Loading Pykachu Go">
-                    <div class="loader-stage">
-                        <!-- Row 1: CSI and Auron, each in a circle, joined by a cross -->
-                        <div class="partner-row">
-                            <span class="mark mark--csi">
-                                <img id="markCsi" src="assets/img/csi.jpg" alt="CSI" width="225" height="225">
-                            </span>
-
-                            <span class="cross" aria-hidden="true">&times;</span>
-
-                            <span class="mark mark--auron">
-                                <img id="markAuron" src="assets/img/auron.png" alt="Auron" width="699"
-                                    height="727">
-                            </span>
-                        </div>
-
-                        <!-- Row 2: presents -->
-                        <p class="presents">presents</p>
-
-                        <!-- Row 3: the main logo, exactly as the file is -->
-                        <img class="main-logo" id="mainLogo" src="assets/img/logo1.png" alt="Pykachu Go"
-                            width="558" height="285">
-                    </div>
-                </div>
+                <!-- Splitter loader: CSI x Auron presents Pykachu Go.
+                     Markup lives in html/loader.html (like the other partials)
+                     and is injected here by js/include.js. The splash covers
+                     step0 on first paint and js/loader.js removes it after
+                     ~1.5s. <html> carries .booting until then so no step ever
+                     flashes before the splash arrives. -->
+                <div data-include="html/loader.html"></div>
 
                 <!-- Full-Width Minimal Internal Status HUD -->
                 <div class="internal-status-bar">

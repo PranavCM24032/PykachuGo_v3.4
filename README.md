@@ -163,31 +163,42 @@ CSI and Auron in circles joined by a cross, the word *presents*, then
 `assets/img/logo1.png` exactly as the file is. It shows **inside the Pokédex
 screen before `step0`** for ~1.5s.
 
+The markup is a partial like the rest of that folder — `html/loader.html` — and
+`index.html` pulls it in with the standard `data-include` mechanism, so there is
+exactly one copy of it in the repo:
+
 | Piece | Role |
 |-------|------|
-| `#appLoader` in `index.html` | The splash itself: `position:absolute; inset:0; z-index:90` inside `#screen`, covering `step0` on first paint |
+| `html/loader.html` | The splash markup (a partial, not a page). `position:absolute; inset:0; z-index:90` inside `#screen`, covering `step0` on first paint |
+| `<div data-include="html/loader.html">` in `index.html` | The injection point, first child of `#screen`, right after the celebration canvas |
 | `css/loader.css` | Self-contained (no Tailwind, no build step) so it paints before the app's CSS is parsed. All sizes container-relative — `%` + `aspect-ratio` + capped `vw` clamps — so it fits the shell frame and a full page alike |
-| `js/loader.js` | In-app mode when `#appLoader` exists; standalone mode otherwise |
+| `js/loader.js` | Waits for `includes:ready`, holds the boot gate, shows the splash, then removes it |
 
-It is deliberately **not** a `.flow-step`. `showStep()` queries `.flow-step`
-and hard-removes every `active` state it finds, so making the splash one would
-mean teaching the step state machine about a screen that isn't a step. As a
-plain overlay, `step0` is simply already active underneath and is revealed when
-the splash fades.
+Paths inside the partial are document-relative (`assets/img/csi.jpg`), exactly
+like `hint.html`, because the fragment is only ever rendered inside `index.html`.
+
+Two design points worth keeping:
+
+- It is deliberately **not** a `.flow-step`. `showStep()` queries `.flow-step`
+  and hard-removes every `active` state it finds, so making the splash one would
+  mean teaching the step state machine about a screen that isn't a step. As a
+  plain overlay, `step0` is already active underneath and is revealed when the
+  splash fades.
+- `<html>` carries `.booting` until the splash is in place. The partial arrives
+  by fetch, so without that gate `step0` would flash for a frame or two before
+  the loader covered it.
 
 | Behaviour | Detail |
 |-----------|--------|
 | Duration | ~1.5s, extended only if the page or the emblem art is still loading, and hard-capped at 4s |
-| Layout preserved | `logo1.png` keeps its exact 558:285 ratio (measured 1.958 at every viewport); the two marks are true circles via `aspect-ratio: 1` |
-| Cannot brick the app | A CSS-only `loader-bailout` animation hides the splash after 6s if `loader.js` never runs |
-| Standalone page | `html/loader.html` still works on its own: progress tracks the three real images (`load` **and** `error` count), then it hands off to `../index.html` or `?next=<url>`, with a `sessionStorage` skip and a 4s cap |
+| Layout preserved | `logo1.png` keeps its exact 558:285 ratio (measured 1.958–1.961 at every viewport); the two marks are true circles via `aspect-ratio: 1` |
+| Partial never arrives | `loader.js` lifts the gate at 3s and the app carries on with no splash |
+| `loader.js` never runs | CSS-only `booting-release` reveals the steps at 8s, so a blocked or missing script can't brick the app |
+| Offline | The partial, its CSS/JS and the three images are all in the service-worker precache |
 
-Every path is relative (`../assets/img/...` on the standalone page), so it works
-both at a domain root and inside a GitHub Pages subpath. The page, its CSS/JS
-and the three images are all in the service-worker precache, so the splash also
-works fully offline. Note `csi.jpg` and `auron.png` are opaque 24-bit RGB with
-no alpha channel, so the circles are a *crop* framed by a gold ring — swapping in
-transparent versions would look cleaner.
+Note `csi.jpg` and `auron.png` are opaque 24-bit RGB with no alpha channel, so
+the circles are a *crop* framed by a gold ring — swapping in transparent versions
+would look cleaner.
 
 ### The step 4 catch reveal
 

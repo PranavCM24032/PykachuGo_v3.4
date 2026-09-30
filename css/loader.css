@@ -1,12 +1,11 @@
 /* ==========================================================================
    Loader - CSI x Auron presents Pykachu Go
-   Two jobs, one stylesheet:
-     1. #appLoader  the splash inside the Pokedex screen, shown before step0
-     2. html/loader.html  a standalone page wrapping the same markup
-   Every size is container-relative (%, aspect-ratio, clamp with vw caps) so it
-   looks right inside the small shell frame as well as on a full page. It does
-   not depend on css/base.css or Tailwind, because it has to paint before the
-   app's CSS has finished parsing.
+   The splash is injected into index.html's #screen from html/loader.html by
+   js/include.js (data-include), then removed by js/loader.js after ~1.5s.
+   This stylesheet does not depend on css/base.css or Tailwind, because it has
+   to be ready before the app's CSS is parsed, and every size is
+   container-relative (% + aspect-ratio + capped vw clamps) so it fits the
+   small Pokedex shell frame as well as a full page.
    ========================================================================== */
 
 :root {
@@ -41,7 +40,25 @@
         repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
 }
 
+/* ---- Boot gate ---------------------------------------------------------- */
+/* html/loader.html arrives via fetch, so there is a gap between first paint and
+   the splash landing. Without this the player would see step0 flash first and
+   then get covered by the loader. .booting hides the steps until loader.js says
+   the splash is up, and releases them on a timer even if loader.js never runs. */
+.booting #screen .flow-step {
+    visibility: hidden;
+    animation: booting-release 1ms linear 8s forwards;
+}
+
+@keyframes booting-release {
+    to {
+        visibility: visible;
+    }
+}
+
 /* ---- Standalone page (html/loader.html) --------------------------------- */
+/* The splash markup is a partial now, not a page, so this block only applies if
+   someone opens the fragment directly while debugging. */
 body.loader-surface {
     height: 100%;
     margin: 0;
@@ -187,29 +204,7 @@ body.loader-surface {
     }
 }
 
-#appLoader .progress-label {
-    display: none;
-}
-
-.progress-label {
-    margin: 0;
-    font-size: 12px;
-    letter-spacing: 1px;
-    color: var(--gold);
-}
-
-.noscript {
-    margin: 0;
-    font-size: 13px;
-    text-align: center;
-    color: #93a1b5;
-}
-
-.noscript a {
-    color: var(--gold);
-}
-
-/* Entrance + exit --------------------------------------------------------- */
+/* ---- Entrance + exit --------------------------------------------------------- */
 .loader-stage.is-ready .main-logo {
     animation: logo-in 520ms ease-out both;
 }
