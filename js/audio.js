@@ -13,43 +13,77 @@ let soundEnabled = true;
 let catchVoice = null;
 let catchVoiceChecked = false;
 
-// Resolves the catch voice. Chrome populates getVoices() async, so this
-// re-runs on voiceschanged until voices actually show up. One consistent
-// voice per browser: simply the first English voice the browser exposes.
+// TTS pitch/rate cannot turn a female voice into a male one, so the VOICE
+// itself has to be right. Anything whose name advertises a female voice is
+// thrown out entirely; the rest are ranked in tiers — an explicit "male"
+// beats a known male voice name, which beats anything else. Android exposes
+// eSpeak ids like "en-us-x-usa#male_1-local", Windows exposes
+// "Microsoft David ...", Google exposes "Google UK English Male".
+const CATCH_FEMALE_VOICE_NAMES = [
+    'female', 'zira', 'susan', 'hazel', 'catherine', 'linda', 'heera',
+    'victoria', 'samantha', 'karen', 'moira', 'fiona', 'tessa', 'stephanie',
+    'alva', 'ayanda', 'agnes', 'allison', 'ava', 'helena', 'jennifer', 'kathy',
+    'siri', 'cortana', 'sonia', 'aria', 'jenny', 'hoda', 'martha', 'nicky',
+    'libby', 'sara', 'natasha', 'xiaoxiao', 'ting-ting', 'yuna', 'zhiyu',
+    'google us english', 'samantha', 'joanna', 'amy', 'emma', 'michelle'
+];
+const CATCH_MALE_VOICE_NAMES = [
+    'male', 'david', 'mark', 'guy', 'george', 'james', 'daniel', 'richard',
+    'fred', 'liam', 'thomas', 'ravi', 'prabhat', 'hemant', 'madhur', 'rishi',
+    'brian', 'andrew', 'eddie', 'matthew', 'steven', 'paul', 'peter', 'sean',
+    'lee', 'aaron', 'charles', 'william', 'alex', 'oliver', 'ryan', 'tom',
+    'chris', 'arthur', 'bruce', 'gordon', 'henry', 'roger', 'yannick', 'rishi'
+];
+
+// -10000 = vetoed (female), so a vetoed voice can never outrank anything.
+const CATCH_FEMALE_VETO = -10000;
+
+function scoreCatchVoice(v) {
+    const name = (v.name || '').toLowerCase();
+    if (CATCH_FEMALE_VOICE_NAMES.some((k) => name.includes(k))) return CATCH_FEMALE_VETO;
+
+    let score = 0;
+    if (name.includes('male')) score += 500;
+    if (CATCH_MALE_VOICE_NAMES.some((k) => name.includes(k))) score += 300;
+    if (/^en[-_]?/i.test(v.lang || '')) score += 20;
+    if (/^en[-_]us/i.test(v.lang || '')) score += 8;
+    else if (/^en[-_]gb/i.test(v.lang || '')) score += 4;
+    if (v.localService) score += 2;
+    if (name.includes('natural')) score += 1;
+    return score;
+}
+
+// Picks one consistent announcer per browser. Deterministic: ties fall back to
+// the order the OS reported, so the same device always speaks with the same
+// voice. Returns null only when the platform has no voices at all.
+function pickCatchVoice(voices) {
+    if (!voices || !voices.length) return null;
+    const english = voices.filter((v) => /^en/i.test(v.lang || ''));
+    const pool = english.length ? english : voices;
+
+    const ranked = pool
+        .map((v, i) => ({ v, i, s: scoreCatchVoice(v) }))
+        .filter((e) => e.s !== CATCH_FEMALE_VETO)
+        .sort((a, b) => (b.s - a.s) || (a.i - b.i));
+
+    // Every English voice on the device is female-labelled: still speak, using
+    // the best remaining voice with a low pitch, rather than muting the line.
+    return (ranked[0] && ranked[0].v) || pool[0] || null;
+}
+
+// Re-resolves the catch voice. Chrome populates getVoices() async, so this
+// also runs on every catch and on voiceschanged — a voice list that only
+// half-loaded earlier must not lock in a wrong voice for the whole session.
 function refreshCatchVoice() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     const voices = window.speechSynthesis.getVoices();
     if (!voices || !voices.length) return;
 
-    const english = voices.filter((v) => /^en(-|_)?/i.test(v.lang || ''));
-    const pool = english.length ? english : voices;
-
-    const maleKeywords = [
-        'male', 'david', 'mark', 'guy', 'george', 'james', 'daniel', 'richard',
-        'alex', 'fred', 'oliver', 'ryan', 'tom', 'chris', 'brian', 'andrew',
-        'eddie', 'matthew', 'steven', 'john', 'paul', 'peter', 'sean', 'lee',
-        'aaron', 'charles', 'william', 'thomas', 'google uk english male'
-    ];
-    const femaleKeywords = [
-        'female', 'zira', 'susan', 'hazel', 'catherine', 'linda', 'heera',
-        'victoria', 'samantha', 'karen', 'moira', 'fiona', 'tessa', 'stephanie',
-        'alva', 'ayanda', 'agnes', 'allison', 'ava', 'helena', 'jennifer',
-        'kathy', 'siri', 'cortana', 'google us english', 'google uk english female'
-    ];
-
-    const scoreVoice = (v) => {
-        const name = (v.name || '').toLowerCase();
-        let score = 0;
-        if (/^en(-|_)?/i.test(v.lang || '')) score += 20;
-        if (/^en[-_]us/i.test(v.lang || '')) score += 10;
-        if (maleKeywords.some((k) => name.includes(k))) score += 100;
-        if (femaleKeywords.some((k) => name.includes(k))) score -= 100;
-        return score;
-    };
-
-    const sorted = [...pool].sort((a, b) => scoreVoice(b) - scoreVoice(a));
-    catchVoice = sorted[0] || null;
-    catchVoiceChecked = true;
+    catchVoice = pickCatchVoice(voices);
+    catchVoiceChecked = !!catchVoice;
+    if (typeof console !== 'undefined' && console.info) {
+        console.info('[pykachu] catch voice:', catchVoice ? `${catchVoice.name} / ${catchVoice.lang}` : 'none');
+    }
 }
 
 // Celebratory 8-bit "caught!" jingle + a soft crowd-cheer swell, fired the
@@ -165,17 +199,15 @@ function speakCatch(pokemonName) {
     const speakNow = () => {
         try {
             const synth = window.speechSynthesis;
-            // Re-resolve right before entering in case the voice list only
-            // just loaded — never fall back to a default female robot voice
-            // when a real male voice is sitting in getVoices().
-            if (!catchVoice && window.speechSynthesis.getVoices().length) {
-                refreshCatchVoice();
-            }
+            // Always re-resolve right before speaking: Chrome often returns a
+            // partial voice list on the first call, and a voice cached from
+            // that half-list is exactly how a female announcer slips through.
+            refreshCatchVoice();
             const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${line}!!`);
             if (catchVoice) utter.voice = catchVoice;
             utter.lang = (catchVoice && catchVoice.lang) || 'en-US';
-            utter.pitch = 0.78;
-            utter.rate = 1.05;
+            utter.pitch = 0.7;
+            utter.rate = 1.02;
             utter.volume = 1.0;
             synth.speak(utter);
         } catch (e) {
@@ -355,44 +387,62 @@ function playSound(soundName, volume = 0.3) {
                 break;
 
             case 'pokeballDrop': {
+                // Gentle set-down, not a slam: a low lowpassed thump with a
+                // breath of air. The old 1.45kHz metallic clink is gone — it
+                // was the harsh part that made the ball feel violent.
                 const tImpact = now;
                 const thud = audioContext.createOscillator();
                 const thudG = audioContext.createGain();
+                const thudLp = audioContext.createBiquadFilter();
                 thud.type = 'sine';
-                thud.frequency.setValueAtTime(160, tImpact);
-                thud.frequency.exponentialRampToValueAtTime(50, tImpact + 0.12);
-                thudG.gain.setValueAtTime(0.35, tImpact);
-                thudG.gain.exponentialRampToValueAtTime(0.001, tImpact + 0.14);
-                thud.connect(thudG); thudG.connect(audioContext.destination);
-                thud.start(tImpact); thud.stop(tImpact + 0.15);
+                thud.frequency.setValueAtTime(130, tImpact);
+                thud.frequency.exponentialRampToValueAtTime(62, tImpact + 0.16);
+                thudLp.type = 'lowpass';
+                thudLp.frequency.value = 420;
+                thudLp.Q.value = 0.6;
+                thudG.gain.setValueAtTime(0.0001, tImpact);
+                thudG.gain.exponentialRampToValueAtTime(0.16, tImpact + 0.02);
+                thudG.gain.exponentialRampToValueAtTime(0.001, tImpact + 0.2);
+                thud.connect(thudLp); thudLp.connect(thudG); thudG.connect(audioContext.destination);
+                thud.start(tImpact); thud.stop(tImpact + 0.22);
 
-                const clink = audioContext.createOscillator();
-                const clinkG = audioContext.createGain();
-                clink.type = 'triangle';
-                clink.frequency.setValueAtTime(1450, tImpact);
-                clink.frequency.exponentialRampToValueAtTime(600, tImpact + 0.08);
-                clinkG.gain.setValueAtTime(0.18, tImpact);
-                clinkG.gain.exponentialRampToValueAtTime(0.001, tImpact + 0.1);
-                clink.connect(clinkG); clinkG.connect(audioContext.destination);
-                clink.start(tImpact); clink.stop(tImpact + 0.11);
+                const airLen = 0.22;
+                const airBuf = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * airLen), audioContext.sampleRate);
+                const airData = airBuf.getChannelData(0);
+                for (let i = 0; i < airData.length; i++) airData[i] = Math.random() * 2 - 1;
+                const air = audioContext.createBufferSource();
+                air.buffer = airBuf;
+                const airBp = audioContext.createBiquadFilter();
+                airBp.type = 'bandpass';
+                airBp.frequency.setValueAtTime(700, tImpact);
+                airBp.frequency.exponentialRampToValueAtTime(260, tImpact + 0.2);
+                airBp.Q.value = 0.8;
+                const airG = audioContext.createGain();
+                airG.gain.setValueAtTime(0.0001, tImpact);
+                airG.gain.exponentialRampToValueAtTime(0.05, tImpact + 0.015);
+                airG.gain.exponentialRampToValueAtTime(0.001, tImpact + 0.21);
+                air.connect(airBp); airBp.connect(airG); airG.connect(audioContext.destination);
+                air.start(tImpact);
                 break;
             }
 
             case 'pokeballOpen': {
-                // OPEN SEQUENCE audio — synced 4-layer choreography:
+                // OPEN SEQUENCE audio — synced 4-layer choreography, every
+                // layer kept soft so the reveal reads calm, not explosive:
                 //   L1 @0.00s spring latch click   (matches button press)
                 //   L2 @0.15s pneumatic vent+pop    (matches shells splitting)
                 //   L3 @0.35s rising beam hum+sizzle (matches plasma outpour)
                 //   L4 @0.65s low thud + creature cry (matches materialization)
 
-                // L1 — sharp metallic latch click (spring release)
+                // L1 — soft mechanical latch tick (sine, not a hard square clack)
                 const click = audioContext.createOscillator();
                 const clickG = audioContext.createGain();
-                click.type = 'square';
-                click.frequency.setValueAtTime(1150, now);
-                click.frequency.exponentialRampToValueAtTime(280, now + 0.07);
-                clickG.gain.setValueAtTime(0.28, now);
-                clickG.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+                click.type = 'sine';
+                click.frequency.setValueAtTime(760, now);
+                click.frequency.exponentialRampToValueAtTime(320, now + 0.09);
+                clickG.gain.setValueAtTime(0.0001, now);
+                clickG.gain.exponentialRampToValueAtTime(0.12, now + 0.012);
+                clickG.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
                 click.connect(clickG); clickG.connect(audioContext.destination);
                 click.start(now); click.stop(now + 0.1);
 
@@ -411,7 +461,7 @@ function playSound(soundName, volume = 0.3) {
                 bp.Q.value = 1.1;
                 const nG = audioContext.createGain();
                 nG.gain.setValueAtTime(0.0001, t2);
-                nG.gain.exponentialRampToValueAtTime(0.4, t2 + 0.02);
+                nG.gain.exponentialRampToValueAtTime(0.16, t2 + 0.03);
                 nG.gain.exponentialRampToValueAtTime(0.001, t2 + 0.29);
                 noiseSrc.connect(bp); bp.connect(nG); nG.connect(audioContext.destination);
                 noiseSrc.start(t2);
@@ -422,7 +472,8 @@ function playSound(soundName, volume = 0.3) {
                 pop.type = 'sine';
                 pop.frequency.setValueAtTime(190, t2);
                 pop.frequency.exponentialRampToValueAtTime(55, t2 + 0.12);
-                popG.gain.setValueAtTime(0.55, t2);
+                popG.gain.setValueAtTime(0.0001, t2);
+                popG.gain.exponentialRampToValueAtTime(0.2, t2 + 0.02);
                 popG.gain.exponentialRampToValueAtTime(0.001, t2 + 0.2);
                 pop.connect(popG); popG.connect(audioContext.destination);
                 pop.start(t2); pop.stop(t2 + 0.22);
@@ -442,7 +493,7 @@ function playSound(soundName, volume = 0.3) {
                 lfo.connect(lfoG); lfoG.connect(hum.frequency);
                 lfo.start(t3); lfo.stop(t3 + 0.68);
                 humG.gain.setValueAtTime(0.0001, t3);
-                humG.gain.exponentialRampToValueAtTime(0.24, t3 + 0.14);
+                humG.gain.exponentialRampToValueAtTime(0.14, t3 + 0.14);
                 humG.gain.exponentialRampToValueAtTime(0.001, t3 + 0.68);
                 hum.connect(humG); humG.connect(audioContext.destination);
                 hum.start(t3); hum.stop(t3 + 0.72);
@@ -459,7 +510,7 @@ function playSound(soundName, volume = 0.3) {
                 hp.frequency.setValueAtTime(7000, t3);
                 const sG = audioContext.createGain();
                 sG.gain.setValueAtTime(0.0001, t3);
-                sG.gain.exponentialRampToValueAtTime(0.06, t3 + 0.05);
+                sG.gain.exponentialRampToValueAtTime(0.028, t3 + 0.05);
                 sG.gain.exponentialRampToValueAtTime(0.001, t3 + 0.45);
                 sSrc.connect(hp); hp.connect(sG); sG.connect(audioContext.destination);
                 sSrc.start(t3);
@@ -472,7 +523,7 @@ function playSound(soundName, volume = 0.3) {
                     ch.type = 'sine';
                     ch.frequency.setValueAtTime(f, t);
                     chG.gain.setValueAtTime(0.0001, t);
-                    chG.gain.exponentialRampToValueAtTime(0.09, t + 0.02);
+                    chG.gain.exponentialRampToValueAtTime(0.06, t + 0.02);
                     chG.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
                     ch.connect(chG); chG.connect(audioContext.destination);
                     ch.start(t); ch.stop(t + 0.26);
@@ -486,7 +537,7 @@ function playSound(soundName, volume = 0.3) {
                 thud.frequency.setValueAtTime(120, t4);
                 thud.frequency.exponentialRampToValueAtTime(38, t4 + 0.42);
                 thudG.gain.setValueAtTime(0.0001, t4);
-                thudG.gain.exponentialRampToValueAtTime(0.5, t4 + 0.03);
+                thudG.gain.exponentialRampToValueAtTime(0.26, t4 + 0.05);
                 thudG.gain.exponentialRampToValueAtTime(0.001, t4 + 0.5);
                 thud.connect(thudG); thudG.connect(audioContext.destination);
                 thud.start(t4); thud.stop(t4 + 0.55);
@@ -522,7 +573,7 @@ function playSound(soundName, volume = 0.3) {
                 an.frequency.setValueAtTime(880, t4);
                 an.frequency.exponentialRampToValueAtTime(1320, t4 + 0.25);
                 anG.gain.setValueAtTime(0.0001, t4);
-                anG.gain.exponentialRampToValueAtTime(0.08, t4 + 0.02);
+                anG.gain.exponentialRampToValueAtTime(0.05, t4 + 0.02);
                 anG.gain.exponentialRampToValueAtTime(0.001, t4 + 0.3);
                 an.connect(anG); anG.connect(audioContext.destination);
                 an.start(t4); an.stop(t4 + 0.32);

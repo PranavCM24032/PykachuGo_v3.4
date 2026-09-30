@@ -43,13 +43,15 @@ function scheduleReveal(fn, ms) {
     return id;
 }
 
-// Step 4 flourish: the caught Pokémon bursts out of its Pokéball.
-// The ball drops in from above and bounces ONCE, then plays the
+// Step 4 flourish: the caught Pokémon drifts out of its Pokéball.
+// The ball drifts in from above, rests on the platform, then plays the
 // audio-synced OPEN SEQUENCE (t = 0 when the ball settles):
-//   0.00s latch click + button press   (release-latch)
-//   0.15s shells split + white flash burst (pokemon-reveal-open / reveal-ready)
-//   0.35s plasma beam outpour + sparkle/ring particles
-//   0.65s white silhouette materializes -> flash dissolve -> full-color Pokémon
+//   0.00s  latch click + button press            (release-latch)
+//   0.21s  shells swing open + warm bloom rises  (pokemon-reveal-open / reveal-ready)
+//   0.45s  plasma beam + sparkle/ring particles
+//   1.00s  white silhouette materializes -> flash dissolve -> full-color Pokémon
+// Pacing is deliberately unhurried: the old version slammed the ball in and
+// flashed a white shockwave, which read as a shock rather than a reveal.
 function playPokemonReveal() {
     const stage = document.getElementById('pokemonReveal');
     const ball = document.getElementById('step4RevealBall');
@@ -81,39 +83,39 @@ function playPokemonReveal() {
         return !!step4 && step4.classList.contains('active');
     };
 
-    // t=0.825s — ball SMACKS the platform on first contact (55% of 1.5s)
+    // t=1.044s — ball first rests on the platform (58% of the 1.8s fall)
     scheduleReveal(() => {
         if (!stillCurrent()) return;
-        playSound('pokeballDrop');
-    }, 825);
+        playSound('pokeballDrop', 0.22);
+    }, 1044);
 
-    // t=1.245s — second contact, lighter (83% of 1.5s)
+    // t=1.53s — second, barely-there contact (85% of 1.8s), quieter
     scheduleReveal(() => {
         if (!stillCurrent()) return;
-        playSound('pokeballDrop');
-    }, 1245);
+        playSound('pokeballDrop', 0.12);
+    }, 1530);
 
-    // t=1.65s — ball has settled; latch release begins
+    // t=1.8s — ball has settled; latch release begins
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         ball.classList.add('release-latch');
         playSound('pokeballOpen');
-    }, 1650);
+    }, 1800);
 
-    // t=1.85s — shells snap open, beam erupts, Pokémon starts emerging
+    // t=2.01s — shells swing open, warm bloom and beam rise, Pokémon emerges
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         ball.classList.remove('release-latch');
         ball.classList.add('pokemon-reveal-open');
         stage.classList.add('reveal-ready');
         spawnReleaseSparkles();
-    }, 1850);
+    }, 2010);
 
-    // t=2.9s — announcer speaks the catch name once the reveal has settled
+    // t=3.2s — announcer speaks the catch name once the reveal has settled
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         speakCatch(pokemonName);
-    }, 2900);
+    }, 3200);
 }
 
 // Falling-star sparkle shower. Many tinytiny stars appear along the top

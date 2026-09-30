@@ -133,7 +133,7 @@
     height: 110%;
     border-color: #3b82f6;
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.6), inset 0 0 10px rgba(59, 130, 246, 0.4);
-    animation: platform-ring-blue-impact 1.0s ease-out both;
+    animation: platform-ring-blue-impact 1.6s ease-out both;
 }
 
 .ring-yellow {
@@ -141,7 +141,7 @@
     height: 75%;
     border-color: #eab308;
     box-shadow: 0 0 20px rgba(234, 179, 8, 0.7), inset 0 0 12px rgba(234, 179, 8, 0.5);
-    animation: platform-ring-yellow-impact 1.0s ease-out both;
+    animation: platform-ring-yellow-impact 1.6s ease-out both;
 }
 
 .ring-core {
@@ -159,22 +159,22 @@
         border-color: #3b82f6;
         transform: rotateX(75deg) scale(1);
     }
-    /* first SMACK at 55% */
+    /* first soft contact */
     56% {
-        box-shadow: 0 0 45px rgba(96, 165, 250, 1), 0 0 70px rgba(59, 130, 246, 0.9), inset 0 0 25px rgba(255, 255, 255, 1);
-        border-color: #eff6ff;
-        transform: rotateX(75deg) scale(1.14);
+        box-shadow: 0 0 26px rgba(96, 165, 250, 0.5), 0 0 40px rgba(59, 130, 246, 0.35), inset 0 0 12px rgba(219, 234, 254, 0.45);
+        border-color: #bfdbfe;
+        transform: rotateX(75deg) scale(1.05);
     }
-    62% {
+    64% {
         box-shadow: 0 0 20px rgba(59, 130, 246, 0.7), inset 0 0 12px rgba(59, 130, 246, 0.5);
         border-color: #93c5fd;
-        transform: rotateX(75deg) scale(1.03);
+        transform: rotateX(75deg) scale(1.01);
     }
-    /* second lighter contact at 83% */
-    84% {
-        box-shadow: 0 0 30px rgba(96, 165, 250, 0.9), 0 0 50px rgba(59, 130, 246, 0.75), inset 0 0 18px rgba(255, 255, 255, 0.85);
-        border-color: #bfdbfe;
-        transform: rotateX(75deg) scale(1.07);
+    /* second, barely-there contact */
+    85% {
+        box-shadow: 0 0 22px rgba(96, 165, 250, 0.42), 0 0 32px rgba(59, 130, 246, 0.28), inset 0 0 10px rgba(219, 234, 254, 0.3);
+        border-color: #dbeafe;
+        transform: rotateX(75deg) scale(1.03);
     }
     90% {
         box-shadow: 0 0 18px rgba(59, 130, 246, 0.65), inset 0 0 11px rgba(59, 130, 246, 0.45);
@@ -194,27 +194,27 @@
         border-color: #eab308;
         transform: rotateX(75deg) scale(1);
     }
-    /* first SMACK */
+    /* first soft contact */
     56% {
-        box-shadow: 0 0 55px rgba(253, 224, 71, 1), 0 0 80px rgba(234, 179, 8, 0.95), inset 0 0 28px rgba(255, 255, 255, 1);
-        border-color: #fefce8;
-        transform: rotateX(75deg) scale(1.18);
+        box-shadow: 0 0 30px rgba(253, 224, 71, 0.55), 0 0 44px rgba(234, 179, 8, 0.4), inset 0 0 14px rgba(255, 255, 255, 0.4);
+        border-color: #fef9c3;
+        transform: rotateX(75deg) scale(1.06);
     }
-    62% {
+    64% {
         box-shadow: 0 0 28px rgba(234, 179, 8, 0.8), inset 0 0 16px rgba(234, 179, 8, 0.6);
         border-color: #fde047;
+        transform: rotateX(75deg) scale(1.02);
+    }
+    /* second, barely-there contact */
+    85% {
+        box-shadow: 0 0 26px rgba(253, 224, 71, 0.45), 0 0 38px rgba(234, 179, 8, 0.32), inset 0 0 12px rgba(255, 255, 255, 0.3);
+        border-color: #fefce8;
         transform: rotateX(75deg) scale(1.04);
     }
-    /* second lighter contact */
-    84% {
-        box-shadow: 0 0 40px rgba(253, 224, 71, 0.95), 0 0 60px rgba(234, 179, 8, 0.85), inset 0 0 22px rgba(255, 255, 255, 0.9);
-        border-color: #fef08a;
-        transform: rotateX(75deg) scale(1.10);
-    }
-    90% {
+    92% {
         box-shadow: 0 0 22px rgba(234, 179, 8, 0.75), inset 0 0 13px rgba(234, 179, 8, 0.55);
         border-color: #facc15;
-        transform: rotateX(75deg) scale(1.02);
+        transform: rotateX(75deg) scale(1.01);
     }
     100% {
         box-shadow: 0 0 20px rgba(234, 179, 8, 0.7), inset 0 0 12px rgba(234, 179, 8, 0.5);
@@ -268,7 +268,8 @@
     overflow: visible;
 }
 
-/* Plasma light beam bursting upward out of the opened Pokéball */
+/* Warm plasma light rising out of the opened Pokéball — golden, slow, and
+   soft-edged instead of a hard white blast. */
 .reveal-beam {
     position: absolute;
     left: 50%;
@@ -277,48 +278,50 @@
     height: 0;
     transform: translateX(-50%);
     background: linear-gradient(to top,
-        rgba(255, 255, 255, 1) 0%,
-        rgba(255, 255, 255, 0.85) 35%,
-        rgba(255, 255, 255, 0.4) 70%,
+        rgba(255, 252, 235, 0.85) 0%,
+        rgba(253, 224, 71, 0.45) 40%,
+        rgba(234, 179, 8, 0.16) 72%,
         transparent 100%);
     border-radius: 50% 50% 0 0;
-    filter: blur(4px);
+    filter: blur(6px);
     opacity: 0;
     pointer-events: none;
     z-index: 7;
 }
 
 .pokemon-reveal.reveal-ready .reveal-beam {
-    animation: reveal-beam-burst 0.85s cubic-bezier(0.18, 0.85, 0.3, 1) forwards;
+    animation: reveal-beam-burst 1.1s cubic-bezier(0.3, 0.7, 0.35, 1) forwards;
 }
 
 @keyframes reveal-beam-burst {
     0% {
         height: 0;
         opacity: 0;
-        transform: translateX(-50%) scaleX(0.4);
+        transform: translateX(-50%) scaleX(0.6);
     }
-    28% {
-        height: clamp(140px, 30vh, 220px);
-        opacity: 1;
-        transform: translateX(-50%) scaleX(1.4);
-        filter: blur(3px) drop-shadow(0 0 25px rgba(255, 255, 255, 0.9));
+    38% {
+        height: clamp(120px, 26vh, 200px);
+        opacity: 0.75;
+        transform: translateX(-50%) scaleX(1.05);
+        filter: blur(5px) drop-shadow(0 0 18px rgba(253, 224, 71, 0.45));
     }
-    65% {
-        height: clamp(170px, 34vh, 260px);
-        opacity: 0.85;
-        transform: translateX(-50%) scaleX(1.8);
+    70% {
+        height: clamp(150px, 30vh, 230px);
+        opacity: 0.5;
+        transform: translateX(-50%) scaleX(1.15);
     }
     100% {
-        height: clamp(180px, 36vh, 280px);
+        height: clamp(160px, 32vh, 245px);
         opacity: 0;
-        transform: translateX(-50%) scaleX(2.2);
-        filter: blur(8px);
+        transform: translateX(-50%) scaleX(1.25);
+        filter: blur(10px);
     }
 }
 
-/* White gradient shockwave pulse expanding from the ball's center */
-.reveal-shockwave {
+/* Soft glow bloom blooming out of the opened Pokéball. This used to be a
+   hard white shockwave (full-opacity flash expanding to 13x) which read as a
+   bang rather than a reveal — now a slow, warm, low-alpha haze. */
+.reveal-bloom {
     position: absolute;
     left: 50%;
     bottom: calc(var(--plat-h) * 0.46 + var(--ball-d) * 0.48);
@@ -326,10 +329,10 @@
     height: 130px;
     border-radius: 50%;
     background: radial-gradient(circle,
-            rgba(255, 255, 255, 0.95) 0%,
-            rgba(255, 255, 255, 0.6) 30%,
-            rgba(255, 255, 255, 0.15) 58%,
-            transparent 72%);
+            rgba(255, 246, 214, 0.55) 0%,
+            rgba(253, 224, 71, 0.3) 34%,
+            rgba(234, 179, 8, 0.12) 60%,
+            transparent 74%);
     opacity: 0;
     pointer-events: none;
     z-index: 11;
@@ -342,7 +345,7 @@
     bottom: calc(var(--plat-h) * 0.46 + var(--ball-d) * 0.4);
     width: 80px;
     height: 24px;
-    border: 2px solid rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.65);
     border-radius: 50%;
     opacity: 0;
     pointer-events: none;
@@ -351,11 +354,11 @@
 }
 
 .pokemon-reveal.reveal-ready .reveal-ring-one {
-    animation: reveal-ring 0.75s 0.08s ease-out both;
+    animation: reveal-ring 1s 0.1s ease-out both;
 }
 
 .pokemon-reveal.reveal-ready .reveal-ring-two {
-    animation: reveal-ring 0.75s 0.25s ease-out both;
+    animation: reveal-ring 1s 0.28s ease-out both;
 }
 
 @keyframes reveal-ring {
@@ -364,40 +367,40 @@
         transform: translate(-50%, 50%) scale(0.2);
     }
 
-    18% {
-        opacity: 0.9;
+    22% {
+        opacity: 0.6;
     }
 
     100% {
         opacity: 0;
-        transform: translate(-50%, 50%) scale(2.4);
+        transform: translate(-50%, 50%) scale(2.2);
     }
 }
 
-.pokemon-reveal.reveal-ready .reveal-shockwave {
-    animation: reveal-shockwave 0.8s ease-in-out forwards;
+.pokemon-reveal.reveal-ready .reveal-bloom {
+    animation: reveal-bloom 1.4s ease-out forwards;
 }
 
-/* Smooth bloom: builds gently, peaks bright, then breathes away. */
-@keyframes reveal-shockwave {
+/* Slow warm haze: swells gently, peaks softly, then breathes away. */
+@keyframes reveal-bloom {
     0% {
         opacity: 0;
-        transform: translate(-50%, 50%) scale(0.1);
+        transform: translate(-50%, 50%) scale(0.2);
     }
 
-    28% {
-        opacity: 1;
-        transform: translate(-50%, 50%) scale(2.6);
+    35% {
+        opacity: 0.5;
+        transform: translate(-50%, 50%) scale(1.9);
     }
 
-    55% {
-        opacity: 0.65;
-        transform: translate(-50%, 50%) scale(7);
+    65% {
+        opacity: 0.3;
+        transform: translate(-50%, 50%) scale(3.4);
     }
 
     100% {
         opacity: 0;
-        transform: translate(-50%, 50%) scale(13);
+        transform: translate(-50%, 50%) scale(5.2);
     }
 }
 
@@ -485,7 +488,7 @@
     transform: translateX(-50%);
     transform-origin: center bottom;
     transform-style: preserve-3d;
-    animation: reveal-ball-drop 1.5s ease-in both;
+    animation: reveal-ball-drop 1.8s ease-in both;
     border-radius: 50%;
     z-index: 6;
 }
@@ -494,45 +497,44 @@
     animation: none;
 }
 
-/* Physics: ball enters from far above, accelerates under gravity,
-   SMACKS the platform center with a hard squash, bounces up 65px
-   (big enough to see clearly), lands again with a lighter squash,
-   then settles perfectly on the ring center. */
+/* Physics: the ball drifts down and settles, rather than dropping and
+   slamming. Gentle ease-in-out fall, a shallow squash on contact, a small
+   float-back, then a soft settle. No violent gravity snap, no 1.32x squash. */
 @keyframes reveal-ball-drop {
-    /* start: far above the screen, spinning slightly */
+    /* start: up above the screen, drifting in slowly */
     0% {
-        transform: translateX(-50%) translateY(-90vh) rotateZ(-18deg);
-        animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.3);
+        transform: translateX(-50%) translateY(-70vh) rotateZ(-8deg);
+        animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
     }
 
-    /* mid-fall: still coming in fast */
-    38% {
-        transform: translateX(-50%) translateY(-28vh) rotateZ(-8deg);
-        animation-timing-function: cubic-bezier(0.6, 0.04, 0.98, 0.335);
+    /* mid-fall: easing off, almost floating */
+    40% {
+        transform: translateX(-50%) translateY(-30vh) rotateZ(-4deg);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1);
     }
 
-    /* FIRST CONTACT: ball bottom hits the ring center — hard squash */
-    55% {
-        transform: translateX(-50%) translateY(0) rotateZ(0deg) scaleX(1.32) scaleY(0.72);
-        animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+    /* FIRST CONTACT: rests on the ring center with a shallow squash */
+    58% {
+        transform: translateX(-50%) translateY(0) rotateZ(0deg) scaleX(1.1) scaleY(0.92);
+        animation-timing-function: cubic-bezier(0.34, 0.9, 0.4, 1);
     }
 
-    /* BOUNCE UP: spring back — clear visible bounce of 65px */
-    70% {
-        transform: translateX(-50%) translateY(-65px) rotateZ(3deg) scaleX(0.94) scaleY(1.08);
-        animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+    /* FLOAT BACK: a small 22px lift, barely a bounce */
+    72% {
+        transform: translateX(-50%) translateY(-22px) rotateZ(1.5deg) scaleX(0.985) scaleY(1.02);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1);
     }
 
-    /* SECOND CONTACT: lands again with a lighter squash */
-    83% {
-        transform: translateX(-50%) translateY(0) rotateZ(0deg) scaleX(1.12) scaleY(0.9);
-        animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+    /* SECOND CONTACT: barely any squash at all */
+    85% {
+        transform: translateX(-50%) translateY(0) rotateZ(0deg) scaleX(1.035) scaleY(0.975);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1);
     }
 
-    /* micro bounce — tiny settle wobble */
-    91% {
-        transform: translateX(-50%) translateY(-10px) rotateZ(-1deg) scaleX(0.98) scaleY(1.03);
-        animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+    /* micro settle — a 4px breath */
+    93% {
+        transform: translateX(-50%) translateY(-4px) rotateZ(-0.5deg) scaleX(0.997) scaleY(1.008);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1);
     }
 
     /* SETTLED: resting perfectly on the ring */
@@ -658,47 +660,47 @@
     z-index: 3;
     filter: blur(3px);
     pointer-events: none;
-    animation: ball-shadow-drop 1.5s ease-in both;
+    animation: ball-shadow-drop 1.8s ease-in both;
 }
 
 @keyframes ball-shadow-drop {
     0% {
         opacity: 0;
-        transform: translateX(-50%) scale(0.1);
-        animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.3);
+        transform: translateX(-50%) scale(0.2);
+        animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
     }
 
-    38% {
+    40% {
+        opacity: 0.32;
+        transform: translateX(-50%) scale(0.6);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1);
+    }
+
+    /* soft contact: shadow widens a little, never slams wide */
+    58% {
+        opacity: 0.75;
+        transform: translateX(-50%) scaleX(1.14) scaleY(0.95);
+    }
+
+    /* ball floating up: shadow recedes */
+    72% {
         opacity: 0.4;
-        transform: translateX(-50%) scale(0.5);
-        animation-timing-function: cubic-bezier(0.6, 0.04, 0.98, 0.335);
-    }
-
-    /* impact: shadow spreads wide as ball squashes */
-    55% {
-        opacity: 1;
-        transform: translateX(-50%) scaleX(1.4) scaleY(0.9);
-    }
-
-    /* ball bouncing up: shadow shrinks */
-    70% {
-        opacity: 0.5;
-        transform: translateX(-50%) scale(0.65);
+        transform: translateX(-50%) scale(0.78);
     }
 
     /* second contact */
-    83% {
-        opacity: 1;
-        transform: translateX(-50%) scaleX(1.15) scaleY(0.92);
+    85% {
+        opacity: 0.7;
+        transform: translateX(-50%) scaleX(1.06) scaleY(0.97);
     }
 
-    91% {
-        opacity: 0.7;
-        transform: translateX(-50%) scale(0.8);
+    93% {
+        opacity: 0.6;
+        transform: translateX(-50%) scale(0.88);
     }
 
     100% {
-        opacity: 1;
+        opacity: 0.7;
         transform: translateX(-50%) scale(1);
     }
 }
@@ -719,7 +721,7 @@
 
 /* OPEN SEQUENCE — Phase 1: Button pulse on platform */
 .pokemon-reveal-ball.release-latch .ball-btn {
-    animation: latch-pulse 0.2s ease-out both;
+    animation: latch-pulse 0.28s ease-in-out both;
 }
 
 @keyframes latch-pulse {
@@ -730,26 +732,26 @@
     }
 
     50% {
-        transform: translate(-50%, -50%) scale(0.78);
+        transform: translate(-50%, -50%) scale(0.86);
         background: #FFFBDE;
-        box-shadow: 0 0 18px rgba(255, 240, 140, 1), 0 0 30px rgba(234, 179, 8, 0.8);
+        box-shadow: 0 0 12px rgba(255, 240, 140, 0.55), 0 0 20px rgba(234, 179, 8, 0.35);
     }
 
     100% {
         transform: translate(-50%, -50%) scale(1);
         background: #FFFFFF;
-        box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
     }
 }
 
-/* Opening: top shell SNAPS open dramatically (hinge from bottom edge)
-   then fades. Bottom shell tips forward and fades away. */
+/* Opening: the top shell swings open like a lid (hinged at the equator)
+   and drifts away slowly — a soft opening, not a snap. */
 .pokemon-reveal-ball.pokemon-reveal-open .ball-top {
-    animation: ball-top-open 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+    animation: ball-top-open 0.85s cubic-bezier(0.35, 0, 0.35, 1) forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-bottom {
-    animation: ball-bottom-open 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) 0.06s forwards;
+    animation: ball-bottom-open 0.85s cubic-bezier(0.35, 0, 0.35, 1) 0.08s forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-shade,
@@ -764,17 +766,17 @@
         transform: translateY(0) rotateX(0deg);
         opacity: 1;
     }
-    /* rapid swing: top half hinges backwards from the equator */
-    45% {
-        transform: translateY(-4px) rotateX(-120deg);
+    /* gentle hinge: top half eases backwards from the equator */
+    50% {
+        transform: translateY(-3px) rotateX(-88deg);
         opacity: 1;
     }
-    75% {
-        transform: translateY(-8px) rotateX(-148deg) rotateZ(-5deg);
+    80% {
+        transform: translateY(-6px) rotateX(-112deg) rotateZ(-4deg);
         opacity: 0.6;
     }
     100% {
-        transform: translateY(-12px) rotateX(-158deg) rotateZ(-8deg);
+        transform: translateY(-10px) rotateX(-124deg) rotateZ(-6deg);
         opacity: 0;
     }
 }
@@ -785,16 +787,16 @@
         opacity: 1;
     }
     /* tips forward slightly and drops */
-    40% {
-        transform: translateY(4px) rotateX(28deg);
+    45% {
+        transform: translateY(3px) rotateX(20deg);
         opacity: 1;
     }
-    75% {
-        transform: translateY(8px) rotateX(34deg);
+    80% {
+        transform: translateY(6px) rotateX(26deg);
         opacity: 0.5;
     }
     100% {
-        transform: translateY(12px) rotateX(38deg);
+        transform: translateY(10px) rotateX(30deg);
         opacity: 0;
     }
 }
@@ -824,8 +826,8 @@
 
 .pokemon-reveal.reveal-ready .reveal-pop {
     animation:
-        reveal-pokemon-emerge 0.75s 0.12s cubic-bezier(0.34, 1.4, 0.64, 1) both,
-        pokemon-materialize 0.85s 0.12s ease-in-out both;
+        reveal-pokemon-emerge 1s 0.14s cubic-bezier(0.3, 0.9, 0.35, 1) both,
+        pokemon-materialize 1s 0.14s ease-in-out both;
 }
 
 @keyframes reveal-pokemon-emerge {
@@ -839,14 +841,14 @@
         opacity: 1;
         transform: translateX(-50%) translateY(-5px) scale(0.35);
     }
-    /* overshoots upward — springs out energetically */
+    /* rises with a soft hint of overshoot */
     60% {
         opacity: 1;
-        transform: translateX(-50%) translateY(-18px) scale(1.12);
+        transform: translateX(-50%) translateY(-14px) scale(1.05);
     }
-    /* pulls back: slight gravity settling */
-    80% {
-        transform: translateX(-50%) translateY(4px) scale(0.97);
+    /* settles back down gently */
+    82% {
+        transform: translateX(-50%) translateY(2px) scale(0.985);
     }
     /* final hover position */
     100% {
@@ -859,11 +861,11 @@
 @keyframes pokemon-materialize {
     0%,
     48% {
-        filter: brightness(0) invert(1) drop-shadow(0 0 25px rgba(255, 255, 255, 0.95));
+        filter: brightness(0) invert(1) drop-shadow(0 0 18px rgba(255, 246, 214, 0.55));
     }
 
-    68% {
-        filter: brightness(2.2) invert(0) drop-shadow(0 0 20px rgba(255, 255, 255, 0.9));
+    70% {
+        filter: brightness(1.35) invert(0) drop-shadow(0 0 14px rgba(255, 246, 214, 0.5));
     }
 
     100% {

@@ -158,22 +158,25 @@ Player screens:
 
 ### The step 4 catch reveal
 
-On solve, a 3D Pokéball drops in from off-screen and bounces **once**, the
-latch fires, the shells split, and the sprite materialises. The catch line is
-**voice-only** — `pokemonName` is never rendered on screen, so the player
-identifies the Pokémon from the sprite alone.
+On solve, a 3D Pokéball drifts in from off-screen, rests softly on the
+platform with a shallow squash, and the latch eases open so the sprite
+materialises out of a warm bloom. The pacing is deliberately unhurried — an
+earlier version dropped the ball hard, punched the platform ring with a white
+flash and fired a full-opacity shockwave, which read as a shock instead of a
+peaceful reveal. The catch line is **voice-only** — `pokemonName` is never
+rendered on screen, so the player identifies the Pokémon from the sprite alone.
 
 `js/audio.js` speaks it as a heavy male anime-announcer line — one deep
 bass voice, `Gotcha!! ... You caught ... <NAME>!!` — with the name
-shouted in caps at pitch 0.78 / rate 1.05 for a deep, energetic delivery.
-Voices are scored (male keywords `+100`, female `-100`, English `+20`) and the
-highest scorer wins, so every browser settles on one consistent announcer. Google
-English male voices are preferred (Google UK English Male / Google US
-English), then any male voice (David / Mark / Guy / Christopher, etc.). A
-celebratory 8-bit "caught" jingle with airy sparkle dust and a faint crowd
-swell fires on the same tick, shaped by a 300Hz–3kHz bandpass to sound like
-90s CRT TV audio (the filter colours the sfx — Web Speech output cannot be
-routed through the Web Audio graph). This fires on every catch regardless of
+shouted in caps at pitch 0.7 / rate 1.02 for a deep, unhurried delivery.
+Voice selection is tiered and deterministic: any voice whose name advertises a
+female voice (`female`, Zira, Samantha, Aria, Google US English, …) is
+**vetoed outright**, then explicit `male` names rank `+500`, known male voice
+names rank `+300`, and English/local-service tie-breaks are small. The
+announcer voice is re-resolved immediately before every utterance, so a
+half-loaded voice list on first paint can no longer lock in a female robot
+voice for the whole session (the selected voice is also logged to the console
+as `[pykachu] catch voice:`). This fires on every catch regardless of
 which Pokémon it is. `stopCatchVoice()` cancels any queued or in-flight
 speech, so leaving step 4 or logging out mid-reveal never leaves a voice
 talking over the next screen.
