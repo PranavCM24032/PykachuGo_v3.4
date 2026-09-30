@@ -870,9 +870,10 @@ pushing is a live content update.
 
 ## 📄 License
 
-Proprietary, all rights reserved © 2026 Pranav Mohan Paunikar. [`LICENSE`](LICENSE) is
-the single, complete and exclusive license for this repository — it supersedes the
-former `LICENSE.md` and any MIT text. It covers definitions and scope, the
+Proprietary, all rights reserved © 2026 Pranav Mohan Paunikar.
+[`LICENSE.md`](LICENSE.md) is the single, complete and exclusive license for
+this repository — it supersedes the earlier `LICENSE` / `LICENSE.md` notice and
+any MIT text. It covers definitions and scope, the
 limited study-and-faculty-review grant, prohibited acts (cloning, deploying,
 deriving, republishing, publishing answers), the mandatory written permission
 process with HOD / Forum Incharge / Principal sign-offs and the limits of any

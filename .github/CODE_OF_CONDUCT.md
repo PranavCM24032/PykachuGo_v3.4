@@ -45,7 +45,7 @@ diverse, inclusive, and healthy community.
 
 Pykachu Go is proprietary work published for academic study and faculty review.
 Forking, deploying, or running an event with this software requires prior
-written permission from the copyright holder (see [`LICENSE`](../LICENSE)).
+written permission from the copyright holder (see [`LICENSE.md`](../LICENSE.md)).
 Issue and pull request activity on this repository is therefore limited to the
 maintainer and explicitly authorised collaborators; unsolicited forks, clones,
 or redeployments are handled under that notice, not this document.

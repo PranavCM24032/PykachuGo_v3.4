@@ -10,10 +10,10 @@
 
 > This document is the **single, complete and exclusive licence** for this
 > repository. It supersedes and replaces every other licence, grant, or notice
-> previously published with it — including any MIT text, the former
-> `LICENSE.md`, and any README or comment wording. Where any other statement
-> conflicts with this document, **this document controls**. No licence is granted
-> except as expressly stated in Section 2.
+> previously published with it — including any MIT text, any earlier `LICENSE` or
+> `LICENSE.md` notice, and any README or comment wording. Where any other
+> statement conflicts with this document, **this document controls**. No licence
+> is granted except as expressly stated in Section 2.
 
 ---
 
