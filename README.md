@@ -96,10 +96,10 @@ html/                          Offline mirrors of the 4 overlay screens
   hint.html                    Hint overlay
   penalty.html                 Tab-switch blocking overlay
   meme.html                    YouTube meme overlay
-  loader.html                  Standalone splash page (full page, not a partial)
+  loader.html                  Splash partial (injected via data-include, not a page)
 css/                           Tailwind input + component/shell/style modules
 js/                            Game logic, scanner, Sheets client and meme player
-  include.js                   Legacy partial loader — now a no-op stub
+  include.js                   Partial loader — fetches [data-include] fragments, fires `includes:ready`
   config.js                    Reads runtime config → CONFIG + sheet endpoints
   state.js                     Global game state, session id, unlock queue, epoch
   audio.js                     SFX + BGM
@@ -181,20 +181,29 @@ Two design points worth keeping:
 
 - It is deliberately **not** a `.flow-step`. `showStep()` queries `.flow-step`
   and hard-removes every `active` state it finds, so making the splash one would
-  mean teaching the step state machine about a screen that isn't a step. As a
-  plain overlay, `step0` is already active underneath and is revealed when the
-  splash fades.
-- `<html>` carries `.booting` until the splash is in place. The partial arrives
-  by fetch, so without that gate `step0` would flash for a frame or two before
-  the loader covered it.
+  mean teaching the step state machine about a screen that isn't a step.
+- `<html>` carries `.booting` until the splash is done, and the gate is only
+  lifted in `finish()`. The partial arrives by fetch, so without the gate `step0`
+  would flash before the loader covered it.
+
+**The splash waits for the app to choose its screen.** `main.js` decides between
+`step0` and `step1` only after the puzzle data has loaded — a returning trainer
+with a remembered team (`pykachuTeam`) goes straight to the login form. It
+signals that choice with a `window` `app:booted` event, and `loader.js` holds the
+splash until it arrives. Without that wait you get the bug this replaced: the
+splash ends, `step0` is visible for a moment, and then the app yanks you to
+`step1` with no tap. The event must be dispatched on `window` — `CustomEvent`
+does not bubble, so a `document` dispatch never reaches a `window` listener.
 
 | Behaviour | Detail |
 |-----------|--------|
-| Duration | ~1.5s, extended only if the page or the emblem art is still loading, and hard-capped at 4s |
+| Duration | ~1.5s measured from splash mount, extended only if the art or the app's boot is still pending, and hard-capped at 4s |
+| Waits for | `includes:ready` (the partial), the three images decoding, and `app:booted` — whichever is slowest |
 | Layout preserved | `logo1.png` keeps its exact 558:285 ratio (measured 1.958–1.961 at every viewport); the two marks are true circles via `aspect-ratio: 1` |
 | Partial never arrives | `loader.js` lifts the gate at 3s and the app carries on with no splash |
 | `loader.js` never runs | CSS-only `booting-release` reveals the steps at 8s, so a blocked or missing script can't brick the app |
 | Offline | The partial, its CSS/JS and the three images are all in the service-worker precache |
+| Epoch reset | If the admin sheet reports a newer epoch, `main.js` wipes saved state *before* picking the screen, so the splash reveals a clean `step0` rather than a stale form |
 
 Note `csi.jpg` and `auron.png` are opaque 24-bit RGB with no alpha channel, so
 the circles are a *crop* framed by a gold ring — swapping in transparent versions

@@ -128,6 +128,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rememberedTeam = getTeamInfo();
     showStep(rememberedTeam ? 1 : 0);
 
+    // Tell the loader which screen we landed on. It holds the splash (and the
+    // .booting gate) until this fires, so a remembered trainer never sees step0
+    // flash for a moment before being pulled to the login form.
+    // On window, not document: CustomEvent does not bubble, and loader.js
+    // listens on window.
+    window.dispatchEvent(new CustomEvent('app:booted'));
+
     // Auxiliary power button: short tap = sign in/out, long hold = CRT power.
     const powerButton = document.getElementById('power-button');
     if (powerButton) {

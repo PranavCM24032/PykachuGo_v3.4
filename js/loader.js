@@ -14,21 +14,24 @@
     'use strict';
 
     var SPLASH_MS = 1500;       // the splash you asked for, ~1.5s
-    var SPLASH_MAX_MS = 4000;   // ...but never longer, even if art crawls
+    var SPLASH_MAX_MS = 4000;   // ...but never longer, even if art or boot crawls
     var INJECT_WAIT_MS = 3000;  // how long to wait for html/loader.html
     var FADE_MS = 300;          // matches #appLoader.is-done below
 
-    var started = Date.now();
+    var started = 0;           // set when the splash is actually mounted, not at parse
     var finished = false;
     var booting = false;
+    var appBooted = false;     // main.js has picked step0 vs step1
+    var kick = null;           // run()'s re-check, so a late app:booted still lands
 
     function reduced() {
         return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     }
 
     // Reveal the app underneath the splash. Removing the class is what makes the
-    // steps visible again; css/loader.css also releases them on a 3s timer in
-    // case this script never runs at all.
+    // steps visible again; css/loader.css also releases them on a timer in case
+    // this script never runs at all. Deliberately only called from finish():
+    // lifting it early would expose the step the app hasn't chosen yet.
     function liftGate() {
         if (document.documentElement) {
             document.documentElement.classList.remove('booting');
@@ -64,6 +67,11 @@
         var stage = el.querySelector('.loader-stage');
         if (stage) stage.classList.add('is-ready');
 
+        // Time the splash from the moment it is on screen. Measuring from script
+        // parse made a cold first visit (slow partial + slow art) collapse the
+        // splash to almost nothing.
+        started = Date.now();
+
         // The bar sweeps for exactly the visible duration, so the fill and the
         // fade-out agree instead of the bar stalling at 100% on its own.
         el.style.setProperty('--loader-ms', SPLASH_MS + 'ms');
@@ -77,36 +85,40 @@
             if (img.complete && img.naturalWidth > 0) {
                 settled++;
             } else {
-                var bump = function () { settled++; };
+                // go() is hoisted, so the last image to land can re-check.
+                var bump = function () { settled++; go(); };
                 img.addEventListener('load', bump, { once: true });
                 img.addEventListener('error', bump, { once: true });
             }
         });
 
-        liftGate();
-
-        // Normally 1.5s from now. Two cases push it later, both bounded: the
-        // document is still loading, or the emblem art hasn't arrived.
+        // Hold until BOTH the minimum time has passed AND the app has picked its
+        // opening screen. Without the second condition a returning trainer sees
+        // step0 flash and get yanked to the login form a moment later, because
+        // main.js only decides between them once the puzzle data has loaded.
         var base = SPLASH_MS;
-        var waitForLoad = document.readyState !== 'complete';
         var waitForArt = settled < images.length;
+        var waitForBoot = !appBooted;
         var guard = window.setTimeout(finish, SPLASH_MAX_MS);
+
+        function ready() {
+            return (!waitForArt || settled >= images.length)
+                && (!waitForBoot || appBooted);
+        }
 
         function go() {
             if (finished) return;
-            var wait = (!waitForArt || settled >= images.length)
-                ? Math.max(0, base - (Date.now() - started))
-                : SPLASH_MAX_MS - (Date.now() - started);
+            if (!ready()) return;
+            var wait = Math.max(0, base - (Date.now() - started));
             window.clearTimeout(guard);
-            window.setTimeout(finish, Math.max(0, wait));
+            window.setTimeout(finish, wait);
         }
 
-        if (!waitForLoad) {
-            go();
-        } else {
-            window.addEventListener('load', go, { once: true });
-            go();
-        }
+        // The remaining preconditions (art decoded, app booted) can each resolve
+        // after this point, and every one of them re-checks.
+        window.addEventListener('load', go, { once: true });
+        kick = go;
+        go();
     }
 
     function boot() {
@@ -122,6 +134,15 @@
     // would sit on screen forever with nothing left to remove it.
     document.addEventListener('includes:ready', boot);
     boot();
+
+    // Registered here, not inside run(): main.js can pick its opening screen
+    // BEFORE html/loader.html finishes injecting (small data JSONs beat the
+    // partial fetch on a warm connection). A listener born in run() would miss
+    // that event and the splash would sit out the full SPLASH_MAX_MS guard.
+    window.addEventListener('app:booted', function () {
+        appBooted = true;
+        if (kick) kick();
+    });
 
     // Last resort: no partial, or include.js missing entirely. Never gate the
     // app on a splash.
