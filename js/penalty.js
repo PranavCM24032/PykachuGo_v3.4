@@ -105,13 +105,9 @@ function resetTimerRing() {
     }
 }
 
-function showGracePeriodUI() {
-    // Legacy support or placeholder for future grace systems
-}
-
+// No #gracePeriodOverlay exists in the markup and showGracePeriodUI() is a
+// no-op, so this only has to clear the (never-started) interval.
 function cancelGracePeriodUI() {
-    const graceOverlay = document.getElementById('gracePeriodOverlay');
-    if (graceOverlay) graceOverlay.remove();
     if (graceCountdownInterval) {
         clearInterval(graceCountdownInterval);
         graceCountdownInterval = null;
@@ -150,6 +146,15 @@ var _blockingPenaltyCallback = null;
 function runBlockingPenalty(onComplete) {
     _blockingPenaltyCallback = typeof onComplete === 'function' ? onComplete : null;
     penaltyActive = true;
+
+    // A penaltyDelayTimeout / grace countdown left pending by a previous
+    // penalty used to survive and fire mid-blocking-penalty, clearing the
+    // overlay early or hiding it behind the hint overlay.
+    if (penaltyDelayTimeout) {
+        clearTimeout(penaltyDelayTimeout);
+        penaltyDelayTimeout = null;
+    }
+    cancelGracePeriodUI();
 
     playSound('error');
 

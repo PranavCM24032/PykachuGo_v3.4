@@ -62,17 +62,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     // A reset from the admin panel bumps the game epoch. If this device was
     // last used before that reset, its saved queue/score/progress is stale —
     // wipe it all so every player starts the new run clean.
+    //
+    // Bounded by an AbortController: on a network that blackholes instead of
+    // refusing (captive portal / venue wifi), this fetch used to hang for the
+    // browser's full connect timeout and the boot handler never reached the
+    // showStep() + power-button wiring below — stranding a returning team on
+    // the intro screen with no listeners attached.
     try {
-        const epochResp = await fetch(`${GOOGLE_SCRIPT_URL}?action=GET_EPOCH&t=${Date.now()}&token=${encodeURIComponent(GOOGLE_SCRIPT_TOKEN)}`);
-        const epochData = await epochResp.json();
-        const serverEpoch = Number(epochData.epoch || 0);
-        const localEpoch = Number(localStorage.getItem(CONFIG.STORAGE_KEYS.gameEpoch) || 0);
-        if (serverEpoch > localEpoch) {
-            Object.values(CONFIG.STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
-            if (typeof SESSION_BUFFER_KEY !== 'undefined') localStorage.removeItem(SESSION_BUFFER_KEY);
-            localStorage.removeItem('pykachuSheetsRateLimit');
-            localStorage.setItem(CONFIG.STORAGE_KEYS.gameEpoch, String(serverEpoch));
-            console.log(`[Epoch] Reset detected (${localEpoch} -> ${serverEpoch}); local progress wiped.`);
+        const epochController = new AbortController();
+        const epochTimeout = setTimeout(() => epochController.abort(), 4000);
+        try {
+            const epochResp = await fetch(`${GOOGLE_SCRIPT_URL}?action=GET_EPOCH&t=${Date.now()}&token=${encodeURIComponent(GOOGLE_SCRIPT_TOKEN)}`, { signal: epochController.signal });
+            const epochData = await epochResp.json();
+            const serverEpoch = Number(epochData.epoch || 0);
+            const localEpoch = Number(localStorage.getItem(CONFIG.STORAGE_KEYS.gameEpoch) || 0);
+            if (serverEpoch > localEpoch) {
+                Object.values(CONFIG.STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+                if (typeof SESSION_BUFFER_KEY !== 'undefined') localStorage.removeItem(SESSION_BUFFER_KEY);
+                localStorage.removeItem('pykachuSheetsRateLimit');
+                localStorage.setItem(CONFIG.STORAGE_KEYS.gameEpoch, String(serverEpoch));
+                console.log(`[Epoch] Reset detected (${localEpoch} -> ${serverEpoch}); local progress wiped.`);
+            }
+        } finally {
+            clearTimeout(epochTimeout);
         }
     } catch (e) {
         console.warn('Epoch check failed (offline?). Keeping saved progress:', e);
@@ -233,19 +245,9 @@ window.addEventListener('beforeunload', () => {
     stopTabMonitoring();
     cleanupHintSystem();
 
-    if (penaltyTimer) {
-        clearInterval(penaltyTimer);
-    }
-
-    if (penaltyDelayTimeout) {
-        clearTimeout(penaltyDelayTimeout);
-    }
-
-    if (graceCountdownInterval) {
-        clearInterval(graceCountdownInterval);
-    }
-
-    cancelGracePeriodUI();
+    // clearPenalty() also nulls the handles (raw clearInterval left them
+    // truthy-but-dead) and hides #penaltyOverlay.
+    clearPenalty();
 
     saveGameState();
 });
@@ -367,10 +369,19 @@ function logoutCurrentUser() {
     stopTabMonitoring();
     cleanupHintSystem();
 
-    if (penaltyTimer) clearInterval(penaltyTimer);
-    if (penaltyDelayTimeout) clearTimeout(penaltyDelayTimeout);
-    if (graceCountdownInterval) clearInterval(graceCountdownInterval);
-    cancelGracePeriodUI();
+    // clearPenalty() is the ONLY thing that hides #penaltyOverlay. Clearing the
+    // raw timer here left the full-screen z-150 overlay frozen and the app
+    // permanently unclickable after a logout during a penalty.
+    clearPenalty();
+
+    // Cancel the pending "move to step 4" reveal, unlock the answer field and
+    // drop any in-flight Pokémon reveal timers.
+    if (typeof revealStepTimer !== 'undefined' && revealStepTimer) {
+        clearTimeout(revealStepTimer);
+        revealStepTimer = null;
+    }
+    if (typeof unlockAnswerInput === 'function') unlockAnswerInput();
+    if (typeof cancelPokemonReveal === 'function') cancelPokemonReveal();
 
     Scheduler.stopTimer('puzzleTimer');
     if (puzzleTimerInterval) {

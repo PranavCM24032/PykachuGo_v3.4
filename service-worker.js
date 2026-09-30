@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v1.5.1';
+const CACHE_NAME = 'pykachu-go-v1.6.2';
 const ASSETS = [
     'admin.html',
     'index.html',
@@ -34,17 +34,14 @@ const ASSETS = [
     'js/rate-limiter.js',
     'js/notepad.js',
     'js/custom-select.js',
-    'html/step0.html',
-    'html/step1.html',
-    'html/step2.html',
     'html/startcode.html',
-    'html/step3.html',
-    'html/step4.html',
     'html/penalty.html',
     'html/hint.html',
     'html/meme.html',
+    'manifest.json',
     'data/puzzle.json',
     'data/teams.json',
+    'data/meme.json',
     'service-worker.js',
     'assets/img/ash.png',
     'assets/img/ash-2.png',
@@ -70,11 +67,28 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-    self.skipWaiting();
+    // Cache entries individually rather than via addAll(): addAll() is
+    // all-or-nothing, so a single missing/renamed file rejects the whole
+    // promise and no offline support installs at all. A partial cache is far
+    // better than none. The .catch() matters too — caches.open() itself can
+    // reject (private-mode quota, corrupt origin storage), and an unhandled
+    // rejection inside waitUntil discards the new worker entirely, leaving the
+    // previous CACHE_NAME serving stale assets indefinitely. skipWaiting() goes
+    // INSIDE waitUntil so the worker never activates with an empty cache.
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(ASSETS);
-        })
+        caches.open(CACHE_NAME)
+            .then((cache) =>
+                Promise.allSettled(
+                    ASSETS.map((asset) => cache.add(asset))
+                ).then((results) => {
+                    const failed = results
+                        .map((r, i) => (r.status === 'rejected' ? ASSETS[i] : null))
+                        .filter(Boolean);
+                    if (failed.length) console.warn('[SW] assets failed to cache:', failed);
+                })
+            )
+            .then(() => self.skipWaiting())
+            .catch((err) => console.warn('[SW] install failed:', err))
     );
 });
 

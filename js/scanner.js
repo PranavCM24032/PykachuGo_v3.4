@@ -14,8 +14,16 @@ function loadScript(src) {
 }
 
 async function startQRScanner() {
+    // Re-entrancy guard. Two fast taps put two getUserMedia() promises in
+    // flight; the loser resolved later and OVERWROTE videoStream (leaking the
+    // first camera track) and overwrote qrScanInterval (orphaning a 300ms
+    // drawImage/getImageData loop that ran for the life of the page).
+    if (videoStream || qrScannerActive || scannerStarting) return;
+    scannerStarting = true;
+    const gen = scanGeneration;
+
     try {
-        videoStream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
             video: {
                 facingMode: 'environment',
                 width: { ideal: 1280 },
@@ -24,10 +32,26 @@ async function startQRScanner() {
             }
         });
 
+        // Back/cancel landed while the permission prompt was open. The promise
+        // still resolved afterwards and used to boot a scanner nobody asked
+        // for — camera light on, scan loop running. Drop the tracks instead.
+        if (gen !== scanGeneration) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+        }
+
+        videoStream = stream;
+
         playSound('scanStart');
 
-        document.getElementById('qrScannerContainer').classList.remove('hidden');
+        const container = document.getElementById('qrScannerContainer');
         const video = document.getElementById('qrVideo');
+        if (!container || !video) {
+            // Bail safely rather than throwing with the camera already open.
+            stopQRScanner();
+            return;
+        }
+        container.classList.remove('hidden');
         video.srcObject = videoStream;
 
         // Wait for video to be ready to check capabilities
@@ -46,8 +70,12 @@ async function startQRScanner() {
 
     } catch (error) {
         console.error('Camera error:', error);
+        // Never leave a live camera running on the failure path.
+        stopQRScanner();
         showToast('Camera access denied. Using manual override.', 'error');
         showManualEntry();
+    } finally {
+        scannerStarting = false;
     }
 }
 
@@ -138,6 +166,8 @@ function setupZoomControl(track) {
 
 function stopQRScanner() {
     qrScannerActive = false;
+    // Invalidates any OCR worker still initialising (see startQRCodeDetection).
+    scanGeneration++;
 
     if (qrScanInterval) {
         clearInterval(qrScanInterval);
@@ -182,14 +212,32 @@ function startQRCodeDetection() {
 
     // Lazy-load heavy scanning libs only when the scanner actually opens
     let libsReady = false;
+    const gen = scanGeneration;
     Promise.all([
         loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'),
         loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js')
     ]).then(() => {
+        // Scanner was closed while the CDN scripts were downloading.
+        if (gen !== scanGeneration) return;
         libsReady = true;
         Tesseract.createWorker().then(worker => {
+            // createWorker() is async: closing the scanner before this resolves
+            // used to make window.cleanupOCR() a no-op (ocrWorker was still
+            // null), leaking a WASM worker + language model per scan cycle.
+            if (gen !== scanGeneration) {
+                worker.terminate();
+                return;
+            }
             worker.loadLanguage('eng').then(() => {
+                if (gen !== scanGeneration) {
+                    worker.terminate();
+                    return;
+                }
                 worker.initialize('eng').then(() => {
+                    if (gen !== scanGeneration) {
+                        worker.terminate();
+                        return;
+                    }
                     ocrWorker = worker;
                     console.log('[Scanner] AI OCR online');
                 });

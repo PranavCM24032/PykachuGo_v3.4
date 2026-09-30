@@ -123,12 +123,12 @@
     transition: all 0.3s ease;
 }
 
+/* Base platform rings stay STATIC — no shrink/spread pulse. */
 .ring-blue {
     width: 110%;
     height: 110%;
     border-color: #3b82f6;
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.6), inset 0 0 10px rgba(59, 130, 246, 0.4);
-    animation: platform-bounce 1.5s infinite ease-in-out;
 }
 
 .ring-yellow {
@@ -136,7 +136,6 @@
     height: 75%;
     border-color: #eab308;
     box-shadow: 0 0 20px rgba(234, 179, 8, 0.7), inset 0 0 12px rgba(234, 179, 8, 0.5);
-    animation: platform-bounce 1.5s infinite ease-in-out;
 }
 
 .ring-core {
@@ -146,20 +145,6 @@
     border: none;
     filter: blur(4px);
     animation: core-pulse 1.5s infinite ease-in-out;
-}
-
-@keyframes platform-bounce {
-
-    0%,
-    100% {
-        transform: rotateX(75deg) scale(1.2);
-        opacity: 1;
-    }
-
-    50% {
-        transform: rotateX(75deg) scale(0.85) translateY(8px);
-        opacity: 0.5;
-    }
 }
 
 @keyframes core-pulse {
@@ -358,8 +343,8 @@
     }
 }
 
-/* The 3D ball body — drops in, bounces TWICE (same height & speed as the
-   Pokémon), then opens. Sized like a real hand-held Pokéball. */
+/* The 3D ball body — drops in from above, bounces ONCE, then opens.
+   Sized like a real hand-held Pokéball. Total: 1.15s. */
 .pokemon-reveal-ball {
     --ball-d: clamp(64px, 15vmin, 96px);
     position: absolute;
@@ -369,7 +354,7 @@
     height: var(--ball-d);
     transform: translate(-50%, -50%);
     transform-style: preserve-3d;
-    animation: reveal-ball-bounce 1.3s cubic-bezier(0.25, 0.7, 0.4, 1) both;
+    animation: reveal-ball-bounce 1.15s cubic-bezier(0.25, 0.7, 0.4, 1) both;
     border-radius: 50%;
     z-index: 6;
 }
@@ -379,55 +364,50 @@
 }
 
 @keyframes reveal-ball-bounce {
-    /* thrown in from above — accelerates downward like gravity */
+    /* thrown in from completely off the TOP of the screen (-70vh keeps it
+       outside the viewport, so #step4's overflow-hidden clips it away until
+       it actually falls in) — accelerates downward like gravity */
     0% {
-        transform: translate(-50%, calc(-50% - 60px)) rotateZ(-14deg);
-        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.35);
+        transform: translate(-50%, calc(-50% - 70vh)) rotateZ(-16deg);
+        animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
     }
 
-    /* first landing */
-    15% {
-        transform: translate(-50%, -48%) rotateZ(-6deg);
+    /* enters the screen, still falling fast */
+    12% {
+        transform: translate(-50%, calc(-50% - 22vh)) rotateZ(-10deg);
+        animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.5);
+    }
+
+    /* lands on the platform */
+    26% {
+        transform: translate(-50%, -50%) rotateZ(-5deg);
         animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
     }
 
-    /* first squash — compresses into the ground */
-    21% {
-        transform: translate(-50%, -40%) scaleX(1.22) scaleY(0.8) rotateZ(0deg);
+    /* impact squash — compresses into the ground */
+    33% {
+        transform: translate(-50%, -42%) scaleX(1.26) scaleY(0.76) rotateZ(0deg);
         animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
-    /* first bounce — decelerates to ~46px apex, same height as the Pokémon */
-    44% {
-        transform: translate(-50%, calc(-50% - 46px)) scaleX(0.97) scaleY(1.03) rotateZ(-6deg);
+    /* THE bounce — springs back up to its apex and falls again */
+    58% {
+        transform: translate(-50%, calc(-50% - 78px)) scaleX(0.95) scaleY(1.05) rotateZ(5deg);
         animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.35);
     }
 
-    /* falling back down */
-    66% {
-        transform: translate(-50%, -47%) rotateZ(-3deg);
+    82% {
+        transform: translate(-50%, -49%) rotateZ(-2deg);
         animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
     }
 
-    /* second squash */
-    72% {
-        transform: translate(-50%, -43%) scaleX(1.18) scaleY(0.84) rotateZ(0deg);
+    /* soft landing squash (same bounce, just the settle) */
+    88% {
+        transform: translate(-50%, -46%) scaleX(1.09) scaleY(0.91) rotateZ(0deg);
         animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
-    /* small second hop */
-    86% {
-        transform: translate(-50%, calc(-50% - 24px)) scaleX(0.98) scaleY(1.02) rotateZ(-3deg);
-        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.35);
-    }
-
-    /* closing in on the platform */
-    96% {
-        transform: translate(-50%, -48%) rotateZ(0deg);
-        animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
-    }
-
-    /* settle — ready for the latch release to fire the open sequence */
+    /* settled — ready for the latch release to fire the open sequence */
     100% {
         transform: translate(-50%, -50%) rotateZ(0deg);
     }
@@ -549,6 +529,44 @@
     border-radius: 50%;
     z-index: 1;
     filter: blur(2px);
+}
+
+/* Ground shadow starts tiny (ball is off-screen far above) and swells as the
+   ball falls toward the platform. Runs off the same 1.15s clock as the drop. */
+.ball-shadow {
+    animation: ball-shadow-drop 1.15s ease-in-out both;
+}
+
+@keyframes ball-shadow-drop {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.25);
+    }
+
+    26% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
+
+    33% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1.18) scaleY(0.8);
+    }
+
+    58% {
+        opacity: 0.6;
+        transform: translateX(-50%) scale(0.75);
+    }
+
+    88% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1.1) scaleY(0.85);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
 }
 
 .pokemon-reveal.reveal-ready .ball-shadow {

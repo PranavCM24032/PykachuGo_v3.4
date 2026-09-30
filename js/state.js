@@ -42,6 +42,12 @@ let qrScannerActive = false;
 let videoStream = null;
 let flashActive = false;
 let qrScanInterval = null;
+// True while the getUserMedia() promise is in flight, so a second tap can't
+// start a competing camera acquisition.
+let scannerStarting = false;
+// Bumped by stopQRScanner(); the async OCR worker init compares against it and
+// terminates itself if the scanner was closed before it finished loading.
+let scanGeneration = 0;
 
 // Hint System State
 let hintPenaltyActive = false;
@@ -229,11 +235,15 @@ function standardizeString(str) {
 // ==============================
 // A puzzle is only allowed to be scanned/unlocked if it is listed in the
 // NEXT puzzle chain of the player's current progress: the scanned puzzle must
-// appear in currentPuzzle.nextPuzzleId. Entry/starting puzzles (marked by a
-// startCode AND badgeId) are legitimate chain entry points, NOT jumps, and
-// always bypass the queue gate.
+// appear in currentPuzzle.nextPuzzleId. Entry/starting puzzles are legitimate
+// chain entry points, NOT jumps, and bypass the queue gate.
+//
+// Entry is declared EXPLICITLY via `isStart` in puzzle.json. It was previously
+// inferred from `startCode && badgeId`, which silently promoted puzzle 4 (it
+// happens to carry both) to a bypass entry point — so `?linkid=XG04`, a QR
+// scan, or an OCR hit on the text "GRASS" skipped puzzles 2 and 3 entirely.
 function isStartingPuzzle(puzzle) {
-    return !!(puzzle && puzzle.startCode && puzzle.badgeId);
+    return !!(puzzle && puzzle.isStart === true);
 }
 
 function getNextPuzzle(puzzle) {

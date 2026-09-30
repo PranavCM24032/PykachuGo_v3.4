@@ -2,8 +2,110 @@
 // SOUND SYSTEM
 // ==============================
 let audioContext = null;
-let isMuted = false;
+var isMuted = false;
 let soundEnabled = true;
+
+// ── Speech ────────────────────────────────────────────────────────────
+// Announces the catch out loud: "You have caught <Name>!" Uses the Web
+// Speech API, so no audio files are needed. Silently no-ops on browsers
+// without support, and respects the same mute/soundEnabled switches.
+//
+// The line is spoken as a small CHORUS (3 voices) rather than a single
+// utterance, so it lands like a crowd shouting the catch together: each
+// voice enters a beat late, sits at its own pitch, and drops in volume so
+// the layers blend instead of clipping into noise.
+let catchVoice = null;
+let catchVoiceChecked = false;
+let catchVoicePool = [];
+let catchChorusTimers = [];
+
+// One entry per singer. `delay` staggers the entrances so they read as
+// separate people reacting rather than a single doubled voice; `pitch` /
+// `rate` separate the timbres; `volume` is deliberately < 1 for the
+// followers so the lead voice stays intelligible on top.
+const CATCH_CHORUS = [
+    { delay: 0, pitch: 1.15, rate: 0.95, volume: 1.0 },
+    { delay: 110, pitch: 0.82, rate: 1.06, volume: 0.62 },
+    { delay: 235, pitch: 1.48, rate: 0.88, volume: 0.45 },
+];
+
+// Resolves the English voice pool. Chrome populates getVoices() async, so
+// this re-runs on voiceschanged until voices actually show up.
+function refreshCatchVoices() {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || !voices.length) return;
+    const english = voices.filter((v) => /^en(-|_)?/i.test(v.lang || ''));
+    if (!english.length) return;
+    catchVoicePool = english;
+    catchVoice = english.find((v) => /female|samantha|zira|google/i.test(v.name))
+        || english[0]
+        || null;
+    catchVoiceChecked = true;
+}
+
+function stopCatchVoice() {
+    catchChorusTimers.forEach(clearTimeout);
+    catchChorusTimers = [];
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch (e) { }
+    }
+}
+
+function speakCatch(pokemonName) {
+    if (!soundEnabled || isMuted) return;
+    if (typeof window === 'undefined' || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+
+    const name = String(pokemonName || '').trim();
+    if (!name) return;
+
+    try {
+        const synth = window.speechSynthesis;
+        // Cancel anything still queued from a previous catch, and drop any
+        // chorus members that haven't entered yet.
+        stopCatchVoice();
+
+        if (!catchVoiceChecked || !catchVoice || !catchVoicePool.length) {
+            refreshCatchVoices();
+        }
+        if (catchVoicePool.length && !window.__pykachuVoicesBound) {
+            window.__pykachuVoicesBound = true;
+            synth.addEventListener('voiceschanged', refreshCatchVoices);
+        }
+
+        const text = `You have caught ${name}!`;
+
+        // Lead with the preferred voice (female where the OS offers one), then
+        // rotate the remaining pool so each singer is a genuinely different
+        // timbre rather than three readings of the same one.
+        const ordered = catchVoicePool.length
+            ? [catchVoice, ...catchVoicePool.filter((v) => v !== catchVoice)]
+            : [];
+
+        CATCH_CHORUS.forEach((part, i) => {
+            const sing = () => {
+                const utter = new SpeechSynthesisUtterance(text);
+
+                const voice = ordered.length > 1
+                    ? ordered[i % ordered.length]
+                    : (catchVoice || ordered[0]);
+                if (voice) utter.voice = voice;
+
+                utter.lang = (voice && voice.lang) || 'en-US';
+                utter.rate = part.rate;
+                utter.pitch = part.pitch;
+                utter.volume = part.volume;
+
+                synth.speak(utter);
+            };
+
+            if (part.delay <= 0) sing();
+            else catchChorusTimers.push(setTimeout(sing, part.delay));
+        });
+    } catch (e) {
+        console.warn('Catch announcement failed:', e);
+    }
+}
 
 function initAudio() {
     try {

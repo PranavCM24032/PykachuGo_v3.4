@@ -66,7 +66,15 @@ function setupHintSystem() {
 }
 
 function loadHintState() {
-    const hintState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.hintState) || '{}');
+    // Every other localStorage read in the app guards JSON.parse; a corrupt or
+    // half-written value threw out of setupHintSystem()/showHint() and skipped
+    // the HINT_USED sheet flag + success toast.
+    let hintState = {};
+    try {
+        hintState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.hintState) || '{}');
+    } catch (e) {
+        console.warn('[Hint] corrupt hintState, ignoring:', e);
+    }
     const teamKey = `${currentTeam}_${currentPuzzle?.id}`;
 
     if (currentPuzzle && currentTeam && hintState[teamKey]) {
@@ -80,7 +88,12 @@ function loadHintState() {
 }
 
 function saveHintState() {
-    const hintState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.hintState) || '{}');
+    let hintState = {};
+    try {
+        hintState = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.hintState) || '{}');
+    } catch (e) {
+        console.warn('[Hint] corrupt hintState, resetting:', e);
+    }
     if (currentPuzzle && currentTeam) {
         const teamKey = `${currentTeam}_${currentPuzzle.id}`;
         hintState[teamKey] = {
@@ -239,8 +252,11 @@ function completeHintPenalty() {
         return;
     }
 
-    // Hide penalty overlay
-    document.getElementById('hintPenaltyOverlay').classList.add('hidden');
+    // Hide penalty overlay. Null-checked: a throw here used to skip
+    // stopHintTabMonitoring(), showHint() and the toast, leaking the
+    // visibility listeners and leaving a frozen countdown on screen.
+    const penaltyOverlay = document.getElementById('hintPenaltyOverlay');
+    if (penaltyOverlay) penaltyOverlay.classList.add('hidden');
 
     // Stop tab monitoring
     stopHintTabMonitoring();
@@ -304,6 +320,15 @@ function handleHintTabSwitch() {
 
 function resumeHintPenalty() {
     if (!hintPenaltyActive) return;
+
+    // completeHintPenalty() guards on this; without it a null currentPuzzle
+    // threw BELOW (at hintPenaltySeconds), which left hintPenaltyActive stuck
+    // true with a dead countdown — a soft lock.
+    if (!currentPuzzle) {
+        hintPenaltyActive = false;
+        cancelHintRequest();
+        return;
+    }
 
     hintTabSwitchDuringPenalty = true;
     hintTabSwitchCount++;
@@ -469,6 +494,11 @@ function cleanupHintSystem() {
 }
 
 function resetHintForNewTeam() {
+    // Stop any live countdown and unbind the visibility/blur listeners first.
+    // This only nulled the flags, so the 1Hz hintPenaltyTimer and the tab
+    // monitors survived every team switch.
+    cleanupHintSystem();
+
     hintDisplayed = false;
     hintPenaltyActive = false;
     hintRequestConfirmed = false;

@@ -95,6 +95,15 @@ const SecuritySystem = {
         // 3. iOS SPECIFIC (Safari Multitasking)
         window.addEventListener('pagehide', () => this.activateLockdown());
 
+        // 3b. bfcache RESTORE. When a navigation is bfcache-eligible, pagehide
+        // blacks the screen out, but neither 'blur' nor 'visibilitychange'
+        // fires on restore — so pointerEvents stayed 'none' and the game was
+        // permanently unclickable until a manual blur/focus cycle or reload.
+        // Pressing Back was the easiest way to trigger it on mobile.
+        window.addEventListener('pageshow', (e) => {
+            if (e.persisted) this.scheduleRelease(0);
+        });
+
         // 4. MULTI-TOUCH GESTURE PROTECTION
         document.addEventListener('touchstart', (e) => {
             if (e.touches.length >= 5) {

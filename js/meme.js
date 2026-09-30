@@ -38,6 +38,13 @@ function ensureYTApiLoaded() {
         tag.onerror = () => finish(reject, new Error('Unable to load YouTube player'));
         document.head.appendChild(tag);
     });
+    // A single failed load was cached forever: every later showMemePlayer()
+    // rejected immediately even after the network recovered. Reset on failure
+    // so a retry can succeed.
+    ytApiReadyPromise = ytApiReadyPromise.catch((error) => {
+        ytApiReadyPromise = null;
+        throw error;
+    });
     return ytApiReadyPromise;
 }
 

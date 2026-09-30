@@ -185,6 +185,7 @@ document.getElementById('unlockForm').addEventListener('submit', function (e) {
 function activatePuzzle(puzzle, unlockedVia) {
     currentPuzzle = puzzle;
     gameStartTime = new Date(); // Reset timer for the specific puzzle
+    unlockAnswerInput(); // new puzzle => answer field is submit-eligible again
 
     const questionEl = document.getElementById('puzzleQuestion');
     if (questionEl) questionEl.textContent = getPuzzleQuestion(puzzle);
@@ -279,9 +280,27 @@ function renderNextLocations(nextPuzzles) {
 // ==============================
 // STEP 4: PUZZLE SOLVING - SUBMIT HANDLER
 // ==============================
+let answerLocked = false;
+
+// The 500ms "move to step 4" delay. Stored so a logout (or a new submit) can
+// cancel it instead of landing a signed-out user on the catch screen.
+let revealStepTimer = null;
+
+// True from the first correct submit until the next puzzle is activated.
+// Blocks double submits that would otherwise double-deduct points.
+function unlockAnswerInput() {
+    answerLocked = false;
+}
+
 function submitPuzzleAnswer() {
     const answerInput = document.getElementById('puzzleAnswer');
     if (!answerInput) return;
+
+    // Re-entrancy guard. The answer field keeps its value and focus after a
+    // correct solve, so a second Enter/SEND re-entered this function and
+    // scored a full -points repeat, stacked a second reveal timeline and
+    // shipped a duplicate SOLVED row. One submit per puzzle.
+    if (answerLocked) return;
 
     const answer = answerInput.value.trim().toLowerCase();
 
@@ -301,6 +320,7 @@ function submitPuzzleAnswer() {
     }
 
     if (standardizeString(currentPuzzle.answer) === standardizeString(answer)) {
+        answerLocked = true;
         playSound('victory');
         showToast("SIGNAL DECRYPTED!", "success");
 
@@ -319,7 +339,17 @@ function submitPuzzleAnswer() {
 
         // Delay move for satisfaction
         const isEnd = !Array.isArray(currentPuzzle.nextPuzzleId) || currentPuzzle.nextPuzzleId.length === 0;
-        setTimeout(() => {
+
+        // Capture the puzzle this reveal belongs to. Without this the callback
+        // read the mutable global `currentPuzzle`, which logout nulls — and the
+        // timer still fired, showing a signed-out user the catch screen.
+        const solvedPuzzle = currentPuzzle;
+
+        clearTimeout(revealStepTimer);
+        revealStepTimer = setTimeout(() => {
+            // The user may have logged out inside this 500ms window.
+            if (!isLoggedIn() || currentPuzzle !== solvedPuzzle) return;
+
             showStep(4);
             playSound('hologram');
 
@@ -331,11 +361,11 @@ function submitPuzzleAnswer() {
                 if (completionMessage) {
                     completionMessage.classList.remove('hidden');
 
-                    // Prefer the solved puzzle's OWN level (puzzle.json `level`
-                    // field); fall back to the mission level only if missing.
-                    const levelNum = (currentPuzzle && typeof currentPuzzle.level === 'number')
-                        ? currentPuzzle.level
-                        : ((currentMissionLevel || "L1").split('_')[0].replace('L', '') || '1');
+                // Prefer the solved puzzle's OWN level (puzzle.json `level`
+                // field); fall back to the mission level only if missing.
+                const levelNum = (solvedPuzzle && typeof solvedPuzzle.level === 'number')
+                    ? solvedPuzzle.level
+                    : ((currentMissionLevel || "L1").split('_')[0].replace('L', '') || '1');
                     const levelTitle = document.getElementById('completionLevelTitle');
                     if (levelTitle) levelTitle.textContent = `LEVEL ${levelNum} CHAMPION`;
 

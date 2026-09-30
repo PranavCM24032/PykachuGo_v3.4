@@ -4,8 +4,48 @@
 let stepTransitionTimer = null;
 let stepTransitionId = 0;
 
+// Delayed .focus() calls. Without a handle, leaving a step before the delay
+// elapsed focused a HIDDEN input and raised the on-screen keyboard on top of
+// whatever screen the user had actually moved to.
+let pendingFocusTimer = null;
+
+// Every pending timer inside the step-4 reveal (latch, shells, voice line) plus
+// the sparkle-removal timeouts. Two overlapping reveals used to add/remove the
+// same classes on different clocks, spawn 160 sparkles and speak twice.
+let revealTimers = [];
+let sparkleTimers = [];
+
+// Monotonic generation counter: a timer from an abandoned reveal can never
+// touch the ball even if it fires after the user re-enters step 4.
+let revealGeneration = 0;
+
+function cancelPokemonReveal() {
+    revealGeneration++;
+    revealTimers.forEach(clearTimeout);
+    revealTimers = [];
+    sparkleTimers.forEach(clearTimeout);
+    sparkleTimers = [];
+    const stage = document.getElementById('pokemonReveal');
+    const ball = document.getElementById('step4RevealBall');
+    // Leaving these on would strand a half-open ball on the next entry to
+    // step 4 (shells split but no sprite, or vice versa).
+    if (stage) stage.classList.remove('reveal-ready');
+    if (ball) ball.classList.remove('release-latch', 'pokemon-reveal-open');
+    document.querySelectorAll('#pokemonReveal .reveal-sparkle').forEach((n) => n.remove());
+    // Chorus members that haven't entered yet would keep talking over the
+    // next screen, so drop any pending entrances with the rest of the reveal.
+    if (typeof stopCatchVoice === 'function') stopCatchVoice();
+}
+
+function scheduleReveal(fn, ms) {
+    const id = setTimeout(fn, ms);
+    revealTimers.push(id);
+    return id;
+}
+
 // Step 4 flourish: the caught Pokémon bursts out of its Pokéball.
-// Choreographed, audio-synced OPEN SEQUENCE (t = 0 when the ball settles):
+// The ball drops in from above and bounces ONCE, then plays the
+// audio-synced OPEN SEQUENCE (t = 0 when the ball settles):
 //   0.00s latch click + button press   (release-latch)
 //   0.15s shells split + white flash burst (pokemon-reveal-open / reveal-ready)
 //   0.35s plasma beam outpour + sparkle/ring particles
@@ -15,6 +55,16 @@ function playPokemonReveal() {
     const ball = document.getElementById('step4RevealBall');
     if (!stage || !ball) return;
 
+    // Abandon any reveal still in flight so two timelines can never overlap.
+    cancelPokemonReveal();
+    const gen = revealGeneration;
+
+    const pokemonName = (typeof currentPuzzle !== 'undefined' && currentPuzzle && currentPuzzle.pokemonName) || '';
+
+    // The name is deliberately NOT rendered — the catch line is voice-only
+    // (pokemonName is spoken by speakCatch), so the player identifies the
+    // Pokémon from the sprite alone.
+
     // Reset to the "waiting" state so re-entering step 4 replays cleanly.
     stage.classList.remove('reveal-ready');
     ball.classList.remove('release-latch');
@@ -23,23 +73,36 @@ function playPokemonReveal() {
     // Force a reflow so the bounce animation always restarts from scratch.
     void stage.offsetWidth;
 
-    // t=0 — the ball has finished bouncing; the latch release begins.
-    setTimeout(() => {
+    // Old guard was `if (step4 && !active) return` — when #step4 was missing
+    // this short-circuited to FALSE and the callback mutated the ball anyway.
+    const stillCurrent = () => {
+        if (gen !== revealGeneration) return false;
         const step4 = document.getElementById('step4');
-        if (step4 && !step4.classList.contains('active')) return;
+        return !!step4 && step4.classList.contains('active');
+    };
+
+    // t=0 — the ball has finished its single bounce; the latch release begins.
+    scheduleReveal(() => {
+        if (!stillCurrent()) return;
         ball.classList.add('release-latch');
         playSound('pokeballOpen');
-    }, 1300);
+    }, 1150);
 
     // t=0.15s — shells snap open, flash bursts, energy pours out.
-    setTimeout(() => {
-        const step4 = document.getElementById('step4');
-        if (step4 && !step4.classList.contains('active')) return;
+    scheduleReveal(() => {
+        if (!stillCurrent()) return;
         ball.classList.remove('release-latch');
         ball.classList.add('pokemon-reveal-open');
         stage.classList.add('reveal-ready');
         spawnReleaseSparkles();
-    }, 1450);
+    }, 1300);
+
+    // t=0.85s — the open-sequence cry finishes here, so the announcer
+    // speaks the catch name cleanly on top of the settled reveal.
+    scheduleReveal(() => {
+        if (!stillCurrent()) return;
+        speakCatch(pokemonName);
+    }, 2100);
 }
 
 // Falling-star sparkle shower. Many tinytiny stars appear along the top
@@ -64,7 +127,7 @@ function spawnReleaseSparkles() {
         s.style.animationDelay = (Math.random() * 1200).toFixed(0) + 'ms';
 
         stage.appendChild(s);
-        setTimeout(() => s.remove(), 7600);
+        sparkleTimers.push(setTimeout(() => s.remove(), 7600));
     }
 }
 
@@ -161,8 +224,12 @@ function showStep(stepNumber) {
 
         if (unlockCodeInput) {
             unlockCodeInput.value = '';
-            setTimeout(() => {
-                unlockCodeInput.focus();
+            // Tracked + cleared on step change: leaving within 600ms used to
+            // pop the keyboard over whatever screen the user had moved to.
+            clearTimeout(pendingFocusTimer);
+            pendingFocusTimer = setTimeout(() => {
+                const el = document.getElementById('startcode');
+                if (el && el.classList.contains('active')) unlockCodeInput.focus();
             }, 600);
         }
     }
@@ -202,10 +269,13 @@ function showStep(stepNumber) {
             langBadge.textContent = currentLanguage === 'CPP' ? 'C++' : 'PYTHON';
         }
 
-        // Focus on answer input
-        setTimeout(() => {
+        // Focus on answer input (tracked so a fast step change can't focus a
+        // hidden field and pop the keyboard on the wrong screen)
+        clearTimeout(pendingFocusTimer);
+        pendingFocusTimer = setTimeout(() => {
             const answerInput = document.getElementById('puzzleAnswer');
-            if (answerInput) {
+            const el = document.getElementById('step3');
+            if (answerInput && el && el.classList.contains('active')) {
                 answerInput.focus();
                 answerInput.value = ''; // Clear previous answer
             }
@@ -254,10 +324,24 @@ function showStep(stepNumber) {
             puzzleTimerInterval = null;
         }
 
-        // Clean up hint system
-        if (hintPenaltyActive) {
-            cleanupHintSystem();
+        // Any step change cancels a delayed focus() and an in-flight reveal.
+        clearTimeout(pendingFocusTimer);
+        pendingFocusTimer = null;
+        // ...but NOT when this call IS the step-4 reveal. The step-4 branch
+        // above already called playPokemonReveal(), and reaching this else
+        // branch cancelled those 3 timers on the very same tick — the ball
+        // dropped and then stayed shut forever. playPokemonReveal() cancels any
+        // previous reveal itself, so skipping here is still safe on re-entry.
+        if (stepNumber !== 4 && typeof cancelPokemonReveal === 'function') {
+            cancelPokemonReveal();
         }
+
+        // Clean up hint system. Unconditional: the hint-confirm path arms a 30s
+        // #hintRequestTimeout while hintPenaltyActive is still FALSE, so gating
+        // on that flag left the timer armed — it later fired an error toast on
+        // whatever screen the player had reached (e.g. the step-4 reveal).
+        // cleanupHintSystem() is idempotent.
+        cleanupHintSystem();
     }
 
     saveGameState();

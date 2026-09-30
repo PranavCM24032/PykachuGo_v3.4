@@ -11,12 +11,14 @@
             6
         ],
         "startCode": "START",
+        "isStart": true,
         "locationClue": "CSE entrance - openspace",
         "level": 1,
         "points": 10,
         "hint": "BODMAS",
-        "hintPenalty": 10,
-        "pokemonId": 39
+        "hintPenalty": 60,
+        "pokemonId": 39,
+        "pokemonName": "Jigglypuff"
     },
     {
         "id": 2,
@@ -32,7 +34,8 @@
         "points": 10,
         "hint": "Simple arithmetic",
         "hintPenalty": 60,
-        "pokemonId": 7
+        "pokemonId": 7,
+        "pokemonName": "Squirtle"
     },
     {
         "id": 3,
@@ -48,7 +51,8 @@
         "points": 10,
         "hint": "Power of 2",
         "hintPenalty": 60,
-        "pokemonId": 4
+        "pokemonId": 4,
+        "pokemonName": "Charmander"
     },
     {
         "id": 4,
@@ -61,12 +65,14 @@
             5
         ],
         "startCode": "GRASS",
+        "isStart": true,
         "locationClue": "M215 back door",
         "level": 1,
         "points": 10,
         "hint": "Linear function: work out func(2) and func(3) first, then subtract.",
         "hintPenalty": 60,
-        "pokemonId": 27
+        "pokemonId": 27,
+        "pokemonName": "Sandshrew"
     },
     {
         "id": 5,
@@ -82,7 +88,8 @@
         "points": 20,
         "hint": "Conditional logic",
         "hintPenalty": 60,
-        "pokemonId": 6
+        "pokemonId": 6,
+        "pokemonName": "Charizard"
     },
     {
         "id": 6,
@@ -99,7 +106,8 @@
         "points": 20,
         "hint": "Sum of series",
         "hintPenalty": 60,
-        "pokemonId": 658
+        "pokemonId": 658,
+        "pokemonName": "Greninja"
     },
     {
         "id": 7,
@@ -113,6 +121,7 @@
         "points": 30,
         "hint": null,
         "hintPenalty": 60,
-        "pokemonId": 25
+        "pokemonId": 25,
+        "pokemonName": "Pikachu"
     }
 ]
