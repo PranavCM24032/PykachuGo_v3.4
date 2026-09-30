@@ -1,7 +1,7 @@
 {
     "name": "Pykachu Go",
     "short_name": "PykachuGo",
-    "description": "Premium Pokémon Binary Signal Decryption Game",
+    "description": "Decode the code. Capture Pikachu. A binary signal decryption hunt - solve Python and C++ riddles, scan QR signals and follow a branching puzzle graph.",
     "start_url": "index.html",
     "display": "standalone",
     "background_color": "#050810",
