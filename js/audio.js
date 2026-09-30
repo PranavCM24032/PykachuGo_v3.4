@@ -6,58 +6,42 @@ var isMuted = false;
 let soundEnabled = true;
 
 // ── Speech ────────────────────────────────────────────────────────────
-// Announces the catch out loud in a classic retro-anime announcer style:
-// "Gotcha! You caught <Name>!" Uses the Web Speech API, so no audio files
-// are needed. Silently no-ops on browsers without support, and respects the
-// same mute/soundEnabled switches.
-//
-// The line is spoken as a small CHORUS (3 voices) so it lands like a crowd
-// catching it together. All three enter at the SAME time; each sits at its
-// own pitch/rate around the energetic announcer setting so the layers blend
-// instead of clipping into noise.
+// Announces the catch out loud in a heavy male anime-announcer style:
+// "Gotcha!! ... You caught ... <NAME>!! ... Wo-hoo!!" Uses the Web
+// Speech API, so no audio files are needed. Silently no-ops on browsers
+// without support, and respects the same mute/soundEnabled switches.
 let catchVoice = null;
 let catchVoiceChecked = false;
-let catchVoicePool = [];
-let catchChorusTimers = [];
 
-// One entry per singer. All three enter at the SAME time (delay 0). The lead
-// carries the retro announcer energy (pitch 1.25 / rate 1.1 per the classic
-// 90s narrator recipe); the followers sit higher/lower on the same energy.
-const CATCH_CHORUS = [
-    { delay: 0, pitch: 1.25, rate: 1.1, volume: 1.0 },
-    { delay: 0, pitch: 0.95, rate: 1.18, volume: 0.6 },
-    { delay: 0, pitch: 1.5, rate: 1.02, volume: 0.45 },
-];
-
-// Resolves the English voice pool. Chrome populates getVoices() async, so
-// this re-runs on voiceschanged until voices actually show up.
-function refreshCatchVoices() {
+// Resolves the English announcer voice. Chrome populates getVoices() async,
+// so this re-runs on voiceschanged until voices actually show up. Prefer a
+// deep male Google English voice for that heavy bass-announcer sound, then
+// any male voice, then anything English.
+function refreshCatchVoice() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     const voices = window.speechSynthesis.getVoices();
     if (!voices || !voices.length) return;
     const english = voices.filter((v) => /^en(-|_)?/i.test(v.lang || ''));
     if (!english.length) return;
-    catchVoicePool = english;
-    // Chrome's Google US English is the bright announcer voice the recipe
-    // wants; fall back to a female US voice, then anything English.
-    const googleEn = english.find((v) => /^en-US/i.test(v.lang) && /google/i.test(v.name));
-    const femaleEn = english.find((v) => /female|samantha|zira/i.test(v.name));
-    catchVoice = googleEn || femaleEn || english[0] || null;
+    const pick = (re) => english.find((v) => re.test(v.name));
+    catchVoice =
+        pick(/Google UK English Male/) ||
+        pick(/Google US English/) ||
+        pick(/Male|David|Mark|Guy|Christopher|James|Brian|Ryan|Antonio|Daniel|Jeff/i) ||
+        english[0] || null;
     catchVoiceChecked = true;
 }
 
 function stopCatchVoice() {
-    catchChorusTimers.forEach(clearTimeout);
-    catchChorusTimers = [];
     if (typeof window !== 'undefined' && window.speechSynthesis) {
         try { window.speechSynthesis.cancel(); } catch (e) { }
     }
 }
 
-// Retro 8-bit "caught!" jingle, fired the instant the announcer line starts.
-// Shaped by a 300Hz-3kHz bandpass so it reads as 90s CRT TV audio. The
-// FILTERED part is the jingle itself — Web Speech output can't be routed
-// through the Web Audio graph, so the retro colour lives in the sfx layer.
+// Celebratory 8-bit "caught!" jingle + a soft crowd-cheer swell, fired the
+// instant the announcer line starts. Shaped by a 300Hz-3kHz bandpass so it
+// reads as 90s CRT TV audio. The FILTERED part is the sfx — Web Speech output
+// can't be routed through the Web Audio graph, so the retro colour lives here.
 function playCatchChime() {
     if (!soundEnabled || isMuted || !audioContext) return;
     try {
@@ -65,7 +49,7 @@ function playCatchChime() {
         const master = audioContext.createGain();
         master.gain.setValueAtTime(0.0001, now);
         master.gain.exponentialRampToValueAtTime(0.14, now + 0.02);
-        master.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+        master.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
         const tv = audioContext.createBiquadFilter();
         tv.type = 'bandpass';
         tv.frequency.value = 1500;
@@ -87,6 +71,38 @@ function playCatchChime() {
             osc.start(t);
             osc.stop(t + 0.26);
         });
+        // Sparkle dust drifting in the air after the jingle — many tiny soft
+        // plinks, small and airy rather than one loud burst, scattered over
+        // the next second like fairy dust in the air.
+        for (let i = 0; i < 20; i++) {
+            const osc = audioContext.createOscillator();
+            const g = audioContext.createGain();
+            osc.type = i % 3 === 0 ? 'triangle' : 'sine';
+            osc.frequency.value = 1200 + Math.random() * 3000;
+            const t = now + 0.12 + Math.random() * 1.35;
+            const peak = 0.03 + Math.random() * 0.04;
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(peak, t + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+            osc.connect(g);
+            g.connect(tv);
+            osc.start(t);
+            osc.stop(t + 0.2);
+        }
+        // Crowd "whoosh" swell — filtered noise that reads as a tiny cheer.
+        const nLen = 0.9;
+        const noiseBuf = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * nLen), audioContext.sampleRate);
+        const nd = noiseBuf.getChannelData(0);
+        for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        const crowd = audioContext.createBufferSource();
+        crowd.buffer = noiseBuf;
+        const cg = audioContext.createGain();
+        cg.gain.setValueAtTime(0.0001, now + 0.05);
+        cg.gain.exponentialRampToValueAtTime(0.05, now + 0.25);
+        cg.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
+        crowd.connect(cg);
+        cg.connect(tv);
+        crowd.start(now + 0.05);
     } catch (e) {
         console.warn('Catch chime failed:', e);
     }
@@ -101,50 +117,28 @@ function speakCatch(pokemonName) {
 
     try {
         const synth = window.speechSynthesis;
-        // Cancel anything still queued from a previous catch, and drop any
-        // chorus members that haven't entered yet.
+        // Cancel anything still queued from a previous catch.
         stopCatchVoice();
 
         // Retro chime + the announcer line land on the same tick.
         playCatchChime();
 
-        if (!catchVoiceChecked || !catchVoice || !catchVoicePool.length) {
-            refreshCatchVoices();
+        if (!catchVoiceChecked || !catchVoice) {
+            refreshCatchVoice();
         }
-        if (catchVoicePool.length && !window.__pykachuVoicesBound) {
+        if (!window.__pykachuVoicesBound) {
             window.__pykachuVoicesBound = true;
-            synth.addEventListener('voiceschanged', refreshCatchVoices);
+            synth.addEventListener('voiceschanged', refreshCatchVoice);
         }
 
-        const text = `Gotcha! You caught ${name}!`;
+        const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${name.toUpperCase()}!! ... Wo-hoo!!`);
+        if (catchVoice) utter.voice = catchVoice;
+        utter.lang = (catchVoice && catchVoice.lang) || 'en-US';
+        utter.pitch = 0.85;
+        utter.rate = 1.1;
+        utter.volume = 1.0;
 
-        // Lead with the announcer voice (Google US English in Chrome, else a
-        // female US voice), then rotate the remaining pool so each singer is a
-        // genuinely different timbre rather than three readings of the same one.
-        const ordered = catchVoicePool.length
-            ? [catchVoice, ...catchVoicePool.filter((v) => v !== catchVoice)]
-            : [];
-
-        CATCH_CHORUS.forEach((part, i) => {
-            const sing = () => {
-                const utter = new SpeechSynthesisUtterance(text);
-
-                const voice = ordered.length > 1
-                    ? ordered[i % ordered.length]
-                    : (catchVoice || ordered[0]);
-                if (voice) utter.voice = voice;
-
-                utter.lang = (voice && voice.lang) || 'en-US';
-                utter.rate = part.rate;
-                utter.pitch = part.pitch;
-                utter.volume = part.volume;
-
-                synth.speak(utter);
-            };
-
-            if (part.delay <= 0) sing();
-            else catchChorusTimers.push(setTimeout(sing, part.delay));
-        });
+        synth.speak(utter);
     } catch (e) {
         console.warn('Catch announcement failed:', e);
     }
