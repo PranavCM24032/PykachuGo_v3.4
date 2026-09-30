@@ -7,7 +7,7 @@ let soundEnabled = true;
 
 // ── Speech ────────────────────────────────────────────────────────────
 // Announces the catch out loud in a heavy male anime-announcer style:
-// "Gotcha!! ... You caught ... <NAME>!! ... Wo-hoo!!" Uses the Web
+// "Gotcha!! ... You caught ... <NAME>!!" Uses the Web
 // Speech API, so no audio files are needed. Silently no-ops on browsers
 // without support, and respects the same mute/soundEnabled switches.
 let catchVoice = null;
@@ -151,7 +151,7 @@ function speakCatch(pokemonName) {
     const speakNow = () => {
         try {
             const synth = window.speechSynthesis;
-            const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${line}!! ... Wo-hoo!!`);
+            const utter = new SpeechSynthesisUtterance(`Gotcha!! ... You caught ... ${line}!!`);
             if (catchVoice) utter.voice = catchVoice;
             utter.lang = (catchVoice && catchVoice.lang) || 'en-US';
             utter.pitch = 0.85;

@@ -164,7 +164,7 @@ latch fires, the shells split, and the sprite materialises. The catch line is
 identifies the Pokémon from the sprite alone.
 
 `js/audio.js` speaks it as a heavy male anime-announcer line — one deep
-bass voice, `Gotcha!! ... You caught ... <NAME>!! ... Wo-hoo!!` — with the name
+bass voice, `Gotcha!! ... You caught ... <NAME>!!` — with the name
 shouted in caps at pitch 0.85 / rate 1.1 for a deep, energetic delivery. Google
 English male voices are preferred (Google UK English Male / Google US
 English), then any male voice (David / Mark / Guy / Christopher, etc.). A
