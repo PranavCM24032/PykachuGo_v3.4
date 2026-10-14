@@ -31,7 +31,7 @@ function cancelPokemonReveal() {
     // step 4 (shells split but no sprite, or vice versa).
     if (stage) stage.classList.remove('reveal-ready');
     if (ball) ball.classList.remove('release-latch', 'pokemon-reveal-open');
-    document.querySelectorAll('#pokemonReveal .reveal-sparkle, #pokemonReveal .reveal-wisp')
+    document.querySelectorAll('#pokemonReveal .reveal-sparkle, #pokemonReveal .reveal-wisp, #pokemonReveal .reveal-type-particle')
         .forEach((n) => n.remove());
     // Chorus members that haven't entered yet would keep talking over the
     // next screen, so drop any pending entrances with the rest of the reveal.
@@ -42,6 +42,39 @@ function scheduleReveal(fn, ms) {
     const id = setTimeout(fn, ms);
     revealTimers.push(id);
     return id;
+}
+
+// ── Reveal flourish: particle burst ────────────────────────────────────────
+// Every Pokémon gets the same white / blue / pink energy burst out of the ball,
+// so the reveal always reads the same regardless of which one was caught.
+
+const REVEAL_PARTICLE_COLORS = ['#ffffff', '#93c5fd', '#f472b6'];
+
+// Fans particles out from the ball. Each one gets its own angle, distance,
+// size, colour and duration so no two bursts read the same.
+function spawnRevealBurst(stage) {
+    const reduced = typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const count = reduced ? 0 : 18;
+    for (let i = 0; i < count; i++) {
+        const p = document.createElement('span');
+        p.className = 'reveal-type-particle';
+        const ang = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+        const dist = 42 + Math.random() * 72;
+        p.style.setProperty('--pp-dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+        p.style.setProperty('--pp-dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
+        p.style.setProperty('--pp-size', (5 + Math.random() * 5).toFixed(1) + 'px');
+        p.style.setProperty('--pp-col', REVEAL_PARTICLE_COLORS[i % REVEAL_PARTICLE_COLORS.length]);
+        p.style.setProperty('--pp-dur', (0.7 + Math.random() * 0.5).toFixed(2) + 's');
+        p.style.setProperty('--pp-delay', (Math.random() * 0.12).toFixed(2) + 's');
+        stage.appendChild(p);
+        sparkleTimers.push(setTimeout(() => p.remove(), 1800));
+    }
+}
+
+// Runs when the shells split: fans the white / blue / pink burst out of the ball.
+function startRevealFx(stage) {
+    spawnRevealBurst(stage);
 }
 
 // Step 4 flourish: the caught Pokémon drifts out of its Pokéball.
@@ -111,6 +144,8 @@ function playPokemonReveal() {
         stage.classList.add('reveal-ready');
         spawnReleaseWisps();
         spawnReleaseSparkles();
+        // White / blue / pink particle burst fired from inside the ball.
+        startRevealFx(stage);
         // Exact frame the ball opens. The end-of-chain confetti celebration
         // listens for this instead of running on a timer of its own, so it
         // always lands with the reveal no matter how the fall is retimed.

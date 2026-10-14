@@ -3,11 +3,25 @@
 // ==============================
 const AssetPreloader = {
     cached: new Set(),
-    preloadImage(url) {
+    preloadImage(url, priority) {
         if (!url || this.cached.has(url)) return;
         this.cached.add(url);
         const img = new Image();
+        img.decoding = 'async';
+        if (priority) img.fetchPriority = 'high';
         img.src = url;
+        // Decode off the main thread now so the reveal shows the sprite on its
+        // first frame instead of decoding (and visibly popping in) mid-animation.
+        if (typeof img.decode === 'function') {
+            img.decode().catch(() => { });
+        }
+    },
+    // Warm a specific Pokémon's artwork ahead of its reveal. Called when a puzzle
+    // is activated so the (large) official-artwork PNG is downloaded + decoded
+    // long before the ball opens.
+    prioritizePokemon(pokemonId) {
+        if (!pokemonId) return;
+        this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonId}.png`, true);
     },
     preload(puzzles) {
         console.log("🚀 [Assets] Fast-tracking Pokemon, Badge & UI sprites...");

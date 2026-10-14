@@ -829,6 +829,9 @@ Loading puzzle data...</pre>
                                 <div class="reveal-bloom"></div>
                                 <div class="reveal-ring reveal-ring-one" aria-hidden="true"></div>
                                 <div class="reveal-ring reveal-ring-two" aria-hidden="true"></div>
+                                <!-- Elemental aura + soft shockwave, coloured from the caught Pokémon's type -->
+                                <div class="reveal-aura" aria-hidden="true"></div>
+                                <div class="reveal-shockwave" aria-hidden="true"></div>
                                 <!-- Ground shadow under the ball resting on platform -->
                                 <div class="ball-shadow"></div>
                                 <!-- 3D Pokéball: drops, lands on platform once, then opens -->
@@ -843,6 +846,7 @@ Loading puzzle data...</pre>
                                 <!-- Pokémon pops out of the ball -->
                                 <div class="reveal-pop">
                                     <img id="caughtPokemonImg" src="" alt="Caught Pokémon"
+                                        decoding="async" fetchpriority="high"
                                         class="pokemon-success-glow relative z-10 size-[clamp(130px,26vh,195px)] object-contain drop-shadow-[0_0_20px_rgba(234,179,8,0.3)] transition-transform duration-300 hover:scale-105" />
                                 </div>
                             </div>

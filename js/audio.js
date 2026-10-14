@@ -389,18 +389,18 @@ function initAudio() {
 // fully synthesised so it costs no bytes and works offline. The cue is locked
 // to the confetti choreography in js/main.js — fountains for 15s plus a star
 // burst every 1.5s — so every visual hit gets an audio hit on the same frame:
-//   0.00s  cannon pop + timpani        -> centre burst
-//   0.40s  accent                       -> left burst
-//   0.80s  accent                       -> right burst
-//   1.20s  accent + cymbal wash         -> centre burst, fountains begin
+//   0.00s  cannon pop + acoustic guitar  -> centre burst
+//   0.40s  guitar accent                 -> left burst
+//   0.80s  guitar accent                 -> right burst
+//   1.20s  guitar accent + cymbal wash   -> centre burst, fountains begin
 //   0.15s  applause: dense, thinning, re-surging for the finale (ends 14.2s)
 //   0.20s  brass fanfare, three phrases (starts 0.2s / 3.3s / 8.6s)
-//   1.5s .. 9.0s  soft timpani taps on each 1.5s star burst
-//   5.85s  timpani roll into the second phrase
-//  12.84s  timpani roll into the finale
+//   1.5s .. 9.0s  soft arpeggio plucks on each 1.5s star burst
+//   5.85s  guitar run into the second phrase
+//  12.84s  guitar run into the finale
 //  13.35s  crowd re-surge + cymbal swell -> the last star burst, which is also
 //          exactly where the confetti stops
-//  13.50s  final brass cadence + held C-major chord
+//  13.50s  final brass cadence + strummed C-major chord
 //  13.60s  master fade to silence at 15.0s — seamless end, no audible cut
 // Purely instrumental: no SpeechSynthesis, so nothing can read as voiceover.
 
@@ -463,7 +463,7 @@ function prewarmCelebrationAudio() {
     try {
         getCelebrationClap(audioContext);
         getCelebrationNoiseBuffer(audioContext, 0.3, 'crack');
-        getCelebrationNoiseBuffer(audioContext, 0.04, 'beater');
+        getCelebrationNoiseBuffer(audioContext, 0.02, 'pick');
         // Durations must match what scheduleFinalCelebrationSting asks for, or
         // the cold path runs again. Crowd/cymbal lengths vary per swell.
         getCelebrationNoiseBuffer(audioContext, 3, 'crowd');
@@ -672,60 +672,66 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
     [[261.63, 0.26], [659.25, 0.3], [783.99, 0.28], [1046.50, 0.24], [1318.51, 0.18]]
         .forEach(([f, lvl]) => playBrassNote(f, t0 + 13.5, 1.45, lvl));
 
-    // ── 5. Timpani: one hit on the pop, a roll building the cadence ──────
-    // The old version was a lone sine sweeping 150→58 Hz. Small speakers roll
-    // off below ~200 Hz, so on a phone the drum was silent — the cue seemed to
-    // play with no percussion at all. It now has three layers so it reads on
-    // any output: a tuned body kept up in the 200-100 Hz band, an octave
-    // partial for the copper "ping", and a soft beater click on the attack.
-    const timpani = (at, level) => {
-        // Kettle body — tuned tone, does not drop so low it disappears.
-        const body = ctx.createOscillator();
-        const bodyG = ctx.createGain();
-        body.type = 'sine';
-        body.frequency.setValueAtTime(210, at);
-        body.frequency.exponentialRampToValueAtTime(96, at + 0.28);
-        bodyG.gain.setValueAtTime(0.0001, at);
-        bodyG.gain.exponentialRampToValueAtTime(level, at + 0.012);
-        bodyG.gain.exponentialRampToValueAtTime(0.0001, at + 0.42);
-        body.connect(bodyG); bodyG.connect(master);
-        body.start(at); body.stop(at + 0.45);
+    // ── 5. Acoustic guitar: a calm, clean fingerstyle celebration that strums
+    //       and rings out under the brass. Each note is a Karplus-Strong pluck
+    //       — a short noise burst ringing through a delay tuned to the note's
+    //       period with a damped feedback loop — but with NO distortion and a
+    //       warm tone filter, so it reads peaceful rather than a rock riff.
+    //       This replaced both the timpani and the overdriven electric guitar.
+    const tone = ctx.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 4800;        // warm top end, nothing brittle
+    tone.Q.value = 0.4;
+    const toneG = ctx.createGain();
+    toneG.gain.value = 0.62;
+    tone.connect(toneG); toneG.connect(master);
 
-        // Octave partial — the pitched ring that separates a timpani from a thud.
-        const over = ctx.createOscillator();
-        const overG = ctx.createGain();
-        over.type = 'triangle';
-        over.frequency.setValueAtTime(310, at);
-        over.frequency.exponentialRampToValueAtTime(190, at + 0.22);
-        overG.gain.setValueAtTime(0.0001, at);
-        overG.gain.exponentialRampToValueAtTime(level * 0.5, at + 0.006);
-        overG.gain.exponentialRampToValueAtTime(0.0001, at + 0.28);
-        over.connect(overG); overG.connect(master);
-        over.start(at); over.stop(at + 0.3);
+    const pluck = (freq, at, level, decay) => {
+        const burst = ctx.createBufferSource();
+        burst.buffer = getCelebrationNoiseBuffer(ctx, 0.02, 'pick');
 
-        // Beater click — a short high bandpassed snap that carries the attack.
-        const click = ctx.createBufferSource();
-        click.buffer = getCelebrationNoiseBuffer(ctx, 0.04, 'beater');
-        const clickBp = ctx.createBiquadFilter();
-        clickBp.type = 'bandpass';
-        clickBp.frequency.value = 2600;
-        clickBp.Q.value = 0.9;
-        const clickG = ctx.createGain();
-        clickG.gain.setValueAtTime(level * 0.9, at);
-        clickG.gain.exponentialRampToValueAtTime(0.001, at + 0.035);
-        click.connect(clickBp); clickBp.connect(clickG); clickG.connect(master);
-        click.start(at); click.stop(at + 0.05);
+        const delay = ctx.createDelay(0.05);
+        delay.delayTime.value = 1 / freq;
+
+        const damp = ctx.createBiquadFilter();
+        damp.type = 'lowpass';
+        // soft, rounded string: gentle high roll-off that closes as it rings
+        damp.frequency.setValueAtTime(Math.min(5200, freq * 11), at);
+        damp.frequency.exponentialRampToValueAtTime(Math.max(420, freq * 3), at + decay);
+
+        const fb = ctx.createGain();
+        fb.gain.setValueAtTime(0.965, at);  // long, ringing sustain
+        fb.gain.exponentialRampToValueAtTime(0.001, at + decay);
+
+        const out = ctx.createGain();
+        out.gain.value = level;
+
+        burst.connect(delay);
+        delay.connect(damp); damp.connect(fb); fb.connect(delay);
+        delay.connect(out); out.connect(tone);
+        burst.start(at); burst.stop(at + 0.02);
     };
-    timpani(t0, 0.34);
-    // Accents on the three follow-up confetti blasts.
-    timpani(t0 + 0.4, 0.16);
-    timpani(t0 + 0.8, 0.17);
-    timpani(t0 + 1.2, 0.24);
-    // Soft taps on every 1.5s star burst so the ongoing confetti keeps a pulse.
-    for (let s = 1.5; s <= 9; s += 1.5) timpani(t0 + s, 0.1);
-    for (let i = 0; i < 8; i++) timpani(t0 + 5.85 + i * 0.085, 0.12 + i * 0.028);
-    for (let i = 0; i < 8; i++) timpani(t0 + 12.84 + i * 0.085, 0.14 + i * 0.03);
-    timpani(t0 + 13.5, 0.5);
+
+    // Plucks a chord's notes a few ms apart so it reads as a soft downward strum.
+    const strum = (freqs, at, level, decay) => {
+        freqs.forEach((f, i) => pluck(f, at + i * 0.014, level, decay));
+    };
+
+    // Gentle opening chord, then single notes ringing into the space.
+    strum([130.81, 196.00, 261.63], t0, 0.15, 1.6);
+    pluck(196.00, t0 + 0.4, 0.12, 1.1);
+    pluck(261.63, t0 + 0.8, 0.12, 1.1);
+    strum([329.63, 392.00], t0 + 1.2, 0.16, 1.2);
+    // Slow arpeggio (C-E-G-C) on every 1.5s star burst keeps a calm pulse.
+    const arp = [261.63, 329.63, 392.00, 523.25];
+    let arpStep = 0;
+    for (let s = 1.5; s <= 9; s += 1.5) pluck(arp[arpStep++ % arp.length], t0 + s, 0.09, 1.0);
+    // Soft ascending C-major runs that lift into the second phrase and the finale.
+    const run = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+    run.forEach((f, i) => pluck(f, t0 + 5.85 + i * 0.12, 0.1 + i * 0.02, 0.9));
+    run.forEach((f, i) => pluck(f, t0 + 12.84 + i * 0.12, 0.11 + i * 0.022, 0.9));
+    // Finale: warm open C-major strum ringing out under the held brass chord.
+    strum([130.81, 164.81, 196.00, 261.63, 329.63, 392.00], t0 + 13.5, 0.11, 1.8);
 
     // ── 6. Cymbal shimmer: a wash under the fountains, then the big swell ──
     const cymbal = (startAt, peakAt, peak, decayEnd) => {

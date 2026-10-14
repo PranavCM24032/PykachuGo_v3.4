@@ -203,6 +203,16 @@ function activatePuzzle(puzzle, unlockedVia) {
         pokeball.classList.remove('hidden');
     }
 
+    // Warm the caught artwork now (and the next puzzles' too) so the step 4
+    // reveal shows the sprite instantly instead of fetching a large PNG on the
+    // frame the ball opens.
+    if (typeof AssetPreloader !== 'undefined') {
+        AssetPreloader.prioritizePokemon(puzzle.pokemonId);
+        if (typeof getNextPuzzles === 'function') {
+            getNextPuzzles(puzzle).forEach((p) => AssetPreloader.prioritizePokemon(p && p.pokemonId));
+        }
+    }
+
     // Start the per-puzzle notebook (one request is made only on solve/abandon)
     notepadStart();
 }

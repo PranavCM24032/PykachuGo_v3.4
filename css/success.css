@@ -18,6 +18,9 @@
 #step4 {
     height: 100%;
     min-height: 0;
+    /* Nudges the Pokéball platform up off the exact screen middle. Tune here:
+       larger = higher. transform keeps the location card below it in place. */
+    --step4-stage-lift: clamp(10px, 2.4vh, 24px);
 }
 
 #step4 .step4-success-layout {
@@ -40,6 +43,8 @@
     width: 100%;
     flex-shrink: 0;
     padding-bottom: 0;
+    /* Visual-only lift so the platform sits a little above centre. */
+    transform: translateY(calc(-1 * var(--step4-stage-lift, 0px)));
 }
 
 #step4 .pokemon-reveal {
@@ -654,6 +659,7 @@
             #E2E8F0 60%,
             #94A3B8 100%);
     border-radius: 0 0 calc(var(--ball-d) / 2) calc(var(--ball-d) / 2);
+    transform-origin: center top;
 }
 
 /* Whole-sphere volume shading (favicon "sphereShade" overlay):
@@ -826,14 +832,16 @@
     }
 }
 
-/* Opening: the top shell swings open like a lid (hinged at the equator)
-   and drifts away slowly — a soft opening, not a snap. */
+/* Opening: both shells hinge out from the equator at the same instant and fade
+   together, so neither half lingers after the other. Rotation is kept under 90°
+   so a shell never swings past its hidden backface and vanishes early — that
+   asymmetry was why the white bottom half seemed to outlive the red top. */
 .pokemon-reveal-ball.pokemon-reveal-open .ball-top {
-    animation: ball-top-open 0.85s cubic-bezier(0.35, 0, 0.35, 1) forwards;
+    animation: ball-top-open 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-bottom {
-    animation: ball-bottom-open 0.85s cubic-bezier(0.35, 0, 0.35, 1) 0.08s forwards;
+    animation: ball-bottom-open 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .pokemon-reveal-ball.pokemon-reveal-open .ball-shade,
@@ -845,40 +853,32 @@
 
 @keyframes ball-top-open {
     0% {
-        transform: translateY(0) rotateX(0deg);
+        transform: rotateX(0deg);
         opacity: 1;
     }
-    /* gentle hinge: top half eases backwards from the equator */
-    50% {
-        transform: translateY(-3px) rotateX(-88deg);
+    /* lid eases back from the equator, then dissolves */
+    40% {
+        transform: rotateX(-52deg);
         opacity: 1;
-    }
-    80% {
-        transform: translateY(-6px) rotateX(-112deg) rotateZ(-4deg);
-        opacity: 0.6;
     }
     100% {
-        transform: translateY(-10px) rotateX(-124deg) rotateZ(-6deg);
+        transform: rotateX(-86deg);
         opacity: 0;
     }
 }
 
 @keyframes ball-bottom-open {
     0% {
-        transform: translateY(0) rotateX(0deg);
+        transform: rotateX(0deg);
         opacity: 1;
     }
-    /* tips forward slightly and drops */
-    45% {
-        transform: translateY(3px) rotateX(20deg);
+    /* opposite hinge, same timing, so both halves melt away as one */
+    40% {
+        transform: rotateX(38deg);
         opacity: 1;
-    }
-    80% {
-        transform: translateY(6px) rotateX(26deg);
-        opacity: 0.5;
     }
     100% {
-        transform: translateY(10px) rotateX(30deg);
+        transform: rotateX(78deg);
         opacity: 0;
     }
 }
@@ -952,6 +952,128 @@
 
     100% {
         filter: none;
+    }
+}
+
+/* ── Reveal flourish: type aura + soft shockwave + type particle burst ──── */
+
+/* Energy aura behind the emerging Pokémon. Fixed white → blue → pink theme
+   colour for every Pokémon (no per-type tint). */
+.reveal-aura {
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--plat-h) * 0.5 + var(--ball-d) * 0.5);
+    width: calc(var(--ball-d) * 3.4);
+    height: calc(var(--ball-d) * 3.4);
+    transform: translate(-50%, 50%) scale(0.25);
+    border-radius: 50%;
+    background: radial-gradient(circle,
+            rgba(255, 255, 255, 0.62) 0%,
+            rgba(147, 197, 253, 0.42) 30%,
+            rgba(244, 114, 182, 0.28) 55%,
+            transparent 75%);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 7;
+    mix-blend-mode: screen;
+}
+
+.pokemon-reveal.reveal-ready .reveal-aura {
+    animation: reveal-aura 1.6s ease-out both;
+}
+
+@keyframes reveal-aura {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 50%) scale(0.25);
+    }
+
+    28% {
+        opacity: 0.9;
+        transform: translate(-50%, 50%) scale(1.05);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, 50%) scale(1.85);
+    }
+}
+
+/* Soft energy ripple the instant the shells split. Fixed theme colour for every
+   Pokémon — a white ring with blue and pink glows — so it reads as the ball
+   releasing energy, not the old hard white flash. Kept low-opacity and gentle. */
+.reveal-shockwave {
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--plat-h) * 0.5 + var(--ball-d) * 0.5);
+    width: calc(var(--ball-d) * 0.9);
+    height: calc(var(--ball-d) * 0.9);
+    transform: translate(-50%, 50%) scale(0.3);
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+        0 0 20px rgba(96, 165, 250, 0.55),
+        0 0 38px rgba(244, 114, 182, 0.42),
+        inset 0 0 16px rgba(255, 255, 255, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 8;
+    mix-blend-mode: screen;
+}
+
+.pokemon-reveal.reveal-ready .reveal-shockwave {
+    animation: reveal-shockwave 0.85s cubic-bezier(0.16, 0.7, 0.3, 1) both;
+}
+
+@keyframes reveal-shockwave {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 50%) scale(0.3);
+        border-width: 4px;
+    }
+
+    22% {
+        opacity: 0.65;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, 50%) scale(2.9);
+        border-width: 1px;
+    }
+}
+
+/* Type-coloured particles flung outward on open. JS sets
+   --pp-dx / --pp-dy / --pp-col / --pp-size / --pp-delay per particle. */
+.reveal-type-particle {
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--plat-h) * 0.5 + var(--ball-d) * 0.5);
+    width: var(--pp-size, 7px);
+    height: var(--pp-size, 7px);
+    margin-left: calc(var(--pp-size, 7px) / -2);
+    border-radius: 50%;
+    background: var(--pp-col, #ffd700);
+    box-shadow: 0 0 10px var(--pp-col, #ffd700);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9;
+    animation: reveal-type-burst var(--pp-dur, 0.9s) var(--pp-delay, 0s) ease-out forwards;
+}
+
+@keyframes reveal-type-burst {
+    0% {
+        opacity: 0;
+        transform: translate(0, 0) scale(0.4);
+    }
+
+    12% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(var(--pp-dx, 0px), var(--pp-dy, 0px)) scale(0.2);
     }
 }
 
