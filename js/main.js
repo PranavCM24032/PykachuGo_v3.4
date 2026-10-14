@@ -557,6 +557,14 @@ function getCelebrationWash(screen) {
 function runCelebration(canvas, screen) {
     if (typeof confetti === 'undefined') return;
 
+    // Fire the cue on the audio clock FIRST, before the confetti library spins
+    // up its worker and we touch the canvas. The cue is pre-rendered to a
+    // single BufferSource (or live-scheduled with a look-ahead), so it is
+    // queued ahead of the heavy visual work and never starts late or past-due.
+    // The visual bursts below are then locked to this same start time.
+    const audioStart = (typeof playFinalCelebration === 'function') ? playFinalCelebration(1) : null;
+    const cueStart = audioStart != null ? audioStart + 0.02 : null;
+
     // Reset and size canvas
     canvas.width = screen.clientWidth;
     canvas.height = screen.clientHeight;
@@ -627,30 +635,34 @@ function runCelebration(canvas, screen) {
         });
     }, 1500);
 
-    // 4. INITIAL GRAND EXPLOSIONS
-    const burst = (delay, x) => {
-        setTimeout(() => {
-            myConfetti({
-                particleCount: 150,
-                startVelocity: 45,
-                spread: 90,
-                origin: { x: x, y: 0.7 },
-                colors: colors,
-                gravity: 1.2
-            });
-        }, delay);
-    };
-
-    // The 10-second instrumental victory cue lands with the first blast:
-    // cannon pop at second 0, crowd cheer + applause, brass fanfare resolving
-    // and fading out seamlessly at 10s. Previously each burst fired a short
-    // generic 'success' blip, which fought the fanfare and had no ending.
-    playSound('finalCelebration', 1);
-
-    burst(0, 0.5);   // Center
-    burst(400, 0.2); // Left
-    burst(800, 0.8); // Right
-    burst(1200, 0.5); // Center again
+    // 4. INITIAL GRAND EXPLOSIONS — locked to the audio clock.
+    // The cannon pops land at 0 / 0.4 / 0.8 / 1.2s in the cue, so the four
+    // blasts fire off the same audio time instead of free-running setTimeouts
+    // that drift away from the sound on a busy frame.
+    const burstAt = (x) => myConfetti({
+        particleCount: 150,
+        startVelocity: 45,
+        spread: 90,
+        origin: { x: x, y: 0.7 },
+        colors: colors,
+        gravity: 1.2
+    });
+    const burstPlan = [[0, 0.5], [0.4, 0.2], [0.8, 0.8], [1.2, 0.5]];
+    const audioNow = (typeof getAudioContextTime === 'function') ? getAudioContextTime() : null;
+    if (cueStart != null && typeof audioNow === 'function' && audioNow() != null) {
+        let bi = 0;
+        (function syncBursts() {
+            const t = audioNow();
+            while (bi < burstPlan.length && t >= cueStart + burstPlan[bi][0]) {
+                burstAt(burstPlan[bi][1]);
+                bi++;
+            }
+            if (bi < burstPlan.length) requestAnimationFrame(syncBursts);
+        }());
+    } else {
+        // No audio clock (muted / unsupported): keep the blasts on plain timers.
+        burstPlan.forEach(([delay, x]) => setTimeout(() => burstAt(x), delay * 1000));
+    }
 }
 
 window.onunhandledrejection = function (event) {

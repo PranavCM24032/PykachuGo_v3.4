@@ -405,16 +405,31 @@ function initAudio() {
 // Purely instrumental: no SpeechSynthesis, so nothing can read as voiceover.
 
 const CELEBRATION_TOTAL_SECONDS = 15;
-const celebrationNoiseBuffers = new Map();
+// Short look-ahead before the first cue hit. Scheduling a hair into the future
+// guarantees no node is ever started past-due on a busy frame — that is what
+// made the opening cannon pop clip/jerk when the cue was queued on the exact
+// frame the reveal + confetti were doing their heaviest work.
+const CELEBRATION_LEAD = 0.08;
+// Noise buffers are cached per AudioContext, not globally: the cue is also
+// rendered once through an OfflineAudioContext during idle, and an AudioBuffer
+// is only safe to reuse in the context that created it.
+const celebrationNoiseBuffers = new WeakMap();
+
+function noiseCache(ctx) {
+    let cache = celebrationNoiseBuffers.get(ctx);
+    if (!cache) { cache = new Map(); celebrationNoiseBuffers.set(ctx, cache); }
+    return cache;
+}
 
 function getCelebrationNoiseBuffer(ctx, seconds, tag) {
+    const cache = noiseCache(ctx);
     const key = `${tag}:${seconds}`;
-    if (celebrationNoiseBuffers.has(key)) return celebrationNoiseBuffers.get(key);
+    if (cache.has(key)) return cache.get(key);
     const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = buf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    celebrationNoiseBuffers.set(key, buf);
+    cache.set(key, buf);
     return buf;
 }
 
@@ -446,10 +461,11 @@ function buildClapBuffer(ctx) {
 }
 
 function getCelebrationClap(ctx) {
+    const cache = noiseCache(ctx);
     const key = 'clap:2100:35ms';
-    if (celebrationNoiseBuffers.has(key)) return celebrationNoiseBuffers.get(key);
+    if (cache.has(key)) return cache.get(key);
     const buf = buildClapBuffer(ctx);
-    celebrationNoiseBuffers.set(key, buf);
+    cache.set(key, buf);
     return buf;
 }
 
@@ -470,6 +486,12 @@ function prewarmCelebrationAudio() {
         getCelebrationNoiseBuffer(audioContext, 2, 'crowd');
         getCelebrationNoiseBuffer(audioContext, 3, 'cymbal');
         getCelebrationNoiseBuffer(audioContext, 2, 'cymbal');
+        // Render the whole 15s cue once, off the main thread, into a single
+        // buffer. At reveal time the celebration is then a single BufferSource
+        // started on the audio clock — instead of building hundreds of nodes on
+        // the exact frame the ball opens, which is where the jerk and lag came
+        // from. Falls back to live scheduling if this is not ready in time.
+        renderCelebrationBuffer();
     } catch (e) {
         // A failed prewarm must never break boot; the cold path still works.
         console.warn('Celebration audio prewarm skipped:', e);
@@ -749,6 +771,70 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
     };
     cymbal(t0 + 1.2, t0 + 1.3, 0.07, t0 + 3.2);   // fountain wash
     cymbal(t0 + 13.35, t0 + 13.5, 0.16, t0 + CELEBRATION_TOTAL_SECONDS); // finale
+}
+
+// The cue, baked once through an OfflineAudioContext while the game is idle.
+// Rendering happens off the main thread, so it never stutters the game, and it
+// turns ~900 live nodes into a single buffer to start at reveal time.
+let celebrationRenderedBuffer = null;
+let celebrationRenderPromise = null;
+
+function renderCelebrationBuffer() {
+    if (celebrationRenderPromise) return celebrationRenderPromise;
+    const OfflineCtor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OfflineCtor || !audioContext) {
+        celebrationRenderPromise = Promise.resolve(null);
+        return celebrationRenderPromise;
+    }
+    try {
+        const sampleRate = audioContext.sampleRate || 44100;
+        // A hair longer than the cue so the final fade is not clipped.
+        const length = Math.ceil(sampleRate * (CELEBRATION_TOTAL_SECONDS + 0.1));
+        const offline = new OfflineCtor(1, length, sampleRate);
+        scheduleFinalCelebrationSting(offline, 0, 1);
+        celebrationRenderPromise = offline.startRendering()
+            .then((buf) => { celebrationRenderedBuffer = buf; return buf; })
+            .catch((err) => {
+                console.warn('Celebration pre-render failed; using live synth:', err);
+                return null;
+            });
+    } catch (e) {
+        console.warn('Celebration pre-render unavailable:', e);
+        celebrationRenderPromise = Promise.resolve(null);
+    }
+    return celebrationRenderPromise;
+}
+
+// Audio-clock time, exposed so the confetti bursts can be locked to the cue
+// instead of drifting on their own setTimeouts.
+function getAudioContextTime() {
+    return audioContext ? audioContext.currentTime : null;
+}
+
+// Play the end-of-chain cue on the hardware audio clock. Returns the scheduled
+// start time (or null if audio is off) so callers can align visuals to it.
+// When the idle pre-render is ready this is one BufferSource on the OS mixer;
+// otherwise it falls back to the live synth, still scheduled with a look-ahead.
+function playFinalCelebration(volume = 1) {
+    if (!soundEnabled || isMuted || !audioContext) return null;
+    try {
+        if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+        const startTime = audioContext.currentTime + CELEBRATION_LEAD;
+        if (celebrationRenderedBuffer) {
+            const src = audioContext.createBufferSource();
+            src.buffer = celebrationRenderedBuffer;
+            const g = audioContext.createGain();
+            g.gain.value = Math.max(0, Math.min(1, volume));
+            src.connect(g); g.connect(audioContext.destination);
+            src.start(startTime);
+        } else {
+            scheduleFinalCelebrationSting(audioContext, startTime, volume);
+        }
+        return startTime;
+    } catch (e) {
+        console.warn('Celebration playback failed:', e);
+        return null;
+    }
 }
 
 function playSound(soundName, volume = 0.3) {
@@ -1084,7 +1170,7 @@ function playSound(soundName, volume = 0.3) {
             }
 
             case 'finalCelebration':
-                scheduleFinalCelebrationSting(audioContext, now, volume);
+                playFinalCelebration(volume);
                 break;
         }
 
