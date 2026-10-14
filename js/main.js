@@ -59,6 +59,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     warmupMemePlayer().catch(() => {});
     initAudio();
 
+    // Warm the end-of-chain celebration while the game is idle. The confetti
+    // library downloads once and the synth buffers are built now, so the frame
+    // the ball opens has nothing heavy to do and animation + cue stay in sync.
+    preloadConfetti().catch(() => { });
+    const warmCelebration = () => {
+        if (typeof prewarmCelebrationAudio === 'function') prewarmCelebrationAudio();
+    };
+    if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(warmCelebration, { timeout: 3000 });
+    } else {
+        setTimeout(warmCelebration, 1200);
+    }
+
     // A reset from the admin panel bumps the game epoch. If this device was
     // last used before that reset, its saved queue/score/progress is stale —
     // wipe it all so every player starts the new run clean.
@@ -501,15 +514,44 @@ window.onerror = function (msg, url, lineNo, columnNo, error) {
     return false; // Let default handler run
 };
 
+// The confetti library is fetched once and remembered. Warming it at boot
+// (and, failing that, the first time a puzzle is solved) means the reveal frame
+// never stalls on a network fetch + script parse while the ball is opening.
+const CONFETTI_CDN_URL = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js';
+let confettiLoadPromise = null;
+
+function preloadConfetti() {
+    if (!confettiLoadPromise) {
+        confettiLoadPromise = loadScript(CONFETTI_CDN_URL).catch(err => {
+            // Allow a later retry instead of caching a permanent failure.
+            confettiLoadPromise = null;
+            throw err;
+        });
+    }
+    return confettiLoadPromise;
+}
+
 function triggerFinalCelebration() {
     const canvas = document.getElementById('celebrationCanvas');
     const screen = document.getElementById('screen');
     if (!canvas || !screen) return;
 
-    // Lazy-load the heavy confetti library only when celebrating
-    loadScript('https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js').then(() => {
+    preloadConfetti().then(() => {
         runCelebration(canvas, screen);
     }).catch(err => console.warn('Confetti load failed:', err));
+}
+
+// Single reusable gold wash layer, created once and kept in the DOM at
+// opacity 0 so the reveal frame doesn't pay to build it. Lives below the
+// confetti canvas (z-100) and above the screen content.
+let celebrationWash = null;
+function getCelebrationWash(screen) {
+    if (celebrationWash && celebrationWash.isConnected) return celebrationWash;
+    const el = document.createElement('div');
+    el.className = 'celebration-wash';
+    screen.insertBefore(el, screen.firstChild);
+    celebrationWash = el;
+    return el;
 }
 
 function runCelebration(canvas, screen) {
@@ -527,13 +569,16 @@ function runCelebration(canvas, screen) {
     // 1. SCREEN WASH — warm gold, not a full-white strobe. This now fires on
     // the exact frame the Pokéball opens, and a pure-white flash there would
     // white out the very reveal it is meant to celebrate.
-    screen.style.transition = 'none';
-    screen.style.backgroundColor = 'rgba(253, 224, 71, 0.2)';
+    //
+    // Animating the background-color of #screen repainted the whole scroll
+    // container every frame and stuttered the confetti underneath. A dedicated
+    // layer animated on opacity stays on the compositor and never repaints.
+    const wash = getCelebrationWash(screen);
+    wash.style.transition = 'none';
+    wash.style.opacity = '0.2';
     requestAnimationFrame(() => {
-        screen.style.transition = 'background-color 1.4s ease';
-        screen.style.backgroundColor = 'rgba(253, 224, 71, 0)';
-        // Hand the screen back to the stylesheet once the wash has faded
-        setTimeout(() => { screen.style.backgroundColor = ''; }, 1500);
+        wash.style.transition = 'opacity 1.4s ease';
+        wash.style.opacity = '0';
     });
 
     // 2. FOUNTAIN EFFECT (Vibrant Multi-color)

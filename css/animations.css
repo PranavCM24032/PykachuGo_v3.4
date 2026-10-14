@@ -284,6 +284,20 @@
     backface-visibility: hidden;
 }
 
+/* Gold flash for the end-of-chain celebration. A dedicated opacity-animated
+   layer instead of transitioning background-color on #screen, which repainted
+   the entire scroll container every frame and stuttered the confetti. */
+.celebration-wash {
+    position: absolute;
+    inset: 0;
+    z-index: 99;
+    pointer-events: none;
+    background-color: rgb(253, 224, 71);
+    opacity: 0;
+    will-change: opacity;
+    backface-visibility: hidden;
+}
+
 /* Pause every animation while the tab is hidden (set by JS visibilitychange) */
 .page-hidden *,
 .page-hidden *::before,

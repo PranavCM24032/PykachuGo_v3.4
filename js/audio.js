@@ -453,6 +453,29 @@ function getCelebrationClap(ctx) {
     return buf;
 }
 
+// Build the celebration buffers while the game is idle so the reveal frame only
+// has to create cheap nodes. Filling these noise buffers (hundreds of thousands
+// of samples) synchronously on the frame the ball opened blocked the main
+// thread for long enough to stutter the reveal + confetti and to delay the
+// first cue hit, which read as the animation and sound being out of sync.
+function prewarmCelebrationAudio() {
+    if (!soundEnabled || !audioContext) return;
+    try {
+        getCelebrationClap(audioContext);
+        getCelebrationNoiseBuffer(audioContext, 0.3, 'crack');
+        getCelebrationNoiseBuffer(audioContext, 0.04, 'beater');
+        // Durations must match what scheduleFinalCelebrationSting asks for, or
+        // the cold path runs again. Crowd/cymbal lengths vary per swell.
+        getCelebrationNoiseBuffer(audioContext, 3, 'crowd');
+        getCelebrationNoiseBuffer(audioContext, 2, 'crowd');
+        getCelebrationNoiseBuffer(audioContext, 3, 'cymbal');
+        getCelebrationNoiseBuffer(audioContext, 2, 'cymbal');
+    } catch (e) {
+        // A failed prewarm must never break boot; the cold path still works.
+        console.warn('Celebration audio prewarm skipped:', e);
+    }
+}
+
 function scheduleFinalCelebrationSting(ctx, startTime, volume) {
     const master = ctx.createGain();
     master.gain.value = Math.max(0, Math.min(1, volume == null ? 1 : volume));
@@ -650,17 +673,48 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
         .forEach(([f, lvl]) => playBrassNote(f, t0 + 13.5, 1.45, lvl));
 
     // ── 5. Timpani: one hit on the pop, a roll building the cadence ──────
+    // The old version was a lone sine sweeping 150→58 Hz. Small speakers roll
+    // off below ~200 Hz, so on a phone the drum was silent — the cue seemed to
+    // play with no percussion at all. It now has three layers so it reads on
+    // any output: a tuned body kept up in the 200-100 Hz band, an octave
+    // partial for the copper "ping", and a soft beater click on the attack.
     const timpani = (at, level) => {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(150, at);
-        osc.frequency.exponentialRampToValueAtTime(58, at + 0.24);
-        g.gain.setValueAtTime(0.0001, at);
-        g.gain.exponentialRampToValueAtTime(level, at + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
-        osc.connect(g); g.connect(master);
-        osc.start(at); osc.stop(at + 0.32);
+        // Kettle body — tuned tone, does not drop so low it disappears.
+        const body = ctx.createOscillator();
+        const bodyG = ctx.createGain();
+        body.type = 'sine';
+        body.frequency.setValueAtTime(210, at);
+        body.frequency.exponentialRampToValueAtTime(96, at + 0.28);
+        bodyG.gain.setValueAtTime(0.0001, at);
+        bodyG.gain.exponentialRampToValueAtTime(level, at + 0.012);
+        bodyG.gain.exponentialRampToValueAtTime(0.0001, at + 0.42);
+        body.connect(bodyG); bodyG.connect(master);
+        body.start(at); body.stop(at + 0.45);
+
+        // Octave partial — the pitched ring that separates a timpani from a thud.
+        const over = ctx.createOscillator();
+        const overG = ctx.createGain();
+        over.type = 'triangle';
+        over.frequency.setValueAtTime(310, at);
+        over.frequency.exponentialRampToValueAtTime(190, at + 0.22);
+        overG.gain.setValueAtTime(0.0001, at);
+        overG.gain.exponentialRampToValueAtTime(level * 0.5, at + 0.006);
+        overG.gain.exponentialRampToValueAtTime(0.0001, at + 0.28);
+        over.connect(overG); overG.connect(master);
+        over.start(at); over.stop(at + 0.3);
+
+        // Beater click — a short high bandpassed snap that carries the attack.
+        const click = ctx.createBufferSource();
+        click.buffer = getCelebrationNoiseBuffer(ctx, 0.04, 'beater');
+        const clickBp = ctx.createBiquadFilter();
+        clickBp.type = 'bandpass';
+        clickBp.frequency.value = 2600;
+        clickBp.Q.value = 0.9;
+        const clickG = ctx.createGain();
+        clickG.gain.setValueAtTime(level * 0.9, at);
+        clickG.gain.exponentialRampToValueAtTime(0.001, at + 0.035);
+        click.connect(clickBp); clickBp.connect(clickG); clickG.connect(master);
+        click.start(at); click.stop(at + 0.05);
     };
     timpani(t0, 0.34);
     // Accents on the three follow-up confetti blasts.
