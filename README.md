@@ -271,36 +271,47 @@ talking over the next screen.
 
 ### The end-of-chain celebration cue
 
-The final puzzle's confetti blast is driven by `playSound('finalCelebration')`
-in `js/audio.js` — a 15-second **instrumental** victory cue, synthesised on the
-fly (no audio files, so it works offline and costs nothing to load). It is
-fired from `runCelebration()` on the same tick as the first confetti burst, and
-nothing speaks: no SpeechSynthesis, so it can never read as voiceover.
+The final puzzle's celebration is driven by `playFinalCelebration()` in
+`js/audio.js`. Its primary cue is the track **`assets/sound.mp3`**, fetched and
+decoded during idle (`decodeAudioData`) and then played **in full** — no clip,
+no fade-out, no length cap — as a single `BufferSource` started on the audio
+hardware clock with a short look-ahead (a 1s fade-in eases the onset in). It is
+fired from `runCelebration()` and nothing speaks: no SpeechSynthesis, so it can
+never read as voiceover.
 
-The cue is **locked to the confetti choreography** rather than just sharing its
-start. `runCelebration()` runs two corner fountains for 15s, four 150-particle
-blasts at 0 / 400 / 800 / 1200ms, and a star burst every 1500ms — so the audio
-puts an accent on every one of those hits, and the finale lands on the frame the
-confetti stops:
+The confetti is **choreographed to the track**, not the other way round. The
+beat grid in `runCelebration()` (`CELEBRATION_BLASTS` / `CELEBRATION_SPARKS` in
+`js/main.js`) was derived by onset-detecting `sound.mp3` (~121 BPM): every
+150-particle blast lands on a beat of the song, the lighter beats fire gold star
+bursts, and the corner fountains run for as long as the music does. Both the cue
+and the bursts read `getAudioContextTime()`, so sound and confetti share one
+clock and behave as a single performance. **If you swap `sound.mp3`, re-derive
+the two arrays** or the blasts will no longer land on the beat.
 
-| Time | Layer | Matches |
-|------|-------|---------|
-| 0.00s | Confetti cannon pop — highpassed noise crack + 190→52 Hz sub thump | centre blast |
-| 0.40s / 0.80s / 1.20s | Matching accents at 42% / 46% / 62% of the main pop | left, right and second centre blasts |
-| 0.05s | Crowd cheer — three bandpass noise layers (420/1050/2400 Hz) with a 5.5 Hz level wobble, swelling to 0.6s and fading by 2.6s | opening roar |
-| 0.15s | Applause — ~270 pre-filtered clap grains (state-variable bandpass baked into the buffer), dense then thinning, re-surging after 12.6s | runs to 14.2s, matching the fountains |
-| 0.20s | Brass fanfare — 32 detuned sawtooth notes through a swept lowpass, with vibrato on notes ≥ 0.6s, in three phrases (call → answer → rising build) | no silent gap anywhere in the cue |
-| 1.5s → 9.0s | Acoustic-guitar arpeggio pluck (C-E-G-C) every 1.5s | each star burst |
-| 1.20s | Cymbal wash under the fountains | fountains begin |
-| 5.85s / 12.84s | Guitar runs (eight rising notes each) into the next phrase and into the finale | phrase changes |
-| 13.35s | Crowd re-surge + big cymbal swell | **last star burst** |
-| 13.50s | Final brass cadence + held chord (C4/E5/G5/C6/E6) | **confetti stops** |
-| 13.60s | Master fade — everything reaches silence at exactly 15.0s | cue end |
+The fully-synthesised cue below is kept only as an **offline fallback** for when
+the file is unavailable. It is a 15-second instrumental generated at runtime
+(zero audio files), fired on the same frame as the confetti:
 
-Applause grains only cost a `BufferSource` each because the filter and envelope
-are baked into the shared clap buffer, which keeps the whole cue at ~480 audio
-nodes — cheap enough for a mid-range phone. Everything routes through one master
-gain so the cue always ends cleanly rather than being cut off mid-note.
+| Time | Layer |
+|------|-------|
+| 0.00s | Confetti cannon pop — highpassed noise crack + 190→52 Hz sub thump |
+| 0.40s / 0.80s / 1.20s | Matching accents at 42% / 46% / 62% of the main pop |
+| 0.05s | Crowd cheer — three bandpass noise layers (420/1050/2400 Hz) with a 5.5 Hz level wobble, swelling to 0.6s and fading by 2.6s |
+| 0.15s | Applause — ~270 pre-filtered clap grains (state-variable bandpass baked into the buffer), dense then thinning, re-surging after 12.6s, running to 14.2s |
+| 0.20s | Brass fanfare — 32 detuned sawtooth notes through a swept lowpass, with vibrato on notes ≥ 0.6s, in three phrases (call → answer → rising build) |
+| 1.5s → 9.0s | Acoustic-guitar arpeggio pluck (C-E-G-C) every 1.5s |
+| 1.20s | Cymbal wash under the fountains |
+| 5.85s / 12.84s | Guitar runs (eight rising notes each) into the next phrase and into the finale |
+| 13.35s | Crowd re-surge + big cymbal swell |
+| 13.50s | Final brass cadence + held chord (C4/E5/G5/C6/E6) |
+| 13.60s | Master fade — everything reaches silence at exactly 15.0s |
+
+The fallback synth is pre-rendered once through an `OfflineAudioContext` during
+idle so it, too, plays as a single `BufferSource`; the reveal frame never builds
+the ~480 nodes. Applause grains only cost a `BufferSource` each because the
+filter and envelope are baked into the shared clap buffer, and everything routes
+through one master gain so the cue always ends cleanly rather than being cut off
+mid-note.
 
 ---
 ## 🔄 Client-side workflow (flowchart)

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v2.0.3';
+const CACHE_NAME = 'pykachu-go-v2.0.5';
 const ASSETS = [
     'admin.html',
     'index.html',
@@ -70,7 +70,9 @@ const ASSETS = [
     // Loader emblem art
     'assets/img/logo1.png',
     'assets/img/csi.jpg',
-    'assets/img/auron.png'
+    'assets/img/auron.png',
+    // End-of-chain celebration track
+    'assets/sound.mp3'
 ];
 
 self.addEventListener('install', (event) => {

@@ -554,16 +554,23 @@ function getCelebrationWash(screen) {
     return el;
 }
 
+// Confetti choreography, derived from the celebration track (assets/) by onset
+// detection: every blast lands on a beat of the song, so the bursts and the
+// music read as one performance instead of two. Times are seconds from the
+// start of the track; the sparks are the lighter beats between the big hits.
+const CELEBRATION_BLASTS = [0, 3.45, 3.94, 4.44, 4.93, 5.43, 5.93, 6.42, 7.41, 7.91, 8.41, 9.40, 10.39, 10.89, 11.38, 11.88, 12.62, 13.37, 14.01, 14.85, 15.75];
+const CELEBRATION_SPARKS = [0.97, 1.97, 16.21, 17.42];
+const CELEBRATION_BLAST_X = [0.5, 0.2, 0.8];
+
 function runCelebration(canvas, screen) {
     if (typeof confetti === 'undefined') return;
 
     // Fire the cue on the audio clock FIRST, before the confetti library spins
-    // up its worker and we touch the canvas. The cue is pre-rendered to a
-    // single BufferSource (or live-scheduled with a look-ahead), so it is
-    // queued ahead of the heavy visual work and never starts late or past-due.
-    // The visual bursts below are then locked to this same start time.
+    // up its worker and we touch the canvas. The decoded track (or synth
+    // fallback) is scheduled ahead of the heavy visual work, so it never starts
+    // late or past-due. Every burst below is locked to this same start time, so
+    // the confetti and the music are one performance.
     const audioStart = (typeof playFinalCelebration === 'function') ? playFinalCelebration(1) : null;
-    const cueStart = audioStart != null ? audioStart + 0.02 : null;
 
     // Reset and size canvas
     canvas.width = screen.clientWidth;
@@ -574,13 +581,10 @@ function runCelebration(canvas, screen) {
         useWorker: true
     });
 
-    // 1. SCREEN WASH — warm gold, not a full-white strobe. This now fires on
-    // the exact frame the Pokéball opens, and a pure-white flash there would
-    // white out the very reveal it is meant to celebrate.
-    //
-    // Animating the background-color of #screen repainted the whole scroll
-    // container every frame and stuttered the confetti underneath. A dedicated
-    // layer animated on opacity stays on the compositor and never repaints.
+    // SCREEN WASH — warm gold, not a full-white strobe. A pure-white flash on
+    // the reveal frame would white out the very reveal it celebrates. This is a
+    // dedicated opacity layer, so it stays on the compositor and never repaints
+    // the scroll container (which used to stutter the confetti underneath).
     const wash = getCelebrationWash(screen);
     wash.style.transition = 'none';
     wash.style.opacity = '0.2';
@@ -589,8 +593,6 @@ function runCelebration(canvas, screen) {
         wash.style.opacity = '0';
     });
 
-    // 2. FOUNTAIN EFFECT (Vibrant Multi-color)
-    const end = Date.now() + (15 * 1000);
     const colors = [
         '#ff0000', // Pokeball Red
         '#3b82f6', // Greatball Blue
@@ -601,45 +603,25 @@ function runCelebration(canvas, screen) {
         '#f97316'  // Fire Orange
     ];
 
-    (function frame() {
-        myConfetti({
-            particleCount: 3,
-            angle: 60,
-            spread: 55,
-            origin: { x: 0, y: 1 },
-            colors: colors
-        });
-        myConfetti({
-            particleCount: 3,
-            angle: 120,
-            spread: 55,
-            origin: { x: 1, y: 1 },
-            colors: colors
-        });
+    // A single clock drives both the sound and the confetti: the audio hardware
+    // clock while the cue plays, wall-clock time otherwise.
+    const hasAudioClock = audioStart != null && typeof getAudioContextTime === 'function' && getAudioContextTime() != null;
+    const clock = hasAudioClock ? () => getAudioContextTime() : () => Date.now() / 1000;
+    const base = audioStart != null ? audioStart : Date.now() / 1000;
 
-        if (Date.now() < end) {
-            requestAnimationFrame(frame);
-        }
-    }());
+    // Merge the two hit lists into one time-ordered schedule.
+    const schedule = [];
+    CELEBRATION_BLASTS.forEach((t) => schedule.push([t, 'blast']));
+    CELEBRATION_SPARKS.forEach((t) => schedule.push([t, 'star']));
+    schedule.sort((a, b) => a[0] - b[0]);
 
-    // 3. PERIODIC STAR BURSTS
-    const starInterval = setInterval(() => {
-        if (Date.now() > end) return clearInterval(starInterval);
+    // Fountains run for as long as the music does (and never past it).
+    const lastHit = schedule.length ? schedule[schedule.length - 1][0] : 0;
+    const trackDur = (typeof getCelebrationDuration === 'function') ? getCelebrationDuration() : null;
+    let displayEnd = lastHit + 1.0;
+    if (trackDur) displayEnd = Math.min(displayEnd, trackDur);
 
-        myConfetti({
-            particleCount: 40,
-            spread: 100,
-            origin: { x: Math.random(), y: Math.random() - 0.2 },
-            shapes: ['star'],
-            colors: ['#FFEAB0', '#FFF9E3', '#FACC15']
-        });
-    }, 1500);
-
-    // 4. INITIAL GRAND EXPLOSIONS — locked to the audio clock.
-    // The cannon pops land at 0 / 0.4 / 0.8 / 1.2s in the cue, so the four
-    // blasts fire off the same audio time instead of free-running setTimeouts
-    // that drift away from the sound on a busy frame.
-    const burstAt = (x) => myConfetti({
+    const blastAt = (x) => myConfetti({
         particleCount: 150,
         startVelocity: 45,
         spread: 90,
@@ -647,22 +629,35 @@ function runCelebration(canvas, screen) {
         colors: colors,
         gravity: 1.2
     });
-    const burstPlan = [[0, 0.5], [0.4, 0.2], [0.8, 0.8], [1.2, 0.5]];
-    const audioNow = (typeof getAudioContextTime === 'function') ? getAudioContextTime() : null;
-    if (cueStart != null && typeof audioNow === 'function' && audioNow() != null) {
-        let bi = 0;
-        (function syncBursts() {
-            const t = audioNow();
-            while (bi < burstPlan.length && t >= cueStart + burstPlan[bi][0]) {
-                burstAt(burstPlan[bi][1]);
-                bi++;
+    const starAt = (x, y) => myConfetti({
+        particleCount: 40,
+        spread: 100,
+        origin: { x: x, y: y },
+        shapes: ['star'],
+        colors: ['#FFEAB0', '#FFF9E3', '#FACC15']
+    });
+
+    let si = 0;
+    let blastCount = 0;
+    (function frame() {
+        const elapsed = clock() - base;
+
+        // Fire every hit whose beat has arrived, on the same clock as the sound.
+        while (si < schedule.length && elapsed >= schedule[si][0]) {
+            if (schedule[si][1] === 'blast') {
+                blastAt(CELEBRATION_BLAST_X[blastCount++ % CELEBRATION_BLAST_X.length]);
+            } else {
+                starAt(Math.random(), Math.random() - 0.2);
             }
-            if (bi < burstPlan.length) requestAnimationFrame(syncBursts);
-        }());
-    } else {
-        // No audio clock (muted / unsupported): keep the blasts on plain timers.
-        burstPlan.forEach(([delay, x]) => setTimeout(() => burstAt(x), delay * 1000));
-    }
+            si++;
+        }
+
+        if (elapsed < displayEnd) {
+            myConfetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 1 }, colors: colors });
+            myConfetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 1 }, colors: colors });
+            requestAnimationFrame(frame);
+        }
+    }());
 }
 
 window.onunhandledrejection = function (event) {

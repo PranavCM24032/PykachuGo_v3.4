@@ -385,10 +385,12 @@ function initAudio() {
 
 // Upgraded playSound to handle synth notes OR external files (cries/music)
 // ── Final celebration sting ───────────────────────────────────────────
-// The end-of-chain confetti blast gets a 15-second instrumental victory cue,
-// fully synthesised so it costs no bytes and works offline. The cue is locked
-// to the confetti choreography in js/main.js — fountains for 15s plus a star
-// burst every 1.5s — so every visual hit gets an audio hit on the same frame:
+// The end-of-chain confetti blast gets a victory cue. The primary cue is the
+// track assets/sound.mp3, played in FULL (no clip/fade); the fully-synthesised
+// cue below is the offline fallback used when that file is unavailable. The
+// cue starts on the same frame as the confetti choreography in js/main.js —
+// fountains for 15s plus a star burst every 1.5s — so the first visual hit
+// lines up with the first audio hit:
 //   0.00s  cannon pop + acoustic guitar  -> centre burst
 //   0.40s  guitar accent                 -> left burst
 //   0.80s  guitar accent                 -> right burst
@@ -410,6 +412,10 @@ const CELEBRATION_TOTAL_SECONDS = 15;
 // made the opening cannon pop clip/jerk when the cue was queued on the exact
 // frame the reveal + confetti were doing their heaviest work.
 const CELEBRATION_LEAD = 0.08;
+// Gentle onset so the track swells in instead of slamming in on the reveal
+// frame. The track itself is still played in full afterwards — this only ramps
+// the very start up to level.
+const CELEBRATION_FADE_IN = 1.0;
 // Noise buffers are cached per AudioContext, not globally: the cue is also
 // rendered once through an OfflineAudioContext during idle, and an AudioBuffer
 // is only safe to reuse in the context that created it.
@@ -486,11 +492,12 @@ function prewarmCelebrationAudio() {
         getCelebrationNoiseBuffer(audioContext, 2, 'crowd');
         getCelebrationNoiseBuffer(audioContext, 3, 'cymbal');
         getCelebrationNoiseBuffer(audioContext, 2, 'cymbal');
-        // Render the whole 15s cue once, off the main thread, into a single
-        // buffer. At reveal time the celebration is then a single BufferSource
-        // started on the audio clock — instead of building hundreds of nodes on
-        // the exact frame the ball opens, which is where the jerk and lag came
-        // from. Falls back to live scheduling if this is not ready in time.
+        // Load + decode the celebration track, and (as a fallback only) render
+        // the synth cue once, off the main thread, into a single buffer. At
+        // reveal time the celebration is then a single BufferSource started on
+        // the audio clock — instead of building hundreds of nodes on the exact
+        // frame the ball opens, which is where the jerk and lag came from.
+        loadCelebrationAudio();
         renderCelebrationBuffer();
     } catch (e) {
         // A failed prewarm must never break boot; the cold path still works.
@@ -773,9 +780,35 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
     cymbal(t0 + 13.35, t0 + 13.5, 0.16, t0 + CELEBRATION_TOTAL_SECONDS); // finale
 }
 
-// The cue, baked once through an OfflineAudioContext while the game is idle.
-// Rendering happens off the main thread, so it never stutters the game, and it
-// turns ~900 live nodes into a single buffer to start at reveal time.
+// The celebration track. When it is present it replaces the synthesized cue:
+// it is fetched and decoded during idle so that at reveal time it plays as a
+// single BufferSource on the audio clock. It is played in FULL — never clipped,
+// faded or stopped to fit the 15s confetti window.
+const CELEBRATION_AUDIO_URL = 'assets/sound.mp3';
+let celebrationAudioBuffer = null;
+let celebrationAudioPromise = null;
+
+function loadCelebrationAudio() {
+    if (celebrationAudioPromise) return celebrationAudioPromise;
+    if (!audioContext) { celebrationAudioPromise = Promise.resolve(null); return celebrationAudioPromise; }
+    celebrationAudioPromise = fetch(CELEBRATION_AUDIO_URL)
+        .then((res) => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.arrayBuffer();
+        })
+        .then((data) => audioContext.decodeAudioData(data))
+        .then((buf) => { celebrationAudioBuffer = buf; return buf; })
+        .catch((err) => {
+            console.warn('Celebration track failed to load; using synth cue:', err);
+            return null;
+        });
+    return celebrationAudioPromise;
+}
+
+// The synth cue, baked once through an OfflineAudioContext while the game is
+// idle. Rendering happens off the main thread, so it never stutters the game,
+// and it turns ~900 live nodes into a single buffer to start at reveal time.
+// Only used when the celebration track is unavailable.
 let celebrationRenderedBuffer = null;
 let celebrationRenderPromise = null;
 
@@ -811,20 +844,34 @@ function getAudioContextTime() {
     return audioContext ? audioContext.currentTime : null;
 }
 
+// Length of the cue that will actually play, so the visuals can run exactly as
+// long as the music does.
+function getCelebrationDuration() {
+    if (celebrationAudioBuffer) return celebrationAudioBuffer.duration;
+    if (celebrationRenderedBuffer) return CELEBRATION_TOTAL_SECONDS;
+    return null;
+}
+
 // Play the end-of-chain cue on the hardware audio clock. Returns the scheduled
 // start time (or null if audio is off) so callers can align visuals to it.
-// When the idle pre-render is ready this is one BufferSource on the OS mixer;
-// otherwise it falls back to the live synth, still scheduled with a look-ahead.
+// Prefers the decoded celebration track, then the idle pre-rendered synth, and
+// finally falls back to live scheduling — always with a look-ahead.
 function playFinalCelebration(volume = 1) {
     if (!soundEnabled || isMuted || !audioContext) return null;
     try {
         if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
         const startTime = audioContext.currentTime + CELEBRATION_LEAD;
-        if (celebrationRenderedBuffer) {
+        const cue = celebrationAudioBuffer || celebrationRenderedBuffer;
+        if (cue) {
             const src = audioContext.createBufferSource();
-            src.buffer = celebrationRenderedBuffer;
+            src.buffer = cue;
             const g = audioContext.createGain();
-            g.gain.value = Math.max(0, Math.min(1, volume));
+            const vol = Math.max(0, Math.min(1, volume));
+            // Short fade-in so the track eases in instead of starting abruptly.
+            // After that it holds full level for the whole track — no clip,
+            // no fade-out, no stop timer.
+            g.gain.setValueAtTime(0, startTime);
+            g.gain.linearRampToValueAtTime(vol, startTime + CELEBRATION_FADE_IN);
             src.connect(g); g.connect(audioContext.destination);
             src.start(startTime);
         } else {
