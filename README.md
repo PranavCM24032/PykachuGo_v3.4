@@ -59,6 +59,7 @@ dashboard** livetracks every team.
 - **Sliding-window rate limiter** — protects the Apps Script endpoint from quota
   busts (see [Rate limiting](#rate-limiting)).
 - **GitHub Actions Auto-Deploy** — push to `main` → GitHub Pages.
+- **Vercel-ready** — `vercel.json` handles the build, headers and `/admin` route.
 - **Installable PWA** — service worker + manifest, offline-capable shell.
 
 ---
@@ -73,7 +74,7 @@ dashboard** livetracks every team.
 | Storage | Google Sheets workbook (1 spreadsheet, 4 tabs) + `localStorage` state |
 | Media | PokeAPI sprites/cries, YouTube IFrame API |
 | Build | Tailwind CSS + Node script for runtime config |
-| Hosting | GitHub Pages via Actions |
+| Hosting | GitHub Pages via Actions / Vercel |
 | Optional runtime deps | YouTube IFrame API (CDN); jsQR is hosted locally and loaded on demand |
 
 ---
@@ -85,6 +86,8 @@ index.html                     Player application
 admin.html                     Admin dashboard
 manifest.json                  PWA manifest
 service-worker.js              PWA cache strategy (bump CACHE_NAME on release)
+vercel.json                    Vercel build, headers and redirects
+.vercelignore                  Build-only files kept out of Vercel deployments
 tailwind.config.js             Tailwind config
 .env.example                   Template for local runtime config
 .html, .vscode/                Meta / editor files
@@ -995,17 +998,35 @@ Open the local URL printed by `serve`. Camera access generally requires either
 
 ---
 
-## 🚀 Deployment (GitHub Pages)
+## 🚀 Deployment
 
-1. Set the Apps Script Script Properties (`PLAYER_TOKEN`, `ADMIN_TOKEN`, and
-   `SPREADSHEET_ID`) and deploy the latest Apps Script version.
-2. Add `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and `GOOGLE_SHEET_URL` as
-   GitHub Actions secrets (repository or `github-pages` environment).
-3. Push to `main` or run the single Pages workflow manually
+Set the Apps Script Script Properties (`PLAYER_TOKEN`, `ADMIN_TOKEN`, and
+`SPREADSHEET_ID`) and deploy the latest Apps Script version before using either
+host. Both hosts need `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and
+`GOOGLE_SHEET_URL`; the runtime-config generator now reads Vercel environment
+variables as well as a local `.env` file.
+
+When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
+`service-worker.js` so cache-first clients receive the update. Bump
+`CONFIG.VERSION` in `admin.html` when admin cache data must also be cleared.
+
+### GitHub Pages
+
+1. Add the three `GOOGLE_*` values as GitHub Actions secrets (repository or
+   `github-pages` environment).
+2. Push to `main` or run the single Pages workflow manually
    (`.github/workflows/static.yml`).
-4. When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
-   `service-worker.js` so cache-first clients receive the update. Bump
-   `CONFIG.VERSION` in `admin.html` when admin cache data must also be cleared.
+
+### Vercel
+
+1. Import the repository in Vercel and choose **Other** as the framework preset.
+2. Add `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and `GOOGLE_SHEET_URL` as
+   Production environment variables.
+3. Deploy. `vercel.json` runs `npm run build && npm run config:runtime`, serves
+   the repository root, adds the `/admin` redirect, and disables caching for
+   `service-worker.js`, `runtime-config.js`, pages, and game data.
+4. `.vercelignore` keeps design docs, GitHub metadata, and editor files out of
+   the deployment without removing them from the repository.
 
 All game content (`data/*.json`) is static JSON. After bumping `CACHE_NAME`,
 updated puzzles, teams, and memes are installed into the new offline cache.

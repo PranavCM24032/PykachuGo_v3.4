@@ -22,7 +22,11 @@ function readEnv(filePath) {
         }, {});
 }
 
-const env = readEnv(envPath);
+const env = { ...readEnv(envPath) };
+['GOOGLE_SCRIPT_URL', 'GOOGLE_SCRIPT_TOKEN', 'GOOGLE_SHEET_URL'].forEach((key) => {
+    if (process.env[key]) env[key] = process.env[key];
+});
+
 const runtimeConfig = {
     googleScriptUrl: env.GOOGLE_SCRIPT_URL || '',
     googleScriptToken: env.GOOGLE_SCRIPT_TOKEN || '',

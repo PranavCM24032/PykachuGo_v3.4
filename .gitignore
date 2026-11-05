@@ -6,3 +6,5 @@ js/runtime-config.js
 .env
 .env.*
 !.env.example
+.vercel/
+.codex-history/
