@@ -78,13 +78,12 @@
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('service-worker.js', {
                     updateViaCache: 'none'
-                }).catch(err => { });
+                }).then(registration => registration.update()).catch(err => {
+                    console.warn('[SW] Registration or update check failed:', err);
+                });
                 // updateViaCache:'none' + an explicit update() on every load.
                 // Without this a phone can keep serving a stale cached js/audio.js
                 // for days, which is how an old voice picker survives a deploy.
-                navigator.serviceWorker.getRegistration().then(reg => {
-                    if (reg) reg.update();
-                }).catch(() => { });
             });
         }
     </script>

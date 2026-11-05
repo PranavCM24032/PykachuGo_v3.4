@@ -215,7 +215,7 @@ under their own licences — **not** under this document:
 | Component | Where | Licence / owner |
 |-----------|-------|-----------------|
 | Tailwind CSS, esbuild and other npm dev dependencies | `package.json`, `package-lock.json`, `css/tailwind.css` | MIT, respective authors |
-| jsQR | loaded at runtime (CDN) | Apache-2.0, jsQR authors |
+| jsQR 1.4.0 | `assets/vendor/jsQR-1.4.0.js` | Apache-2.0, jsQR authors; licence in `assets/vendor/jsQR-1.4.0.LICENSE` |
 | YouTube IFrame API | loaded at runtime | Google APIs Terms of Service |
 | Pokémon sprites (official artwork, gym badges) | `PokeAPI/sprites` | © Nintendo / Creatures Inc. / GAME FREAK Inc. |
 | Background music (Pokémon Showdown) | `js/main.js` | respective owners / Pokémon Showdown project |

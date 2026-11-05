@@ -272,11 +272,17 @@ function startQRCodeDetection() {
     // Lazy-load heavy scanning libs only when the scanner actually opens
     let libsReady = false;
     const gen = scanGeneration;
-    loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js').then(() => {
+    loadScript('assets/vendor/jsQR-1.4.0.js').then(() => {
         // Scanner was closed while the CDN scripts were downloading.
         if (gen !== scanGeneration) return;
         libsReady = true;
-    }).catch(err => console.warn('[Scanner] QR decoder failed to load:', err));
+    }).catch(err => {
+        if (gen !== scanGeneration) return;
+        console.warn('[Scanner] QR decoder failed to load:', err);
+        showToast('QR scanner is unavailable. Use manual code entry.', 'error');
+        stopQRScanner();
+        showManualEntry();
+    });
 
     // OCR is an optional text-code fallback, not a prerequisite for QR scanning.
     // Avoid its large script/WASM downloads when data saver or a slow link is detected.

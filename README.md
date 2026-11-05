@@ -74,7 +74,7 @@ dashboard** livetracks every team.
 | Media | PokeAPI sprites/cries, YouTube IFrame API |
 | Build | Tailwind CSS + Node script for runtime config |
 | Hosting | GitHub Pages via Actions |
-| LD deps (CDN) | jsQR, YouTube IFrame API |
+| Optional runtime deps | YouTube IFrame API (CDN); jsQR is hosted locally and loaded on demand |
 
 ---
 
@@ -921,7 +921,7 @@ and renders aggregated JSON.
 
 - `manifest.json` — standalone install, portrait, maskable icon.
 - `service-worker.js` — caches the app shell and required JSON data for offline
-  reloads using cache version `pykachu-go-v2.0.6`. Large optional audio and
+  reloads using cache version `pykachu-go-v2.0.7`. Large optional audio and
   decorative artwork are not downloaded during installation; the small Pikachu
   image is cached as an offline fallback for remote Pokémon artwork.
 - Cached local assets use cache-first delivery, so repeat visits and offline
@@ -930,9 +930,12 @@ and renders aggregated JSON.
 - Startup skips optional artwork preloads and external fonts when the browser
   reports data saver, 2G, or a downlink below 1 Mbps. Fonts are deferred until
   after initial page load; YouTube and celebration audio load only when needed.
-- Camera scanning loads the QR decoder independently of optional OCR. OCR is
-  skipped on detected slow/data-saver connections; manual code entry remains
-  available when QR scanning or network access is unavailable.
+- Camera scanning loads the locally hosted QR decoder on demand and retains it
+  across app updates without adding it to the initial download. After its first
+  successful load, QR decoding is available offline; on a first-ever offline
+  scan or a failed download, the camera closes and manual code entry is shown.
+  Optional OCR is skipped on detected slow/data-saver connections. Google
+  Sheets synchronization and YouTube media still require network access.
 - Requires HTTPS (GitHub Pages provides it). Bump `CACHE_NAME` in
   `service-worker.js` and the Admin dashboard `CONFIG.VERSION` when making a
   release that must replace offline assets and cached admin logs immediately.
@@ -1000,11 +1003,12 @@ Open the local URL printed by `serve`. Camera access generally requires either
    GitHub Actions secrets (repository or `github-pages` environment).
 3. Push to `main` or run the single Pages workflow manually
    (`.github/workflows/static.yml`).
-4. When releasing frontend changes, bump both `CACHE_NAME` in
-   `service-worker.js` and `CONFIG.VERSION` in `admin.html`.
+4. When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
+   `service-worker.js` so cache-first clients receive the update. Bump
+   `CONFIG.VERSION` in `admin.html` when admin cache data must also be cleared.
 
-All content (`data/*.json`) is static JSON, so updating puzzles/teams and
-pushing is a live content update.
+All game content (`data/*.json`) is static JSON. After bumping `CACHE_NAME`,
+updated puzzles, teams, and memes are installed into the new offline cache.
 
 ---
 

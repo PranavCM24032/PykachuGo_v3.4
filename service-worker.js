@@ -1,4 +1,5 @@
-const CACHE_NAME = 'pykachu-go-v2.0.6';
+const CACHE_NAME = 'pykachu-go-v2.0.7';
+const OPTIONAL_CACHE_NAME = 'pykachu-go-optional-v1';
 const ASSETS = [
     'index.html',
     '404.html',
@@ -80,7 +81,7 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((name) => {
-                    if (name !== CACHE_NAME) {
+                    if (name !== CACHE_NAME && name !== OPTIONAL_CACHE_NAME) {
                         return caches.delete(name);
                     }
                 })
@@ -99,6 +100,25 @@ self.addEventListener('fetch', (event) => {
         'raw.githubusercontent.com', 'fonts.googleapis.com', 'fonts.gstatic.com'
     ];
     if (networkOnlyHosts.some(h => url.hostname.includes(h))) return;
+
+    // The QR decoder is fetched only when scanning starts, then retained
+    // separately so routine app updates do not force another library download.
+    if (url.pathname.endsWith('/assets/vendor/jsQR-1.4.0.js')) {
+        event.respondWith(
+            caches.open(OPTIONAL_CACHE_NAME).then((cache) =>
+                cache.match(event.request).then((cached) => {
+                    if (cached) return cached;
+                    return fetch(event.request).then((response) => {
+                        if (response && response.status === 200 && response.type === 'basic') {
+                            return cache.put(event.request, response.clone()).then(() => response);
+                        }
+                        return response;
+                    });
+                })
+            )
+        );
+        return;
+    }
 
     // Config is regenerated on every deploy (URL/token can change). Serving a
     // stale copy cache-first silently breaks all future writes for that device,
