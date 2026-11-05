@@ -921,7 +921,7 @@ and renders aggregated JSON.
 
 - `manifest.json` — standalone install, portrait, maskable icon.
 - `service-worker.js` — caches the app shell and required JSON data for offline
-  reloads using cache version `pykachu-go-v2.0.7`. Large optional audio and
+  reloads using cache version `pykachu-go-v2.0.9`. Large optional audio and
   decorative artwork are not downloaded during installation; the small Pikachu
   image is cached as an offline fallback for remote Pokémon artwork.
 - Cached local assets use cache-first delivery, so repeat visits and offline

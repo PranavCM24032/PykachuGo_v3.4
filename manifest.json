@@ -9,15 +9,9 @@
     "orientation": "portrait",
     "icons": [
         {
-            "src": "assets/img/poketropy.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any maskable"
-        },
-        {
-            "src": "assets/img/poketropy.png",
-            "sizes": "512x512",
-            "type": "image/png",
+            "src": "assets/img/pokeball.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
             "purpose": "any maskable"
         }
     ]
