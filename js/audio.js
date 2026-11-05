@@ -492,12 +492,11 @@ function prewarmCelebrationAudio() {
         getCelebrationNoiseBuffer(audioContext, 2, 'crowd');
         getCelebrationNoiseBuffer(audioContext, 3, 'cymbal');
         getCelebrationNoiseBuffer(audioContext, 2, 'cymbal');
-        // Load + decode the celebration track, and (as a fallback only) render
-        // the synth cue once, off the main thread, into a single buffer. At
-        // reveal time the celebration is then a single BufferSource started on
-        // the audio clock — instead of building hundreds of nodes on the exact
-        // frame the ball opens, which is where the jerk and lag came from.
-        loadCelebrationAudio();
+        // Avoid downloading the optional celebration track for data-saver or
+        // slow connections; the synthesized cue remains available offline.
+        if (typeof isLowBandwidthConnection !== 'function' || !isLowBandwidthConnection()) {
+            loadCelebrationAudio();
+        }
         renderCelebrationBuffer();
     } catch (e) {
         // A failed prewarm must never break boot; the cold path still works.

@@ -127,12 +127,6 @@ function warmupMemePlayer() {
     return memePlayerReadyPromise;
 }
 
-// Warm the API up immediately so memes open faster.
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    ensureYTApiLoaded().catch(() => {});
-} else {
-    document.addEventListener('DOMContentLoaded', () => ensureYTApiLoaded().catch(() => {}));
-}
 
 // ── URL helpers ───────────────────────────────────────────────────────────────
 function extractVideoId(url) {

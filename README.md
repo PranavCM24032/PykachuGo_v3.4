@@ -679,7 +679,14 @@ The backend creates these tabs automatically on first use.
   `L1`/`L2`/`L3` rows: `solved` = union of solved puzzle IDs, `currentPuzzle` =
   most recent puzzle row, `unlocked` = union of queue snapshots, `score` = latest
   Total Score; the client derives the frontier as `unlocked − solved`.
-- Uses `LockService` (`tryLock 20s`) for concurrency safety on every POST.
+- Uses `LockService` (`tryLock 20s`) to serialize writes and resets; initialized
+  read-only team-state requests do not take the write lock. Rows are added to a
+  sheet automatically if a write needs more than its current row capacity.
+- A team is limited to 90 write requests per minute. Rate-limited events are
+  explicitly rejected and retained in the client buffer; transient lock,
+  network, and Apps Script quota failures are retried with backoff. Event IDs
+  make retries safe from duplicate score awards. Unload beacons retain their
+  notebook locally until a later server confirmation.
 - Token auth: every request carries `{ token: GOOGLE_SCRIPT_TOKEN }`.
 - Script properties include `PLAYER_TOKEN`, `ADMIN_TOKEN`, and
   `SPREADSHEET_ID`; the Apps Script opens the configured spreadsheet by ID.
@@ -722,17 +729,25 @@ flowchart TD
     PU --> DO_POST
 
     subgraph DSP["B · doPost(e) — entry + dispatch"]
-        DO_POST["doPost(e)"] --> LOCK{"tryLock(20s)<br/>acquired?"}
-        LOCK -- "No" --> LFAIL["{status: 'error',<br/>message: 'lock unavailable'}"]
-        LOCK -- "Yes" --> ENSURE["ensureSheetsExist()<br/>create Registration / L1 / L2 / L3<br/>tabs + headers if missing"]
-        ENSURE --> PARSE["Parse JSON body"]
-        PARSE --> TOK{"token ===<br/>ACCESS_TOKEN?"}
+        DO_POST["doPost(e)"] --> PARSE["Parse JSON body"]
+        PARSE --> TOK{"token valid<br/>for action?"}
         TOK -- "No" --> TFAIL["{status: 'error',<br/>message: 'unauthorized'}"]
         TOK -- "Yes" --> ACT{"action?"}
-        ACT -- "RESET_ALL" --> RESET["Wipe all 4 tabs' rows<br/>(keep headers) → bump gameEpoch"]
+        ACT -- "GET_TEAM_STATE" --> READ["Read team state<br/>(write lock only to initialize missing tabs)"]
+        READ --> READOK["Return team state"]
+        ACT -- "RESET_ALL" --> RESETLOCK{"tryLock(20s)<br/>acquired?"}
+        RESETLOCK -- "No" --> LFAIL
+        RESETLOCK -- "Yes" --> RESETENSURE["ensureSheetsExist()"]
+        RESETENSURE --> RESET["Wipe all 4 tabs' rows<br/>(keep headers) → bump gameEpoch"]
         RESET --> ROK["{status: success, epoch: N}"]
-        ACT -- "SESSION_BATCH" --> BATCH["For each event:<br/>processEvent(ss, event)"]
-        ACT -- "Single game event" --> SINGLE["processEvent(ss, data)"]
+        ACT -- "Game write" --> LOCK{"tryLock(20s)<br/>acquired?"}
+        LOCK -- "No" --> LFAIL["{status: 'error',<br/>message: 'lock unavailable'}"]
+        LOCK -- "Yes" --> ENSURE["ensureSheetsExist()<br/>create Registration / L1 / L2 / L3<br/>tabs + headers if missing"]
+        ENSURE --> TEAMRATE{"under team request limit?"}
+        TEAMRATE -- "No" --> RATELIMIT["{status: rate_limited}<br/>client retains events"]
+        TEAMRATE -- "Yes" --> WRITEACT{"action?"}
+        WRITEACT -- "SESSION_BATCH" --> BATCH["For each event:<br/>processEvent(ss, event)"]
+        WRITEACT -- "Single game event" --> SINGLE["processEvent(ss, data)"]
         BATCH --> FLUSH["SpreadsheetApp.flush()"]
         SINGLE --> FLUSH
         FLUSH --> ROK2["{status: success}"]
@@ -905,8 +920,19 @@ and renders aggregated JSON.
 ## 💾 PWA
 
 - `manifest.json` — standalone install, portrait, maskable icon.
-- `service-worker.js` — caches shell + data for offline reloads using cache
-  version `pykachu-go-v1.7.1`.
+- `service-worker.js` — caches the app shell and required JSON data for offline
+  reloads using cache version `pykachu-go-v2.0.6`. Large optional audio and
+  decorative artwork are not downloaded during installation; the small Pikachu
+  image is cached as an offline fallback for remote Pokémon artwork.
+- Cached local assets use cache-first delivery, so repeat visits and offline
+  reloads do not trigger background re-downloads. The deployment-specific
+  runtime config remains network-first with a cached offline fallback.
+- Startup skips optional artwork preloads and external fonts when the browser
+  reports data saver, 2G, or a downlink below 1 Mbps. Fonts are deferred until
+  after initial page load; YouTube and celebration audio load only when needed.
+- Camera scanning loads the QR decoder independently of optional OCR. OCR is
+  skipped on detected slow/data-saver connections; manual code entry remains
+  available when QR scanning or network access is unavailable.
 - Requires HTTPS (GitHub Pages provides it). Bump `CACHE_NAME` in
   `service-worker.js` and the Admin dashboard `CONFIG.VERSION` when making a
   release that must replace offline assets and cached admin logs immediately.

@@ -3,12 +3,24 @@
 // ==============================
 function loadScript(src) {
     return new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) return resolve();
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing) {
+            if (existing.dataset.loaded === 'true') return resolve();
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+            return;
+        }
         const tag = document.createElement('script');
         tag.src = src;
         tag.async = true;
-        tag.onload = () => resolve();
-        tag.onerror = () => reject(new Error(`Failed to load ${src}`));
+        tag.onload = () => {
+            tag.dataset.loaded = 'true';
+            resolve();
+        };
+        tag.onerror = () => {
+            tag.remove();
+            reject(new Error(`Failed to load ${src}`));
+        };
         document.head.appendChild(tag);
     });
 }
@@ -21,9 +33,10 @@ async function startQRScanner() {
     if (videoStream || qrScannerActive || scannerStarting) return;
     scannerStarting = true;
     const gen = scanGeneration;
+    let stream = null;
 
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        stream = await navigator.mediaDevices.getUserMedia({
             video: {
                 facingMode: 'environment',
                 width: { ideal: 1280 },
@@ -52,27 +65,71 @@ async function startQRScanner() {
             return;
         }
         container.classList.remove('hidden');
-        video.srcObject = videoStream;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.srcObject = stream;
+        await video.play();
 
-        // Wait for video to be ready to check capabilities
-        video.onloadedmetadata = () => {
-            video.play().catch(e => console.warn('Video play prevented:', e));
-            try {
-                const track = videoStream ? videoStream.getVideoTracks()[0] : null;
-                if (track) setupZoomControl(track);
-            } catch (e) {
-                console.warn('[Scanner] Zoom setup safely skipped:', e);
-            }
-        };
+        if (gen !== scanGeneration) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+        }
+        if (video.readyState < video.HAVE_CURRENT_DATA) {
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('Camera stream did not produce video frames'));
+                }, 10000);
+                const onLoadedData = () => {
+                    cleanup();
+                    resolve();
+                };
+                const onError = () => {
+                    cleanup();
+                    reject(video.error || new Error('Camera video could not be played'));
+                };
+                const cleanup = () => {
+                    clearTimeout(timeout);
+                    video.removeEventListener('loadeddata', onLoadedData);
+                    video.removeEventListener('error', onError);
+                };
+                video.addEventListener('loadeddata', onLoadedData, { once: true });
+                video.addEventListener('error', onError, { once: true });
+            });
+        }
+
+        if (gen !== scanGeneration) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+        }
+
+        try {
+            const track = stream.getVideoTracks()[0];
+            if (track) setupZoomControl(track);
+        } catch (error) {
+            console.warn('[Scanner] Zoom setup safely skipped:', error);
+        }
 
         qrScannerActive = true;
         startQRCodeDetection();
 
     } catch (error) {
+        if (gen !== scanGeneration) {
+            stream?.getTracks().forEach((track) => track.stop());
+            return;
+        }
         console.error('Camera error:', error);
         // Never leave a live camera running on the failure path.
         stopQRScanner();
-        showToast('Camera access denied. Using manual override.', 'error');
+        const message = error.name === 'NotFoundError'
+            ? 'No camera found. Using manual override.'
+            : error.name === 'NotReadableError'
+                ? 'Camera is busy or unavailable. Using manual override.'
+                : error.name === 'NotAllowedError' || error.name === 'SecurityError'
+                    ? 'Camera permission denied. Using manual override.'
+                    : 'Camera could not start. Using manual override.';
+        showToast(message, 'error');
         showManualEntry();
     } finally {
         scannerStarting = false;
@@ -178,6 +235,8 @@ function stopQRScanner() {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
     }
+    const video = document.getElementById('qrVideo');
+    if (video) video.srcObject = null;
 
     const scannerOverlay = document.getElementById('qrScannerContainer');
     if (scannerOverlay) {
@@ -213,37 +272,45 @@ function startQRCodeDetection() {
     // Lazy-load heavy scanning libs only when the scanner actually opens
     let libsReady = false;
     const gen = scanGeneration;
-    Promise.all([
-        loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'),
-        loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js')
-    ]).then(() => {
+    loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js').then(() => {
         // Scanner was closed while the CDN scripts were downloading.
         if (gen !== scanGeneration) return;
         libsReady = true;
-        Tesseract.createWorker().then(worker => {
-            // createWorker() is async: closing the scanner before this resolves
-            // used to make window.cleanupOCR() a no-op (ocrWorker was still
-            // null), leaking a WASM worker + language model per scan cycle.
-            if (gen !== scanGeneration) {
-                worker.terminate();
-                return;
-            }
-            worker.loadLanguage('eng').then(() => {
+    }).catch(err => console.warn('[Scanner] QR decoder failed to load:', err));
+
+    // OCR is an optional text-code fallback, not a prerequisite for QR scanning.
+    // Avoid its large script/WASM downloads when data saver or a slow link is detected.
+    if (!isLowBandwidthConnection()) {
+        loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js')
+            .then(() => {
+                if (gen !== scanGeneration) return null;
+                return Tesseract.createWorker();
+            })
+            .then(worker => {
+                if (!worker) return;
+                // createWorker() is async: closing the scanner before this resolves
+                // used to make cleanupOCR() a no-op and leak the worker.
                 if (gen !== scanGeneration) {
                     worker.terminate();
-                    return;
+                    return null;
                 }
-                worker.initialize('eng').then(() => {
-                    if (gen !== scanGeneration) {
+                return worker.loadLanguage('eng')
+                    .then(() => worker.initialize('eng'))
+                    .then(() => {
+                        if (gen !== scanGeneration) {
+                            worker.terminate();
+                            return;
+                        }
+                        ocrWorker = worker;
+                        console.log('[Scanner] AI OCR online');
+                    })
+                    .catch(error => {
                         worker.terminate();
-                        return;
-                    }
-                    ocrWorker = worker;
-                    console.log('[Scanner] AI OCR online');
-                });
-            });
-        });
-    }).catch(err => console.warn('[Scanner] Lazy lib load failed:', err));
+                        throw error;
+                    });
+            })
+            .catch(err => console.warn('[Scanner] Optional OCR failed to load:', err));
+    }
 
     qrScanInterval = setInterval(() => {
         if (!qrScannerActive || video.readyState !== video.HAVE_ENOUGH_DATA) return;

@@ -13,7 +13,15 @@
 // object that gets persisted (fresh parses are read-only snapshots).
 let _notebookMirror = null;
 // Skip the 20s flush iteration when nothing has changed since the last check.
-let _notebookDirty = false;
+let _notebookDirty = (() => {
+    try {
+        const notebook = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.puzzleNotebook) || '{}');
+        return Object.keys(notebook).some(pid => notebook[pid] && notebook[pid].dirty && !notebook[pid].solvedAt);
+    } catch (error) {
+        console.warn('[Notebook] Could not restore dirty state:', error);
+        return false;
+    }
+})();
 
 function getPuzzleNotebook() {
     _notebookMirror = _notebookMirror || (() => {
@@ -134,7 +142,8 @@ async function flushPuzzleNotebook(puzzleId, solved, extra) {
         await submitToGoogleSheets('SOLVED', { ...(extra || {}), ...summary });
         delete notebook[puzzleId];
     } else {
-        await submitToGoogleSheets('PUZZLE_ABANDONED', summary);
+        await submitToGoogleSheets('PUZZLE_ABANDONED', { ...summary, eventId: n.pendingEventId });
+        delete n.pendingEventId;
         n.dirty = false;
         n.lastActivityAt = Date.now();
     }
@@ -187,6 +196,8 @@ function flushPuzzleNotebooksOnUnload() {
             console.log('[Notebook] Unload flush skipped — rate limit reached');
             continue;
         }
+        n.pendingEventId = n.pendingEventId || (typeof generateEventId === 'function' ? generateEventId() : undefined);
+        savePuzzleNotebook(notebook);
         const summary = notepadSummaryOf(n);
         const payload = {
             action: 'PUZZLE_ABANDONED',
@@ -195,7 +206,7 @@ function flushPuzzleNotebooksOnUnload() {
             tid: currentTeamTid,
             mission: currentMissionLevel || '',
             timestamp: new Date().toISOString(),
-            eventId: (typeof generateEventId === 'function' ? generateEventId() : undefined),
+            eventId: n.pendingEventId,
             ...summary
         };
         const body = JSON.stringify({ ...payload, token: GOOGLE_SCRIPT_TOKEN });
@@ -210,7 +221,9 @@ function flushPuzzleNotebooksOnUnload() {
             } catch (e) { }
         }
 
-        if (!queued) {
+        if (queued) {
+            console.log('[Notebook] Abandonment queued; retaining it locally until a later confirmation.');
+        } else {
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'cors',
@@ -218,13 +231,23 @@ function flushPuzzleNotebooksOnUnload() {
                 keepalive: true,
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: body
-            }).catch(() => { });
+            })
+                .then(async response => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const json = await response.json();
+                    if (json && !json.rateLimited && (json.status === 'success' || json.status === 'OK')) {
+                        n.dirty = false;
+                        delete n.pendingEventId;
+                        savePuzzleNotebook(notebook);
+                    } else {
+                        console.warn('[Notebook] Unload save was not confirmed:', (json && json.message) || json);
+                    }
+                })
+                .catch(error => console.warn('[Notebook] Unload save failed; retaining it for retry:', error));
         }
 
-        // Keep failed/unconfirmed unloads dirty so the next session can retry.
-        if (queued) {
-            n.dirty = false;
-            savePuzzleNotebook(notebook);
-        }
+        n.dirty = true;
+        _notebookDirty = true;
+        savePuzzleNotebook(notebook);
     }
 }

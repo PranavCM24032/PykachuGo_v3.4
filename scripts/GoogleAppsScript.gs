@@ -98,17 +98,9 @@ function doOptions(e) {
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
-  var lockAcquired = lock.tryLock(20000);
+  var lockAcquired = false;
 
   try {
-    if (!lockAcquired) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "lock unavailable" }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var ss = getSpreadsheet_();
-    ensureSheetsExist(ss);
-
     var raw = (e && e.postData && e.postData.contents) || '';
     var data;
     try {
@@ -139,9 +131,17 @@ function doPost(e) {
           .setMimeType(ContentService.MimeType.JSON);
       }
 
+      lockAcquired = lock.tryLock(20000);
+      if (!lockAcquired) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "lock unavailable" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      var resetSpreadsheet = getSpreadsheet_();
+      ensureSheetsExist(resetSpreadsheet);
       var sheetsToWipe = ['Registration', 'L1', 'L2', 'L3'];
       sheetsToWipe.forEach(function(name) {
-        var sheet = ss.getSheetByName(name);
+        var sheet = resetSpreadsheet.getSheetByName(name);
         if (sheet && sheet.getLastRow() > 1) {
           sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
         }
@@ -160,7 +160,22 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    var ss = getSpreadsheet_();
     if (data.action === 'GET_TEAM_STATE') {
+      var missingSheet = ['Registration', 'L1', 'L2', 'L3'].some(function(name) {
+        return !ss.getSheetByName(name);
+      });
+      if (missingSheet) {
+        lockAcquired = lock.tryLock(20000);
+        if (!lockAcquired) {
+          return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "lock unavailable" }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+        ensureSheetsExist(ss);
+        lock.releaseLock();
+        lockAcquired = false;
+      }
+
       var qTid = (data.tid || '').toString().trim();
       var solved = [];
       var currentPuzzle = null;
@@ -215,9 +230,24 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    if (!checkTeamRate(data.tid || data.teamName || '')) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", rateLimited: true }))
+    lockAcquired = lock.tryLock(20000);
+    if (!lockAcquired) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "lock unavailable" }))
         .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    ensureSheetsExist(ss);
+
+    var rateLimitTeam = data.tid || data.teamName || '';
+    if (data.action === 'SESSION_BATCH' && Array.isArray(data.events) && data.events.length > 0) {
+      rateLimitTeam = data.events[0].tid || data.events[0].teamName || rateLimitTeam;
+    }
+    if (!checkTeamRate(rateLimitTeam)) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "rate_limited",
+        message: "Team request limit reached",
+        retryAfterSeconds: TEAM_RATE_WINDOW_SECS
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     if (data.action === 'SESSION_BATCH' && Array.isArray(data.events)) {
@@ -545,6 +575,10 @@ function findPuzzleRow(rows, teamName, tid, puzzleId, nullPuzzleMatch) {
 
 function writeRow(sheet, rows, rowIdx) {
   if (rowIdx <= 0 || !rows[rowIdx - 1]) return;
+  var maxRows = sheet.getMaxRows();
+  if (rowIdx > maxRows) {
+    sheet.insertRowsAfter(maxRows, rowIdx - maxRows);
+  }
   var rowData = rows[rowIdx - 1];
   sheet.getRange(rowIdx, 1, 1, rowData.length).setValues([rowData]);
 }

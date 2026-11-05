@@ -25,6 +25,59 @@ async function waitForSheetsSlot() {
     return await sheetsRateLimiter.acquire();
 }
 
+const SHEETS_RETRY_DELAYS_MS = [500, 1500, 3500];
+
+function isSheetsSuccess(result) {
+    const json = result && result.json;
+    return Boolean(result && result.ok && json && !json.rateLimited && (json.status === 'success' || json.status === 'OK'));
+}
+
+function isRetryableSheetsFailure(response, json) {
+    if (json && json.status === 'rate_limited') return false;
+    if (!response || !json) return true;
+    if (response.status === 408 || response.status === 429 || response.status >= 500) return true;
+    const message = String(json.message || '').toLowerCase();
+    return /lock unavailable|simultaneous|too many scripts|service invoked too many times|quota exceeded/.test(message);
+}
+
+async function postToGoogleSheets(body, action) {
+    for (let attempt = 0; attempt <= SHEETS_RETRY_DELAYS_MS.length; attempt++) {
+        await waitForSheetsSlot();
+        let response;
+        let json = null;
+        try {
+            response = await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'cors',
+                cache: 'no-cache',
+                keepalive: true,
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ ...body, token: GOOGLE_SCRIPT_TOKEN })
+            });
+            json = await response.json();
+        } catch (error) {
+            if (attempt === SHEETS_RETRY_DELAYS_MS.length) {
+                console.warn(`[Sheets] Request failed for ${action}:`, error);
+                return { ok: false, json: null };
+            }
+        }
+
+        if (response && response.ok && isSheetsSuccess({ ok: true, json })) {
+            return { ok: true, json };
+        }
+
+        if (!isRetryableSheetsFailure(response, json) || attempt === SHEETS_RETRY_DELAYS_MS.length) {
+            return { ok: false, json };
+        }
+
+        await new Promise(resolve => setTimeout(
+            resolve,
+            SHEETS_RETRY_DELAYS_MS[attempt] + Math.floor(Math.random() * 500)
+        ));
+    }
+    return { ok: false, json: null };
+}
+
 function getSessionBuffer() {
     try {
         return JSON.parse(localStorage.getItem(SESSION_BUFFER_KEY) || '[]');
@@ -150,29 +203,15 @@ async function sendToGoogleSheets(payload) {
         return false;
     }
     try {
-        // Throttle to a max of N requests per sliding window
-        await waitForSheetsSlot();
-        const res = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'cors',
-            cache: 'no-cache',
-            keepalive: true,
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ ...payload, token: GOOGLE_SCRIPT_TOKEN })
-        });
-        if (!res.ok) {
-            console.warn(`[Sheets] HTTP error ${res.status} for ${payload.action}`);
-            return false;
-        }
-        const json = await res.json();
-        if (json.status === 'success' || json.status === 'OK') {
+        const result = await postToGoogleSheets(payload, payload.action);
+        if (isSheetsSuccess(result)) {
             console.log(`[Sheets] Confirmed written: ${payload.action}`);
             return true;
         }
-        console.warn(`[Sheets] Script returned error for ${payload.action}:`, json.message || json);
+        console.warn(`[Sheets] Script did not confirm ${payload.action}:`, (result && result.json && result.json.message) || result);
         return false;
-    } catch (e) {
-        console.warn(`[Sheets] Send failed for ${payload.action}:`, e);
+    } catch (error) {
+        console.warn(`[Sheets] Send failed for ${payload.action}:`, error);
         return false;
     }
 }
@@ -190,28 +229,21 @@ async function flushSessionBuffer() {
     }
 
     try {
-        // Throttle batch flushes through the same sliding window
-        await waitForSheetsSlot();
-        const res = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'cors',
-            cache: 'no-cache',
-            keepalive: true,
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'SESSION_BATCH', events: buffer, sessionId: sessionId, token: GOOGLE_SCRIPT_TOKEN })
-        });
-        // The Apps Script always returns HTTP 200 even on failures, so clearing
-        // the buffer on res.ok alone would DROP events that never reached the
-        // sheet. Only clear once the script confirms success.
-        const json = await res.json().catch(() => null);
-        if (res.ok && json && (json.status === 'success' || json.status === 'OK')) {
+        const result = await postToGoogleSheets({
+            action: 'SESSION_BATCH',
+            events: buffer,
+            sessionId: sessionId,
+            teamName: currentTeam,
+            tid: currentTeamTid
+        }, 'SESSION_BATCH');
+        if (isSheetsSuccess(result)) {
             console.log(`[Sheets] Flushed ${buffer.length} buffered events`);
             clearSessionBuffer();
         } else {
-            console.warn('[Sheets] Flush rejected by server, keeping buffer for retry:', (json && json.message) || res.status);
+            console.warn('[Sheets] Flush rejected by server, keeping buffer for retry:', (result && result.json && result.json.message) || result);
         }
-    } catch (e) {
-        console.warn('[Sheets] Flush failed, will retry later:', e);
+    } catch (error) {
+        console.warn('[Sheets] Flush failed, will retry later:', error);
     }
 }
 
@@ -220,21 +252,12 @@ async function fetchTeamState(tid) {
     if (!tid) return null;
     if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) return null;
     try {
-        await waitForSheetsSlot();
-        const res = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'cors',
-            cache: 'no-cache',
-            keepalive: true,
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'GET_TEAM_STATE', tid, token: GOOGLE_SCRIPT_TOKEN })
-        });
-        if (!res.ok) return null;
-        const json = await res.json();
-        if (json.status !== 'success') return null;
-        return json;
-    } catch (e) {
-        console.warn('[Sheets] Could not fetch team state:', e);
+        const result = await postToGoogleSheets({ action: 'GET_TEAM_STATE', tid }, 'GET_TEAM_STATE');
+        if (result && result.ok && result.json && result.json.status === 'success') return result.json;
+        console.warn('[Sheets] Could not fetch team state:', (result && result.json && result.json.message) || result);
+        return null;
+    } catch (error) {
+        console.warn('[Sheets] Could not fetch team state:', error);
         return null;
     }
 }
@@ -263,11 +286,18 @@ window.addEventListener('beforeunload', () => {
                     cache: 'no-cache',
                     keepalive: true,
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'SESSION_BATCH', events: buffer, sessionId: sessionId, token: GOOGLE_SCRIPT_TOKEN })
+                    body: JSON.stringify({
+                        action: 'SESSION_BATCH',
+                        events: buffer,
+                        sessionId: sessionId,
+                        teamName: currentTeam,
+                        tid: currentTeamTid,
+                        token: GOOGLE_SCRIPT_TOKEN
+                    })
                 })
                     .then(r => r.json())
                     .then(json => {
-                        if (json && (json.status === 'success' || json.status === 'OK')) clearSessionBuffer();
+                        if (json && !json.rateLimited && (json.status === 'success' || json.status === 'OK')) clearSessionBuffer();
                     })
                     .catch(() => { });
             } else {

@@ -1,6 +1,5 @@
-const CACHE_NAME = 'pykachu-go-v2.0.5';
+const CACHE_NAME = 'pykachu-go-v2.0.6';
 const ASSETS = [
-    'admin.html',
     'index.html',
     '404.html',
     'css/base.css',
@@ -46,33 +45,8 @@ const ASSETS = [
     'data/teams.json',
     'data/meme.json',
     'service-worker.js',
-    'assets/img/ash.png',
-    'assets/img/ash-2.png',
-    'assets/img/ash-3.png',
-    'assets/img/brock.png',
-    'assets/img/jenny.png',
-    'assets/img/joy.png',
-    'assets/img/oak.png',
-    'assets/img/officer-jenny.png',
-    'assets/img/poketropy.png',
-    'assets/img/python.png',
-    'assets/img/C++.png',
-    'assets/img/grass.png',
-    'assets/img/fire.png',
-    'assets/img/water.png',
-    'assets/img/ground.png',
-    'assets/img/ghost.png',
-    'assets/img/fairy.png',
-    'assets/img/pikachu.png',
-    'assets/img/pykachu.png',
-    'assets/img/go.png',
     'assets/img/favicon.svg',
-    // Loader emblem art
-    'assets/img/logo1.png',
-    'assets/img/csi.jpg',
-    'assets/img/auron.png',
-    // End-of-chain celebration track
-    'assets/sound.mp3'
+    'assets/img/pikachu.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -144,21 +118,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Cache-first for all local static assets: instant serve + background refresh.
+    // Cache-first avoids repeat downloads and keeps previously visited pages usable offline.
     event.respondWith(
         caches.match(event.request).then((cached) => {
-            if (cached) {
-                // Serve from cache immediately; refresh in background so next visit is current.
-                fetch(event.request)
-                    .then((response) => {
-                        if (response && response.status === 200 && response.type === 'basic') {
-                            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
-                        }
-                    })
-                    .catch(() => { });
-                return cached;
-            }
-            // Not in cache yet: fetch, cache, and return.
+            if (cached) return cached;
+
             return fetch(event.request).then((response) => {
                 if (response && response.status === 200 && response.type === 'basic') {
                     const copy = response.clone();

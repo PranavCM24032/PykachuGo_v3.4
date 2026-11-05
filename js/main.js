@@ -54,15 +54,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         return;
     }
-    // Preload the player without delaying the rest of the game if YouTube is
-    // unavailable or slow on the current network.
-    warmupMemePlayer().catch(() => {});
     initAudio();
 
-    // Warm the end-of-chain celebration while the game is idle. The confetti
-    // library downloads once and the synth buffers are built now, so the frame
-    // the ball opens has nothing heavy to do and animation + cue stay in sync.
-    preloadConfetti().catch(() => { });
+    // Keep optional celebration downloads off the startup path.
     const warmCelebration = () => {
         if (typeof prewarmCelebrationAudio === 'function') prewarmCelebrationAudio();
     };

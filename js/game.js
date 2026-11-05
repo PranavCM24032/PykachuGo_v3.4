@@ -341,6 +341,10 @@ function submitPuzzleAnswer() {
         // Prepare Success Step Data
         const caughtImg = document.getElementById('capturePokemonImg') || document.getElementById('caughtPokemonImg');
         if (caughtImg && currentPuzzle.pokemonId) {
+            caughtImg.onerror = () => {
+                caughtImg.onerror = null;
+                caughtImg.src = 'assets/img/pikachu.png';
+            };
             caughtImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${currentPuzzle.pokemonId}.png`;
         }
 

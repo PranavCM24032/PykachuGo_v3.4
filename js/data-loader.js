@@ -1,6 +1,15 @@
 // ==============================
 // 0. ASSET PRELOADER (FOR SPEED)
 // ==============================
+function isLowBandwidthConnection() {
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    return Boolean(connection && (
+        connection.saveData ||
+        ['slow-2g', '2g'].includes(connection.effectiveType) ||
+        (Number(connection.downlink) > 0 && Number(connection.downlink) < 1)
+    ));
+}
+
 const AssetPreloader = {
     cached: new Set(),
     preloadImage(url, priority) {
@@ -16,33 +25,21 @@ const AssetPreloader = {
             img.decode().catch(() => { });
         }
     },
-    // Warm a specific Pokémon's artwork ahead of its reveal. Called when a puzzle
-    // is activated so the (large) official-artwork PNG is downloaded + decoded
-    // long before the ball opens.
+    // Warm only selected artwork on normal connections; data-saver users fetch
+    // the caught sprite only when it is needed.
     prioritizePokemon(pokemonId) {
-        if (!pokemonId) return;
+        if (!pokemonId || isLowBandwidthConnection()) return;
         this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonId}.png`, true);
     },
-    preload(puzzles) {
-        console.log("🚀 [Assets] Fast-tracking Pokemon, Badge & UI sprites...");
+    preload() {
+        if (isLowBandwidthConnection()) return;
+        console.log("🚀 [Assets] Fast-tracking local UI sprites...");
 
         const scheduleTask = window.requestIdleCallback || (cb => setTimeout(cb, 50));
 
         scheduleTask(() => {
-            // Preload critical UI assets & watermarks
-            ['assets/img/poketropy.png', 'assets/img/brock.png', 'assets/img/jenny.png'].forEach(url => {
+            ['assets/img/oak.png', 'assets/img/poketropy.png'].forEach(url => {
                 this.preloadImage(url);
-            });
-
-            // Preload puzzle-specific sprites asynchronously
-            puzzles.forEach(p => {
-                if (p.pokemonId) {
-                    this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.pokemonId}.png`);
-                    // Cries load on-demand at solve time — no bulk prefetch needed
-                }
-                if (p.badgeId) {
-                    this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${p.badgeId}.png`);
-                }
             });
         });
     }
@@ -58,7 +55,7 @@ async function loadPuzzles() {
         console.log(`Loaded ${PUZZLES.length} puzzles from puzzle.json`);
 
         // Speed up UI by pre-caching all sprites
-        AssetPreloader.preload(PUZZLES);
+        AssetPreloader.preload();
 
         // Validate puzzles have required fields
         PUZZLES.forEach((puzzle, index) => {

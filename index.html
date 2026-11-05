@@ -18,19 +18,38 @@
     <meta name="twitter:description"
         content="A Pokédex-styled binary signal decryption hunt. Solve Python &amp; C++ riddles, scan QR signals, chase a branching puzzle graph.">
     <meta name="twitter:image" content="assets/img/pykachu.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://www.youtube.com">
-    <link rel="preconnect" href="https://i.ytimg.com">
-    <link rel="preconnect" href="https://s.ytimg.com">
-    <link rel="dns-prefetch" href="https://www.youtube.com">
+    <script>
+        (() => {
+            window.addEventListener('load', () => {
+                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                const lowBandwidth = connection && (
+                    connection.saveData ||
+                    ['slow-2g', '2g'].includes(connection.effectiveType) ||
+                    (Number(connection.downlink) > 0 && Number(connection.downlink) < 1)
+                );
+                if (lowBandwidth) return;
 
-    <link
-        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@300;400;600&family=Handlee&family=Pixelify+Sans:wght@400..700&display=swap"
-        rel="stylesheet">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
-        rel="stylesheet">
+                const loadFonts = () => {
+                    [
+                        'https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@300;400;600&family=Handlee&family=Pixelify+Sans:wght@400..700&display=swap',
+                        'https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200'
+                    ].forEach(href => {
+                        const link = document.createElement('link');
+                        link.rel = 'stylesheet';
+                        link.href = href;
+                        link.media = 'print';
+                        link.onload = () => { link.media = 'all'; };
+                        document.head.appendChild(link);
+                    });
+                };
+                if (typeof requestIdleCallback === 'function') {
+                    requestIdleCallback(loadFonts, { timeout: 5000 });
+                } else {
+                    setTimeout(loadFonts, 1500);
+                }
+            });
+        })();
+    </script>
 
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/shell.css">
@@ -344,7 +363,7 @@
 
                             <!-- Overlapping Professor Oak -->
                             <div class="oak-overlap">
-                                <img src="assets/img/oak.png" alt="Professor Oak">
+                                <img src="assets/img/oak.png" alt="Professor Oak" loading="lazy" decoding="async">
                             </div>
                         </div>
 
@@ -368,7 +387,7 @@
                                 <div
                                     class="relative w-14 h-14 sm:w-16 sm:h-16 bg-gray-900 rounded-full flex items-center justify-center border border-blue-500/20">
                                     <div class="p-1 w-full h-full">
-                                        <img src="assets/img/ash-3.png" alt="Ash"
+                                        <img src="assets/img/ash-3.png" alt="Ash" loading="lazy" decoding="async"
                                             class="w-full h-full rounded-full object-cover filter brightness-90" />
                                     </div>
                                 </div>
@@ -625,7 +644,7 @@
                             <!-- Gym Badge Display -->
                             <div id="step3BadgeContainer" class="gym-badge-container hidden animate-fade-in">
                                 <div class="badge-sparkle"></div>
-                                <img id="gymBadgeImg" src="" alt="Gym Badge" class="gym-badge-image">
+                                <img id="gymBadgeImg" src="" alt="Gym Badge" loading="lazy" decoding="async" class="gym-badge-image">
                             </div>
 
                             <h2 class="font-pixel text-yellow-500 mb-1 tracking-widest uppercase text-xs sm:text-sm">
@@ -843,7 +862,7 @@ Loading puzzle data...</pre>
                                 <!-- Pokémon pops out of the ball -->
                                 <div class="reveal-pop">
                                     <img id="caughtPokemonImg" src="" alt="Caught Pokémon"
-                                        decoding="async" fetchpriority="high"
+                                        loading="lazy" decoding="async"
                                         class="pokemon-success-glow relative z-10 size-[clamp(130px,26vh,195px)] object-contain drop-shadow-[0_0_20px_rgba(234,179,8,0.3)] transition-transform duration-300 hover:scale-105" />
                                 </div>
                             </div>
@@ -907,6 +926,7 @@ Loading puzzle data...</pre>
                                             class="absolute inset-0 rounded-full bg-yellow-400/20 blur-xl animate-pulse">
                                         </div>
                                         <img id="completionTrophyImg" src="assets/img/poketropy.png" alt="Level Trophy"
+                                            loading="lazy" decoding="async"
                                             width="80" height="80" loading="eager"
                                             class="relative z-10 size-full object-contain drop-shadow-[0_0_15px_rgba(234,179,8,0.8)]" />
                                         <div class="gemini-shine shine-1"></div>
@@ -970,7 +990,7 @@ Loading puzzle data...</pre>
                         class="relative w-full max-w-64 sm:max-w-80 border-2 border-red-500/30 rounded-xl p-4 sm:p-6 bg-black/80 shadow-[0_0_30px_rgba(220,38,38,0.4)] text-center z-10 backdrop-blur-sm">
                         <!-- Warning Icon -->
                         <div class="absolute inset-0 flex items-center justify-center">
-                            <img src="assets/img/jenny.png" alt="Officer Jenny"
+                            <img src="assets/img/jenny.png" alt="Officer Jenny" loading="lazy" decoding="async"
                                 class="h-[85%] max-h-80 object-contain opacity-25">
                         </div>
                         <!-- Timer -->
@@ -1035,7 +1055,7 @@ Loading puzzle data...</pre>
                                 class="absolute inset-0 bg-gradient-to-br from-stone-900/80 via-amber-900/20 to-stone-900/80">
                                 <!-- Brock Watermark (Center, Large, Very Subtle) -->
                                 <div class="absolute inset-0 flex items-center justify-center opacity-10">
-                                    <img src="assets/img/brock.png" alt="Brock"
+                                    <img src="assets/img/brock.png" alt="Brock" loading="lazy" decoding="async"
                                         class="h-[70%] max-h-64 object-contain opacity-90">
                                 </div>
                             </div>
