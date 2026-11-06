@@ -1009,9 +1009,9 @@ Open the local URL printed by `serve`. Camera access generally requires either
 
 Set the Apps Script Script Properties (`PLAYER_TOKEN`, `ADMIN_TOKEN`, and
 `SPREADSHEET_ID`) and deploy the latest Apps Script version before using either
-host. Both hosts need `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and
-`GOOGLE_SHEET_URL`; the runtime-config generator now reads Vercel environment
-variables as well as a local `.env` file.
+host. The Vercel build uses the same Apps Script and spreadsheet as the GitHub
+Pages workflow by default; local development reads the three `GOOGLE_*` values
+from `.env`.
 
 When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
 `service-worker.js` so cache-first clients receive the update. Bump
@@ -1027,9 +1027,13 @@ When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
 ### Vercel
 
 1. Import the repository in Vercel and choose **Other** as the framework preset.
-2. Add `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and `GOOGLE_SHEET_URL` as
-   Production environment variables.
-3. Deploy. `vercel.json` runs `npm run build && npm run config:runtime`, serves
+2. Add `GOOGLE_SCRIPT_TOKEN` as a Production environment variable. It must
+   match the Apps Script `PLAYER_TOKEN` property. The backend URL and sheet URL
+   default to the same values used by the GitHub Pages workflow; set
+   `GOOGLE_SCRIPT_URL` or `GOOGLE_SHEET_URL` in Vercel only if using a different
+   backend or workbook.
+3. Redeploy after adding the variable. `vercel.json` runs
+   `npm run build && npm run config:runtime`, serves
    the repository root, adds the `/admin` redirect, and disables caching for
    `service-worker.js`, `runtime-config.js`, pages, and game data.
 4. `.vercelignore` keeps design docs, GitHub metadata, and editor files out of

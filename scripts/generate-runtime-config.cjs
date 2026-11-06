@@ -4,6 +4,10 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const envPath = path.join(root, '.env');
 const outputPath = path.join(root, 'js', 'runtime-config.js');
+const vercelDefaults = {
+    googleScriptUrl: 'https://script.google.com/macros/s/AKfycbwloiCwYYeoQQvzjccERsb5YvI2j9MEq_7lBa68M8QaYIfspD-lfpUURfIOxi-ZlNF_/exec',
+    googleSheetUrl: 'https://docs.google.com/spreadsheets/d/1sXcAgdp9dDJ9ygx2xkBSdC3HyRlC-5TxDQ_y-Gyrg30/edit?gid=1056900225#gid=1056900225'
+};
 
 function readEnv(filePath) {
     if (!fs.existsSync(filePath)) return {};
@@ -28,9 +32,9 @@ const env = { ...readEnv(envPath) };
 });
 
 const runtimeConfig = {
-    googleScriptUrl: env.GOOGLE_SCRIPT_URL || '',
+    googleScriptUrl: env.GOOGLE_SCRIPT_URL || (process.env.VERCEL ? vercelDefaults.googleScriptUrl : ''),
     googleScriptToken: env.GOOGLE_SCRIPT_TOKEN || '',
-    googleSheetUrl: env.GOOGLE_SHEET_URL || ''
+    googleSheetUrl: env.GOOGLE_SHEET_URL || (process.env.VERCEL ? vercelDefaults.googleSheetUrl : '')
 };
 
 fs.writeFileSync(
@@ -39,5 +43,13 @@ fs.writeFileSync(
 );
 
 if (!runtimeConfig.googleScriptUrl || !runtimeConfig.googleScriptToken) {
-    console.warn('Runtime config created without Google Sheets settings. Copy .env.example to .env and fill both values.');
+    const message = process.env.VERCEL
+        ? 'Runtime config is missing GOOGLE_SCRIPT_TOKEN. Add it to the Vercel project environment variables and redeploy.'
+        : 'Runtime config created without Google Sheets settings. Copy .env.example to .env and fill both values.';
+    if (process.env.VERCEL) {
+        console.error(message);
+        process.exitCode = 1;
+    } else {
+        console.warn(message);
+    }
 }
