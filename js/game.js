@@ -26,23 +26,30 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     }
 
     const foundTeam = TEAMS.find(t => t.team.toLowerCase() === teamInput.toLowerCase());
-    if (!foundTeam || String(foundTeam.securityKey || '').trim() !== securityKeyInput) {
-        showFeedback('registrationFeedback', 'Invalid team name or security key!', 'error');
-        triggerShake('teamSecurityKey');
+    if (!foundTeam) {
+        showFeedback('registrationFeedback', 'Trainer not found. Check the team name and try again.', 'error');
+        triggerShake('teamName');
         playSound('error');
         return;
     }
 
-    // Check the roster key locally, then obtain a short-lived session from the
-    // server so subsequent game state and scoring requests stay authenticated.
+    // The backend owns team-key validation; the bundled roster is only used to
+    // resolve the team's stable ID and must not reject rotated server-side keys.
     const lookupTid = foundTeam.tid || '';
 
     const login = await loginTeam(teamInput, lookupTid, securityKeyInput);
     if (thisLoginFlow !== loginFlowId) return; // superseded by a newer login
     if (!login.ok || !login.loginToken) {
-        const message = login.json?.status === 'rate_limited'
+        const status = login.json?.status;
+        const message = status === 'rate_limited'
             ? 'Too many attempts. Wait one minute and try again.'
-            : 'Invalid team name or security key!';
+            : status === 'configuration_error'
+                ? 'Sign-in is not configured. Please contact the organizer.'
+                : status === 'network_error'
+                    ? 'Could not reach the sign-in service. Check your connection and try again.'
+                    : status === 'error' && login.json?.message === 'unauthorized'
+                        ? 'The sign-in service is unavailable. Please contact the organizer.'
+                        : 'Invalid team name or security key!';
         showFeedback('registrationFeedback', message, 'error');
         triggerShake('teamSecurityKey');
         playSound('error');

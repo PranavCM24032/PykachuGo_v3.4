@@ -349,10 +349,10 @@ flowchart TD
         EMPTYREQ -- "No" --> TEXIST{"Team in<br/>teams.json?"}
         TEXIST -- "No" --> TNOTF["'Trainer not found'<br/>+ shake"]
         TNOTF --> REG
-        TEXIST -- "Yes" --> PWOK{"securityKey ===<br/>securityKey?"}
-        PWOK -- "No" --> PWBAD["'Incorrect security key'<br/>+ shake"]
+        TEXIST -- "Yes" --> SERVERAUTH{"Backend accepts<br/>team + security key?"}
+        SERVERAUTH -- "No" --> PWBAD["Show auth / connection error"]
         PWBAD --> REG
-        PWOK -- "Yes" --> TEAMSET["Set team / tid / mission / language<br/>create sessionId · REGISTRATION log"]
+        SERVERAUTH -- "Yes" --> TEAMSET["Set team / tid / mission / language<br/>create sessionId · REGISTRATION log"]
         TEAMSET --> TDL{"Deep-linked puzzle<br/>set & starting?"}
         TDL -- "Yes" --> STARTCODE["STEP startcode"]
         TDL -- "No" --> TDL2{"Deep-linked puzzle<br/>set & allowed?"}
@@ -380,19 +380,20 @@ flowchart TD
     end
 
     subgraph STARTR["4 · START CODE"]
-        STARTCODE --> SUBKEY["Submit start key"]
+        STARTCODE --> SUBKEY["Submit start key to backend"]
         SUBKEY --> KEYEMPTY{"Key empty?"}
         KEYEMPTY -- "Yes" --> KERR["Toast: Enter start key"]
         KERR --> SUBKEY
-        KEYEMPTY -- "No" --> KSEL{"Deep-linked puzzle<br/>present?"}
-        KSEL -- "Yes" --> KNORM{"Starting &<br/>key === startCode?"}
-        KNORM -- "Yes" --> ACTIVATE
-        KNORM -- "No" --> KALLOW{"Non-start &<br/>isPuzzleAllowed()?"}
-        KALLOW -- "Yes" --> ACTIVATE
-        KALLOW -- "No" --> BADKEY
-        KSEL -- "No" --> KPASS{"Any starting puzzle:<br/>key === startCode?"}
-        KPASS -- "Yes" --> ACTIVATE
-        KPASS -- "No" --> BADKEY["UNLOCK_FAILED log<br/>Error + shake"]
+        KEYEMPTY -- "No" --> KSEL{"Specific starting puzzle<br/>deep-linked?"}
+        KSEL -- "Yes" --> KREQ["Validate key for that puzzle"]
+        KSEL -- "No" --> KANY["Search all starting puzzles"]
+        KREQ --> KVALID
+        KANY --> KVALID{"Backend validates<br/>normalized key?"}
+        KVALID -- "Yes" --> KRESOLVE["Resolve returned puzzle ID"]
+        KRESOLVE --> ACTIVATE
+        KVALID -- "No: rate limited" --> KRL["Wait one minute"]
+        KRL --> STARTCODE
+        KVALID -- "No: invalid key" --> BADKEY["UNLOCK_FAILED log<br/>Error + shake"]
         BADKEY --> STARTCODE
     end
 
@@ -400,22 +401,21 @@ flowchart TD
 
     subgraph ASR["5 · ANSWER & SOLVE"]
         QUIZ --> ANS{"Submit answer<br/>(answerForm)?"}
-        ANS -- "No" --> HINTREQ
+        QUIZ --> HINTREQ
         ANS -- "Yes" --> AEMPTY{"Answer empty?"}
         AEMPTY -- "Yes" --> TE["Toast: INPUT REQUIRED"]
         TE --> QUIZ
         AEMPTY -- "No" --> ANO{"currentPuzzle<br/>loaded?"}
         ANO -- "No" --> APZ["Toast: NO PUZZLE LOADED"]
         APZ --> QUIZ
-        ANO -- "Yes" --> ACUR{"standardizeString(answer)<br/>=== puzzle.answer?"}
-        ACUR -- "No" --> WRONG["WRONG_ATTEMPT log<br/>glitch + shake + clear"]
+        ANO -- "Yes" --> ACUR{"Backend accepts answer<br/>for this puzzle?"}
+        ACUR -- "No: incorrect" --> WRONG["DECRYPTION FAILED<br/>glitch + shake + clear<br/>increment local notebook"]
         WRONG --> QUIZ
-        ACUR -- "Yes" --> FIRST{"First solve of<br/>this puzzle?"}
-        FIRST -- "Yes" --> BASE["+ points<br/>(puzzle.points)"]
-        BASE --> REC
-        FIRST -- "No" --> REP["− points<br/>(repeat solve — full value,<br/>never below zero)"]
-        REP --> REC
-        REC["recordPuzzleSolve() · push nextPuzzleId<br/>to unlock queue · SOLVED log"] --> ENDCHK{"Final puzzle?<br/>(nextPuzzleId empty)"}
+        ACUR -- "No: server/rate-limit error" --> AERR["Unlock answer for retry<br/>show error"]
+        AERR --> QUIZ
+        ACUR -- "Yes" --> REC["Server persists SOLVED<br/>and computes repeat, points,<br/>solved + unlocked state"]
+        REC --> APPLY["Apply authoritative result<br/>locally; clear notebook"]
+        APPLY --> ENDCHK{"Final puzzle?<br/>(nextPuzzleId empty)"}
         ENDCHK -- "Yes" --> COMPLETE["STEP 4 — Completion<br/>trophy · confetti · GAME COMPLETE"]
         ENDCHK -- "No" --> SUC["STEP 4 — Success + Pokémon reveal"]
         SUC --> BRANCH{"nextPuzzleId length?"}
@@ -429,8 +429,7 @@ flowchart TD
     end
 
     subgraph HINTR["6 · HINT SYSTEM"]
-        HINTREQ{"Hint requested?"} -- "Yes" --> HV{"Puzzle has a valid<br/>hint? (isHintValid)"}
-        HINTREQ -- "No" --> QUIZ
+        HINTREQ{"Hint requested?"} --> HV{"Puzzle has a valid<br/>hint? (isHintValid)"}
         HV -- "No" --> NOH["Hint button hidden"]
         NOH --> QUIZ
         HV -- "Yes" --> HU{"Already paid /<br/>hintUsed?"}
@@ -591,10 +590,13 @@ The Admin dashboard's **LEADERBOARD** tab aggregates records by TID:
 ]
 ```
 
-- Inline JSON roster (no server). Team logs in with `team` + `securityKey`.
+- The inline JSON roster supplies team names and stable IDs; the backend
+  validates the submitted security key and issues the login session.
 - `tid` is the stable team id used inside the backend spreadsheet.
-- (Note: `securityKey` is currently plain text — fine for an event tournament,
-  but do not use for anything sensitive.)
+- Backend team keys can be set with the Apps Script `TEAM_KEYS_JSON` script
+  property (keyed by team ID or team name). Until configured, the backend uses
+  `DEFAULT_TEAM_KEY` or its legacy fallback. Do not rely on the client roster
+  for authentication.
 
 ---
 

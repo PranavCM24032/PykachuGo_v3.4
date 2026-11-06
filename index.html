@@ -18,38 +18,10 @@
     <meta name="twitter:description"
         content="A Pokédex-styled binary signal decryption hunt. Solve Python &amp; C++ riddles, scan QR signals, chase a branching puzzle graph.">
     <meta name="twitter:image" content="assets/img/pykachu.png">
-    <script>
-        (() => {
-            window.addEventListener('load', () => {
-                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                const lowBandwidth = connection && (
-                    connection.saveData ||
-                    ['slow-2g', '2g'].includes(connection.effectiveType) ||
-                    (Number(connection.downlink) > 0 && Number(connection.downlink) < 1)
-                );
-                if (lowBandwidth) return;
-
-                const loadFonts = () => {
-                    [
-                        'https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@300;400;600&family=Handlee&family=Pixelify+Sans:wght@400..700&display=swap'
-                    ].forEach(href => {
-                        const link = document.createElement('link');
-                        link.rel = 'stylesheet';
-                        link.href = href;
-                        link.media = 'print';
-                        link.onload = () => { link.media = 'all'; };
-                        document.head.appendChild(link);
-                    });
-                };
-                if (typeof requestIdleCallback === 'function') {
-                    requestIdleCallback(loadFonts, { timeout: 5000 });
-                } else {
-                    setTimeout(loadFonts, 1500);
-                }
-            });
-        })();
-    </script>
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@300;400;600&family=Handlee&family=Pixelify+Sans:wght@400..700&display=swap">
     <link rel="preload" href="assets/fonts/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/shell.css">
