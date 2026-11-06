@@ -647,6 +647,9 @@
             if (state.usingCachedData) {
                 indicator.textContent = '[CACHED]';
                 indicator.className = 'text-[10px] text-amber-500 font-mono ml-2 pulse-alert';
+            } else if (!state.hasLiveData) {
+                indicator.textContent = '[ERROR]';
+                indicator.className = 'text-[10px] text-pink-500 font-mono ml-2';
             } else {
                 indicator.textContent = '[LIVE]';
                 indicator.className = 'text-[10px] text-emerald-500 font-mono ml-2';
@@ -673,14 +676,17 @@
                 if (!response.ok) throw new Error('Network response was not ok');
 
                 const rawData = await response.json();
+                let serverError = '';
 
                 if (Array.isArray(rawData)) {
                     state.logs = rawData;
                     localStorage.setItem('pykachuLogs', JSON.stringify(state.logs));
                     state.usingCachedData = false;
+                    state.hasLiveData = true;
                     if (rawData.length === 0) console.log('Google Sheet returned empty data array');
                 } else {
                     console.warn('Server returned error:', rawData);
+                    serverError = String(rawData && rawData.message || 'Unexpected server response');
                     if (state.logs.length === 0) {
                         const cached = localStorage.getItem('pykachuLogs');
                         if (cached) {
@@ -699,9 +705,17 @@
                 updateDataSourceIndicator();
                 renderLogs();
 
-                document.getElementById('lastUpdated').textContent = 'UPDATED: ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                document.getElementById('systemStatus').textContent = 'ONLINE';
-                document.getElementById('systemStatus').className = 'text-xs font-mono text-green-400';
+                const lastUpdated = document.getElementById('lastUpdated');
+                const systemStatus = document.getElementById('systemStatus');
+                if (serverError) {
+                    lastUpdated.textContent = 'SERVER ERROR';
+                    systemStatus.textContent = 'ERROR';
+                    systemStatus.className = 'text-xs font-mono text-pink-500';
+                } else {
+                    lastUpdated.textContent = 'UPDATED: ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    systemStatus.textContent = 'ONLINE';
+                    systemStatus.className = 'text-xs font-mono text-green-400';
+                }
 
             } catch (error) {
                 console.warn('Fetch error:', error);
@@ -722,6 +736,7 @@
                         }
                     }
                 }
+                updateDataSourceIndicator();
             } finally {
                 state.isFetching = false;
             }
