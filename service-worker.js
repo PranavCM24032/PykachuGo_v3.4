@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v2.0.9';
+const CACHE_NAME = 'pykachu-go-v2.0.10';
 const OPTIONAL_CACHE_NAME = 'pykachu-go-optional-v1';
 const ASSETS = [
     'index.html',
@@ -47,7 +47,9 @@ const ASSETS = [
     'data/meme.json',
     'service-worker.js',
     'assets/img/pokeball.svg',
-    'assets/img/pikachu.png'
+    'assets/img/apple-touch-icon.png',
+    'assets/img/pikachu.png',
+    'assets/fonts/material-symbols-rounded.woff2'
 ];
 
 self.addEventListener('install', (event) => {

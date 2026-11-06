@@ -116,14 +116,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         showToast(puzzleGateMessage(puzzle), 'error');
     }
 
-    if (urlLockedPuzzle) {
-        if (isStartingPuzzle(urlLockedPuzzle)) {
-            // Pre-fill the start key for the entry puzzle so deep links one-tap through
-            const unlockCodeInput = document.getElementById('unlockCode');
-            if (unlockCodeInput) unlockCodeInput.value = urlLockedPuzzle.startCode || "START";
-        }
-    }
-
     updateTeamStatus();
     prefillRegistrationForm();
     updatePowerLed();
@@ -308,12 +300,10 @@ function prefillRegistrationForm() {
     if (!info) return;
 
     const teamInput = document.getElementById('teamName');
-    const keyInput = document.getElementById('teamSecurityKey');
     const langSel = document.getElementById('codeLanguage');
     const missionSel = document.getElementById('missionLevel');
 
     if (teamInput && info.teamName) teamInput.value = info.teamName;
-    if (keyInput && info.securityKey) keyInput.value = info.securityKey;
     if (langSel && info.language && langSel.querySelector(`option[value="${info.language}"]`)) {
         langSel.value = info.language;
     }
@@ -334,7 +324,7 @@ function handlePowerTap() {
     if (isLoggedIn()) {
         showConfirmDialog({
             title: 'SIGN OUT',
-            message: `Trainer <span class="font-bold text-white">${escapeHTML(currentTeam)}</span><br>Your progress is backed up before sign-out. Continue?`,
+            message: `Trainer ${currentTeam}\nYour progress is backed up before sign-out. Continue?`,
             icon: 'power_settings_new',
             iconClass: 'text-red-500',
             titleClass: 'text-red-500',
@@ -372,7 +362,11 @@ function logoutCurrentUser() {
     // Both senders capture globals synchronously at call time (keepalive fetch);
     // anything still blocked by the rate limiter stays buffered for next login.
     flushPuzzleNotebooksOnUnload();
+    // flushSessionBuffer captures the queue synchronously before its first
+    // await, so clearing here guarantees a later team's login can never flush
+    // the previous team's events under the new team's session.
     flushSessionBuffer();
+    if (typeof clearSessionBuffer === 'function') clearSessionBuffer();
 
     stopQRScanner();
     destroyMemePlayer();
@@ -405,6 +399,7 @@ function logoutCurrentUser() {
     currentTeam = "";
     currentTeamTid = "";
     currentMissionLevel = "";
+    loginToken = "";
     sessionId = generateSessionId();
     currentPuzzle = null;
     urlLockedPuzzle = null;
@@ -412,6 +407,14 @@ function logoutCurrentUser() {
     tabSwitchCount = 0;
     isPuzzleActive = false;
     resetHintForNewTeam();
+    if (typeof resetNotebookMirror === 'function') resetNotebookMirror();
+
+    // Never leave a stale session token in remembered trainer data.
+    const remembered = (typeof getTeamInfo === 'function') ? getTeamInfo() : null;
+    if (remembered && remembered.loginToken) {
+        delete remembered.loginToken;
+        saveTeamInfo(remembered);
+    }
 
     updateTeamStatus();
     updatePowerLed();

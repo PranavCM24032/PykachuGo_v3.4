@@ -13,20 +13,37 @@
 // object that gets persisted (fresh parses are read-only snapshots).
 let _notebookMirror = null;
 // Skip the 20s flush iteration when nothing has changed since the last check.
-let _notebookDirty = (() => {
+let _notebookDirty = false;
+
+// Notebooks are keyed by team so a shared device can never leak one team's
+// half-solved notes into another team's session.
+function getNotebookStorageKey() {
+    const teamKey = (typeof getTeamStorageKey === 'function')
+        ? getTeamStorageKey()
+        : ((typeof currentTeamTid !== 'undefined' && currentTeamTid) || (typeof currentTeam !== 'undefined' ? currentTeam : ''));
+    return CONFIG.STORAGE_KEYS.puzzleNotebook + (teamKey ? ':' + teamKey : '');
+}
+
+function refreshNotebookDirty() {
     try {
-        const notebook = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.puzzleNotebook) || '{}');
-        return Object.keys(notebook).some(pid => notebook[pid] && notebook[pid].dirty && !notebook[pid].solvedAt);
-    } catch (error) {
-        console.warn('[Notebook] Could not restore dirty state:', error);
-        return false;
+        const notebook = JSON.parse(localStorage.getItem(getNotebookStorageKey()) || '{}');
+        _notebookDirty = Object.keys(notebook).some(pid => notebook[pid] && notebook[pid].dirty && !notebook[pid].solvedAt);
+    } catch (e) {
+        _notebookDirty = false;
     }
-})();
+    return _notebookDirty;
+}
+
+// Called after login/logout so the in-memory mirror never spans two teams.
+function resetNotebookMirror() {
+    _notebookMirror = null;
+    refreshNotebookDirty();
+}
 
 function getPuzzleNotebook() {
     _notebookMirror = _notebookMirror || (() => {
         try {
-            const nb = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.puzzleNotebook) || '{}');
+            const nb = JSON.parse(localStorage.getItem(getNotebookStorageKey()) || '{}');
             return nb;
         } catch (e) {
             return {};
@@ -38,10 +55,17 @@ function getPuzzleNotebook() {
 function savePuzzleNotebook(notebook) {
     _notebookMirror = notebook;
     try {
-        localStorage.setItem(CONFIG.STORAGE_KEYS.puzzleNotebook, JSON.stringify(notebook));
+        localStorage.setItem(getNotebookStorageKey(), JSON.stringify(notebook));
     } catch (e) {
         console.warn('[Notebook] Could not save:', e);
     }
+}
+
+function deletePuzzleNotebook(puzzleId) {
+    const notebook = getPuzzleNotebook();
+    delete notebook[puzzleId];
+    savePuzzleNotebook(notebook);
+    refreshNotebookDirty();
 }
 
 function createNotepad(notebook, puzzle) {
@@ -73,12 +97,15 @@ function currentNotepad() {
 }
 
 // Puzzle unlocked (via start-key, QR scan or deep link) — start the notepad.
-function notepadStart() {
+// An explicit puzzle can be passed when the current one has not been activated
+// yet (e.g. a scan of the next location).
+function notepadStart(puzzle) {
+    const target = puzzle || (typeof currentPuzzle !== 'undefined' ? currentPuzzle : null);
+    if (!target) return;
     const notebook = getPuzzleNotebook();
-    const pid = currentPuzzle ? currentPuzzle.id : null;
-    if (pid === null) return;
+    const pid = target.id;
     let n = notebook[pid];
-    if (!n) n = createNotepad(notebook, currentPuzzle);
+    if (!n) n = createNotepad(notebook, target);
     n.unlockedAt = n.unlockedAt || Date.now();
     n.lastActivityAt = Date.now();
     n.dirty = true;
@@ -87,12 +114,13 @@ function notepadStart() {
 }
 
 // Bump a counter locally: 'scan' | 'wrong' | 'hint' | 'tabswitch'
-function notepadBump(field) {
+function notepadBump(field, puzzle) {
+    const target = puzzle || (typeof currentPuzzle !== 'undefined' ? currentPuzzle : null);
+    if (!target) return;
     const notebook = getPuzzleNotebook();
-    const pid = currentPuzzle ? currentPuzzle.id : null;
-    if (pid === null) return;
+    const pid = target.id;
     let n = notebook[pid];
-    if (!n) n = createNotepad(notebook, currentPuzzle);
+    if (!n) n = createNotepad(notebook, target);
     if (field === 'scan') n.scanCount += 1;
     else if (field === 'wrong') n.wrongAttempts += 1;
     else if (field === 'hint') n.hintsUsed += 1;
@@ -138,17 +166,21 @@ async function flushPuzzleNotebook(puzzleId, solved, extra) {
     if (solved) n.solvedAt = Date.now();
     const summary = notepadSummaryOf(n);
 
+    let sent = false;
     if (solved) {
-        await submitToGoogleSheets('SOLVED', { ...(extra || {}), ...summary });
-        delete notebook[puzzleId];
+        sent = await submitToGoogleSheets('SOLVED', { ...(extra || {}), ...summary });
+        if (sent) delete notebook[puzzleId];
     } else {
-        await submitToGoogleSheets('PUZZLE_ABANDONED', { ...summary, eventId: n.pendingEventId });
-        delete n.pendingEventId;
-        n.dirty = false;
-        n.lastActivityAt = Date.now();
+        sent = await submitToGoogleSheets('PUZZLE_ABANDONED', { ...summary, eventId: n.pendingEventId });
+        if (sent) {
+            delete n.pendingEventId;
+            n.dirty = false;
+            n.lastActivityAt = Date.now();
+        }
     }
     savePuzzleNotebook(notebook);
-    return true;
+    refreshNotebookDirty();
+    return sent;
 }
 
 // Watchdog: puzzles left open get their half-done notepad flushed once
@@ -209,7 +241,11 @@ function flushPuzzleNotebooksOnUnload() {
             eventId: n.pendingEventId,
             ...summary
         };
-        const body = JSON.stringify({ ...payload, token: GOOGLE_SCRIPT_TOKEN });
+        const body = JSON.stringify({
+            ...payload,
+            token: GOOGLE_SCRIPT_TOKEN,
+            loginToken: (typeof getLoginToken === 'function') ? getLoginToken() : ''
+        });
         let queued = false;
 
         if (typeof navigator.sendBeacon === 'function') {

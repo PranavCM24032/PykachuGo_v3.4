@@ -7,7 +7,8 @@
     <title>Pykachu Go - Admin</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/img/pokeball.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="assets/img/pokeball.svg">
+    <link rel="icon" href="assets/img/apple-touch-icon.png" type="image/png" sizes="180x180">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#4361ee">
@@ -488,7 +489,9 @@
             filter: 'ALL',
             activeTab: 'REG',
             refreshTimer: null,
-            usingCachedData: false
+            usingCachedData: false,
+            hasLiveData: false,
+            adminSession: ''
         };
 
         function escapeHTML(s) {
@@ -557,9 +560,10 @@
                         })
                     });
                     const json = await resp.json();
-                    if (json.status !== 'success') {
+                    if (json.status !== 'success' || !json.session) {
                         throw new Error(json.message || 'unauthorized');
                     }
+                    state.adminSession = json.session;
                     authModal.remove();
                     await initializeAdmin();
                 } catch (e) {
@@ -577,16 +581,21 @@
         });
 
         async function initializeAdmin() {
-            const storedVersion = localStorage.getItem('pykachuVersion');
-            if (storedVersion !== CONFIG.VERSION) {
-                localStorage.removeItem('pykachuLogs');
-                localStorage.setItem('pykachuVersion', CONFIG.VERSION);
-                console.log('Cache auto-cleared due to version upgrade to ' + CONFIG.VERSION);
+            let storedVersion = null;
+            let cached = null;
+            try {
+                storedVersion = localStorage.getItem('pykachuVersion');
+                if (storedVersion !== CONFIG.VERSION) {
+                    localStorage.removeItem('pykachuLogs');
+                    localStorage.setItem('pykachuVersion', CONFIG.VERSION);
+                    console.log('Cache auto-cleared due to version upgrade to ' + CONFIG.VERSION);
+                }
+                cached = localStorage.getItem('pykachuLogs');
+            } catch (e) {
+                console.warn('localStorage unavailable:', e);
             }
 
             await loadTeams();
-
-            const cached = localStorage.getItem('pykachuLogs');
             if (cached) {
                 try {
                     state.logs = JSON.parse(cached);
@@ -667,7 +676,7 @@
 
             try {
                 const timestamp = new Date().getTime();
-                const url = `${CONFIG.SCRIPT_URL}?t=${timestamp}&token=${encodeURIComponent(CONFIG.TOKEN)}`;
+                const url = `${CONFIG.SCRIPT_URL}?t=${timestamp}&token=${encodeURIComponent(CONFIG.TOKEN)}&session=${encodeURIComponent(state.adminSession || '')}`;
 
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 35000);
@@ -679,8 +688,14 @@
                 let serverError = '';
 
                 if (Array.isArray(rawData)) {
-                    state.logs = rawData;
-                    localStorage.setItem('pykachuLogs', JSON.stringify(state.logs));
+                    state.logs = rawData.length > CONFIG.MAX_LOGS
+                        ? rawData.slice(rawData.length - CONFIG.MAX_LOGS)
+                        : rawData;
+                    try {
+                        localStorage.setItem('pykachuLogs', JSON.stringify(state.logs));
+                    } catch (e) {
+                        console.warn('Could not cache logs:', e);
+                    }
                     state.usingCachedData = false;
                     state.hasLiveData = true;
                     if (rawData.length === 0) console.log('Google Sheet returned empty data array');
@@ -722,6 +737,7 @@
                 document.getElementById('lastUpdated').textContent = 'RETRYING...';
                 document.getElementById('systemStatus').textContent = "OFFLINE";
                 document.getElementById('systemStatus').className = 'text-xs font-mono text-pink-500';
+                if (state.logs.length > 0) state.usingCachedData = true;
 
                 if (state.logs.length === 0) {
                     const cached = localStorage.getItem('pykachuLogs');
@@ -919,7 +935,7 @@
             let leaderboard = Object.values(teamMap);
 
             if (searchTerm) {
-                leaderboard = leaderboard.filter(t => t.name.toLowerCase().includes(searchTerm) || t.tid.toLowerCase().includes(searchTerm));
+                leaderboard = leaderboard.filter(t => t.name.toLowerCase().includes(searchTerm) || String(t.tid || '').toLowerCase().includes(searchTerm));
             }
 
             const matchesLevel = (missionStr, targetLvl) => {
@@ -1012,8 +1028,10 @@
                             }
                             totalTabs += Math.max(0, toInt(r.tabSwitches, 0));
                             if (r.tabSwitches > 0) hasMalpractice = true;
-                            // Only solved puzzles earn points; unsolved rows stay empty.
-                            if (r.status === 'SOLVED') {
+                            // Solved puzzles earn points; repeat solves are
+                            // standalone rows with a negative delta and must be
+                            // included so the running total matches the sheet.
+                            if (r.status === 'SOLVED' || r.status === 'REPEAT_SOLVE') {
                                 pointsFromRecords += toNumber(r.points, 0);
                                 hasPointData = true;
                             }
@@ -1049,7 +1067,7 @@
                 });
 
                 let lbRows = lb;
-                if (searchTerm) lbRows = lbRows.filter(r => r.name.toLowerCase().includes(searchTerm) || r.tid.toLowerCase().includes(searchTerm));
+                if (searchTerm) lbRows = lbRows.filter(r => r.name.toLowerCase().includes(searchTerm) || String(r.tid || '').toLowerCase().includes(searchTerm));
                 if (typeFilter !== 'ALL') {
                     lbRows = lbRows.filter(r =>
                         (r.mission || '').toString().toUpperCase().includes(typeFilter)
@@ -1230,7 +1248,7 @@
 
         function clearCache() {
             if (confirm('Clear all cached data and force fresh fetch from Google Sheets?')) {
-                localStorage.removeItem('pykachuLogs');
+                try { localStorage.removeItem('pykachuLogs'); } catch (e) { }
                 state.logs = [];
                 state.usingCachedData = false;
                 fetchData();

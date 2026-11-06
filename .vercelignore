@@ -2,4 +2,5 @@
 .github/
 .vscode/
 assets/docs/
+scripts/GoogleAppsScript.gs
 *.docx

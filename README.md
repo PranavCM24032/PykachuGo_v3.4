@@ -511,8 +511,7 @@ outgoing links.
   "questionCpp": "…",      // riddle in C++
   "answer": "-5",          // single correct answer (string compare)
   "nextPuzzleId": [2, 6],  // puzzle ids this one UNLOCKS (branching edge list)
-  "isStart": true,         // true = entry point a fresh team may start from
-  "startCode": "START",    // the key the player types on the startcode screen
+  "startCode": "START",    // presence marks a start puzzle; key typed on startcode screen
   "locationClue": "CSE entrance - openspace",
   "level": 1,              // 1 | 2 | 3 (routes telemetry to L1/L2/L3 tab)
   "points": 10,
@@ -524,9 +523,9 @@ outgoing links.
 
 Rules:
 
-- **Starting puzzles** have `isStart: true` — the ONLY things a fresh team can
-  unlock. `startCode` is the literal key the player types; it does not mark the
-  entry point by itself.
+- **Starting puzzles** are the only puzzles a fresh team can unlock. A
+  non-empty `startCode` marks a puzzle as a starting puzzle and is the key the
+  player types on the startcode screen.
 - **Chains** are forward-linked: `nextPuzzleId` lists every puzzle this solve
   unlocks (branching allowed, e.g. `[2, 6]`, and even a loop back like
   puzzle 6 → `[7, 3]`).
@@ -623,6 +622,8 @@ Extra external media:
 - Background music (Pokémon Showdown): `js/main.js`
 - Google Fonts (Press Start 2P, JetBrains Mono, Handlee, Pixelify Sans):
   <https://fonts.googleapis.com>
+- Material Symbols Rounded icon font (self-hosted subset, Apache 2.0):
+  <https://fonts.google.com/icons>
 
 ---
 
@@ -922,17 +923,21 @@ and renders aggregated JSON.
 
 ## 💾 PWA
 
-- `manifest.json` — standalone install, portrait, maskable icon.
+- `manifest.json` — standalone install, portrait, maskable SVG icon.
+- `assets/img/apple-touch-icon.png` — 180×180 opaque PNG for iOS home screens
+  and older Safari tabs, which ignore the SVG icon format.
 - `service-worker.js` — caches the app shell and required JSON data for offline
-  reloads using cache version `pykachu-go-v2.0.9`. Large optional audio and
+  reloads using cache version `pykachu-go-v2.0.10`. Large optional audio and
   decorative artwork are not downloaded during installation; the small Pikachu
   image is cached as an offline fallback for remote Pokémon artwork.
 - Cached local assets use cache-first delivery, so repeat visits and offline
   reloads do not trigger background re-downloads. The deployment-specific
   runtime config remains network-first with a cached offline fallback.
-- Startup skips optional artwork preloads and external fonts when the browser
-  reports data saver, 2G, or a downlink below 1 Mbps. Fonts are deferred until
-  after initial page load; YouTube and celebration audio load only when needed.
+- Startup skips optional artwork preloads and external text fonts when the
+  browser reports data saver, 2G, or a downlink below 1 Mbps. The Material
+  Symbols icon font is self-hosted and precached, so in-game icons render
+  immediately and still work offline. Text fonts are deferred until after
+  initial page load; YouTube and celebration audio load only when needed.
 - Camera scanning loads the locally hosted QR decoder on demand and retains it
   across app updates without adding it to the initial download. After its first
   successful load, QR decoding is available offline; on a first-ever offline

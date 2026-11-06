@@ -14,6 +14,13 @@ function generateEventId() {
     return 'EV_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
 }
 
+// The server-issued login session is the only accepted proof of team identity.
+function getLoginToken() {
+    if (typeof loginToken !== 'undefined' && loginToken) return loginToken;
+    const info = typeof getTeamInfo === 'function' ? getTeamInfo() : null;
+    return (info && info.loginToken) || '';
+}
+
 // Sliding window rate limit for Google Sheets API calls (protects Apps Script quota).
 const sheetsRateLimiter = new SlidingWindowRateLimiter({
     limit: 30,               // max requests per window
@@ -52,7 +59,11 @@ async function postToGoogleSheets(body, action) {
                 cache: 'no-cache',
                 keepalive: true,
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ ...body, token: GOOGLE_SCRIPT_TOKEN })
+                body: JSON.stringify({
+                    ...body,
+                    token: GOOGLE_SCRIPT_TOKEN,
+                    loginToken: body.loginToken || getLoginToken()
+                })
             });
             json = await response.json();
         } catch (error) {
@@ -133,7 +144,7 @@ const _throttleCounts = {};
 function shouldSendThrottled(action, puzzleId) {
     const rule = EVENT_THROTTLE[action];
     if (!rule) return { send: true, count: 1 };
-    const key = `${action}:${puzzleId || 0}`;
+    const key = `${currentTeam || ''}:${action}:${puzzleId || 0}`;
     const n = (_throttleCounts[key] = (_throttleCounts[key] || 0) + 1);
     if (rule.once) return { send: n === 1, count: n };
     if (n === 1 || n % rule.interval === 0) return { send: true, count: n };
@@ -145,7 +156,7 @@ async function submitToGoogleSheets(action, data = {}) {
         // Skip entirely if no valid team (anonymous sessions)
         if (!isValidTeam()) {
             console.log('[Sheets] Skipping — no valid team set');
-            return;
+            return false;
         }
 
         const payload = {
@@ -157,6 +168,7 @@ async function submitToGoogleSheets(action, data = {}) {
             puzzleId: data.puzzleId || currentPuzzle?.id || 0,
             puzzleLevel: data.puzzleLevel || currentPuzzle?.level,
             timestamp: new Date().toISOString(),
+            loginToken: getLoginToken(),
             ...data
         };
         // One id per logical event; preserved across buffer retries.
@@ -176,7 +188,7 @@ async function submitToGoogleSheets(action, data = {}) {
         if (throttle.countField) payload[throttle.countField] = throttle.count;
         if (!throttle.send) {
             console.log(`[Sheets] Throttled ${action} (${throttle.count}th occurrence)`);
-            return;
+            return false;
         }
 
         // Send immediately in real-time; buffer ONLY if the send fails so the
@@ -186,9 +198,11 @@ async function submitToGoogleSheets(action, data = {}) {
             addToSessionBuffer(payload);
             console.log(`[Sheets] Buffered ${action} for retry`);
         }
+        return sent;
 
     } catch (error) {
         console.error('CRITICAL: Error submitting telemetry:', error);
+        return false;
     }
 }
 
@@ -247,12 +261,93 @@ async function flushSessionBuffer() {
     }
 }
 
-// Pull a team's stored frontier (solved/queue ids + score) back from Google Sheets
-async function fetchTeamState(tid) {
-    if (!tid) return null;
+// Exchange a team key for a short-lived server login session. The token is
+// the only thing the backend will accept as proof of team identity.
+async function loginTeam(teamName, tid, securityKey) {
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
+        return { ok: false, json: null };
+    }
+    try {
+        const result = await postToGoogleSheets({
+            action: 'LOGIN',
+            teamName: teamName || '',
+            tid: tid || '',
+            securityKey: securityKey || ''
+        }, 'LOGIN');
+        if (isSheetsSuccess(result) && result.json && result.json.loginToken) {
+            return { ok: true, ...result.json };
+        }
+        return { ok: false, json: (result && result.json) || null };
+    } catch (error) {
+        console.warn('[Sheets] Login failed:', error);
+        return { ok: false, json: null };
+    }
+}
+
+// Server-side answer validation. The client never sees the expected answer.
+async function submitAnswerToServer(puzzleId, answer, extra = {}) {
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
+        return { ok: false, json: null };
+    }
+    try {
+        const payload = {
+            action: 'SUBMIT_ANSWER',
+            puzzleId: Number(puzzleId) || 0,
+            answer: String(answer == null ? '' : answer),
+            ...extra
+        };
+        if (!payload.eventId) payload.eventId = generateEventId();
+        const result = await postToGoogleSheets(payload, 'SUBMIT_ANSWER');
+        if (isSheetsSuccess(result) && result.json) return { ok: true, ...result.json };
+        return { ok: false, json: (result && result.json) || null };
+    } catch (error) {
+        console.warn('[Sheets] Answer submit failed:', error);
+        return { ok: false, json: null };
+    }
+}
+
+// Validate a start code without shipping the code list to the browser.
+async function verifyStartCode(startCode, puzzleId = 0) {
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
+        return { ok: false, json: null };
+    }
+    try {
+        const result = await postToGoogleSheets({
+            action: 'SUBMIT_START_CODE',
+            startCode: String(startCode || ''),
+            puzzleId: Number(puzzleId) || 0
+        }, 'SUBMIT_START_CODE');
+        if (isSheetsSuccess(result) && result.json) return { ok: true, ...result.json };
+        return { ok: false, json: (result && result.json) || null };
+    } catch (error) {
+        console.warn('[Sheets] Start code check failed:', error);
+        return { ok: false, json: null };
+    }
+}
+
+// Fetch a hint only for a puzzle the team is allowed to see.
+async function fetchHint(puzzleId) {
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
+        return { ok: false, json: null };
+    }
+    try {
+        const result = await postToGoogleSheets({
+            action: 'GET_HINT',
+            puzzleId: Number(puzzleId) || 0
+        }, 'GET_HINT');
+        if (isSheetsSuccess(result) && result.json) return { ok: true, ...result.json };
+        return { ok: false, json: (result && result.json) || null };
+    } catch (error) {
+        console.warn('[Sheets] Hint fetch failed:', error);
+        return { ok: false, json: null };
+    }
+}
+
+// Pull the logged-in team's stored frontier (solved/unlocked ids + score).
+async function fetchTeamState() {
     if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) return null;
     try {
-        const result = await postToGoogleSheets({ action: 'GET_TEAM_STATE', tid }, 'GET_TEAM_STATE');
+        const result = await postToGoogleSheets({ action: 'GET_TEAM_STATE' }, 'GET_TEAM_STATE');
         if (result && result.ok && result.json && result.json.status === 'success') return result.json;
         console.warn('[Sheets] Could not fetch team state:', (result && result.json && result.json.message) || result);
         return null;
@@ -292,7 +387,8 @@ window.addEventListener('beforeunload', () => {
                         sessionId: sessionId,
                         teamName: currentTeam,
                         tid: currentTeamTid,
-                        token: GOOGLE_SCRIPT_TOKEN
+                        token: GOOGLE_SCRIPT_TOKEN,
+                        loginToken: getLoginToken()
                     })
                 })
                     .then(r => r.json())

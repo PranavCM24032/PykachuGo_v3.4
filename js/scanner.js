@@ -25,6 +25,72 @@ function loadScript(src) {
     });
 }
 
+async function getCameraPermissionState() {
+    try {
+        if (!navigator.permissions || typeof navigator.permissions.query !== 'function') return 'unknown';
+        const status = await navigator.permissions.query({ name: 'camera' });
+        return status.state || 'unknown';
+    } catch {
+        return 'unknown';
+    }
+}
+
+async function requestCameraStream() {
+    // Phones vary wildly in what they accept. Try the preferred rear-camera
+    // setup first, then progressively simpler constraints so an unsupported
+    // resolution or frame rate does not sink the whole scan.
+    const attempts = [
+        {
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30 }
+            }
+        },
+        { video: { facingMode: { ideal: 'environment' } } },
+        { video: true }
+    ];
+
+    let lastError = null;
+    for (const constraints of attempts) {
+        try {
+            return await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (error) {
+            lastError = error;
+            if (['NotAllowedError', 'SecurityError'].includes(error.name)) throw error;
+        }
+    }
+    throw lastError || new Error('Camera could not start');
+}
+
+function cameraErrorMessage(error) {
+    if (!window.isSecureContext) return 'Camera needs HTTPS. Use manual code entry.';
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        return 'This browser cannot access the camera. Use manual code entry.';
+    }
+
+    switch (error && error.name) {
+        case 'NotFoundError':
+        case 'DevicesNotFoundError':
+            return 'No camera found. Use manual code entry.';
+        case 'NotReadableError':
+        case 'TrackStartError':
+            return 'Camera is busy in another app. Close it and retry, or use manual entry.';
+        case 'NotAllowedError':
+        case 'PermissionDeniedError':
+        case 'SecurityError':
+            return 'Camera blocked. Allow camera for this site, then retry or use manual entry.';
+        case 'OverconstrainedError':
+        case 'ConstraintNotSatisfiedError':
+            return 'Camera settings are unsupported. Retry or use manual entry.';
+        case 'AbortError':
+            return 'Camera stopped before it started. Retry or use manual entry.';
+        default:
+            return 'Camera could not start. Use manual code entry.';
+    }
+}
+
 async function startQRScanner() {
     // Re-entrancy guard. Two fast taps put two getUserMedia() promises in
     // flight; the loser resolved later and OVERWROTE videoStream (leaking the
@@ -36,14 +102,20 @@ async function startQRScanner() {
     let stream = null;
 
     try {
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                frameRate: { ideal: 30 }
-            }
-        });
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            const error = new Error('Camera API unavailable');
+            error.name = window.isSecureContext ? 'NotSupportedError' : 'SecurityError';
+            throw error;
+        }
+
+        const permissionState = await getCameraPermissionState();
+        if (permissionState === 'denied') {
+            const error = new Error('Camera permission denied');
+            error.name = 'NotAllowedError';
+            throw error;
+        }
+
+        stream = await requestCameraStream();
 
         // Back/cancel landed while the permission prompt was open. The promise
         // still resolved afterwards and used to boot a scanner nobody asked
@@ -66,10 +138,17 @@ async function startQRScanner() {
         }
         container.classList.remove('hidden');
         video.muted = true;
+        video.autoplay = true;
         video.playsInline = true;
         video.setAttribute('playsinline', '');
         video.srcObject = stream;
-        await video.play();
+        try {
+            await video.play();
+        } catch (playError) {
+            // Some mobile browsers reject the initial play() while the stream
+            // is still warming up. The loadeddata wait below still recovers.
+            console.warn('[Scanner] Video play deferred:', playError);
+        }
 
         if (gen !== scanGeneration) {
             stream.getTracks().forEach((track) => track.stop());
@@ -122,14 +201,7 @@ async function startQRScanner() {
         console.error('Camera error:', error);
         // Never leave a live camera running on the failure path.
         stopQRScanner();
-        const message = error.name === 'NotFoundError'
-            ? 'No camera found. Using manual override.'
-            : error.name === 'NotReadableError'
-                ? 'Camera is busy or unavailable. Using manual override.'
-                : error.name === 'NotAllowedError' || error.name === 'SecurityError'
-                    ? 'Camera permission denied. Using manual override.'
-                    : 'Camera could not start. Using manual override.';
-        showToast(message, 'error');
+        showToast(cameraErrorMessage(error), 'error');
         showManualEntry();
     } finally {
         scannerStarting = false;
@@ -377,7 +449,7 @@ function startQRCodeDetection() {
 // QR Processing State
 let processingQR = false;
 
-function handleQRScanResult(qrData) {
+async function handleQRScanResult(qrData) {
     if (processingQR) return;
     processingQR = true;
 
@@ -433,12 +505,13 @@ function handleQRScanResult(qrData) {
     const normalizedInput = standardizeString(linkId);
     urlLockedPuzzle = PUZZLES.find(p => standardizeString(p.linkid) === normalizedInput);
 
-    // Allow direct start-code entry for the first puzzle
-    if (!urlLockedPuzzle) {
-        urlLockedPuzzle = PUZZLES.find(p =>
-            isStartingPuzzle(p) && p.startCode &&
-            standardizeString(p.startCode) === normalizedInput
-        );
+    // Allow direct start-code entry. Codes are server-side only, so the
+    // scanned text is checked against the backend (puzzleId 0 = search all).
+    if (!urlLockedPuzzle && typeof verifyStartCode === 'function') {
+        const codeResult = await verifyStartCode(normalizedInput, 0);
+        if (codeResult.ok && codeResult.correct && codeResult.puzzleId) {
+            urlLockedPuzzle = PUZZLES.find(p => Number(p.id) === Number(codeResult.puzzleId)) || null;
+        }
     }
 
     if (urlLockedPuzzle) {
@@ -462,7 +535,7 @@ function handleQRScanResult(qrData) {
             return;
         }
 
-        notepadBump('scan');
+        notepadBump('scan', urlLockedPuzzle);
 
         showToast('✓ Signal Acquired - Redirecting...', 'success');
         setTimeout(() => {

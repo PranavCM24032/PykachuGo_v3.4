@@ -11,7 +11,6 @@
             6
         ],
         "startCode": "START",
-        "isStart": true,
         "locationClue": "CSE entrance - openspace",
         "level": 1,
         "points": 10,
@@ -65,7 +64,6 @@
             5
         ],
         "startCode": "GRASS",
-        "isStart": true,
         "locationClue": "M215 back door",
         "level": 1,
         "points": 10,

@@ -49,6 +49,15 @@
       ]
     },
     {
+      "source": "/assets/fonts/material-symbols-rounded.woff2",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "font/woff2"
+        }
+      ]
+    },
+    {
       "source": "/",
       "headers": [
         {

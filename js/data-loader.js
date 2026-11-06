@@ -57,9 +57,10 @@ async function loadPuzzles() {
         // Speed up UI by pre-caching all sprites
         AssetPreloader.preload();
 
-        // Validate puzzles have required fields
+        // Validate puzzles have required public fields. Answers, start codes
+        // and hints are server-side only and intentionally absent here.
         PUZZLES.forEach((puzzle, index) => {
-            if (!puzzle.id || (!puzzle.questionPython && !puzzle.questionCpp) || !puzzle.answer) {
+            if (!puzzle.id || (!puzzle.questionPython && !puzzle.questionCpp)) {
                 console.error(`Puzzle ${index + 1} is missing required fields`);
             }
         });

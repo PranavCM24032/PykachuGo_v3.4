@@ -2,9 +2,12 @@
 // UTILITY FUNCTIONS
 // ==============================
 function escapeHTML(value) {
-    const element = document.createElement('div');
-    element.textContent = value == null ? '' : String(value);
-    return element.innerHTML;
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function showToast(message, type = 'info') {
@@ -23,7 +26,7 @@ function showToast(message, type = 'info') {
     toast.innerHTML = `
         <div class="flex items-center gap-2 relative z-10 w-full">
             <span class="material-symbols-rounded text-xs shrink-0">${type === 'error' ? 'warning' : type === 'success' ? 'check_circle' : 'info'}</span>
-            <span class="text-[8px] leading-tight break-words">${message}</span>
+            <span class="text-[8px] leading-tight break-words">${escapeHTML(message)}</span>
         </div>
     `;
 
@@ -65,12 +68,13 @@ function showConfirmDialog(opts) {
     overlay.setAttribute('aria-modal', 'true');
 
     const primaryBtn = opts.primaryClass || 'bg-yellow-600 text-black hover:bg-yellow-700';
+    const safeMessage = escapeHTML(opts.message || '').replace(/\n/g, '<br>');
 
     overlay.innerHTML = `
         <div class="bg-gray-900/90 border-2 ${opts.accentClass || 'border-yellow-600/50'} rounded-xl p-4 sm:p-5 w-full max-w-xs sm:max-w-sm text-center">
-            <span class="material-symbols-rounded ${opts.iconClass || 'text-yellow-500'} text-3xl sm:text-4xl">${opts.icon || 'lightbulb'}</span>
+            <span class="material-symbols-rounded ${opts.iconClass || 'text-yellow-500'} text-3xl sm:text-4xl">${escapeHTML(opts.icon || 'lightbulb')}</span>
             <h3 class="font-pixel ${opts.titleClass || 'text-yellow-500'} text-sm sm:text-base my-3">${escapeHTML(opts.title || 'Confirm')}</h3>
-            <p class="text-gray-400 text-xs sm:text-sm mb-4 leading-relaxed">${opts.message || ''}</p>
+            <p class="text-gray-400 text-xs sm:text-sm mb-4 leading-relaxed">${safeMessage}</p>
             <div class="flex gap-2 sm:gap-3">
                 <button type="button" data-act="ok" onclick="playSound('click')"
                     class="${primaryBtn} font-bold flex-1 py-3 sm:py-4 rounded-lg text-sm sm:text-base transition-colors min-h-[44px]">

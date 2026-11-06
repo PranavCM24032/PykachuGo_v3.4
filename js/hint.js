@@ -11,6 +11,14 @@ function isHintValid(hint) {
     return false;
 }
 
+// The hint TEXT is server-side only; the public puzzle data just says whether
+// one exists (`hasHint`). Older cached data may still carry `hint`.
+function puzzleHasHint(puzzle) {
+    if (!puzzle) return false;
+    if (puzzle.hasHint === true) return true;
+    return isHintValid(puzzle.hint);
+}
+
 function setupHintSystem() {
     console.log('Setting up hint system...');
     if (!currentPuzzle || !CONFIG.FEATURES.hintSystem) return;
@@ -23,10 +31,11 @@ function setupHintSystem() {
 
     if (!hintContainer) return;
 
-    currentPuzzleHint = currentPuzzle.hint;
+    // The actual hint text is fetched from the server only when requested.
+    currentPuzzleHint = null;
 
-    // VALIDATION: null/undefined/false/"none"/"" → no hint button
-    const isValidHint = isHintValid(currentPuzzleHint);
+    // VALIDATION: no hint for this puzzle → no hint button
+    const isValidHint = puzzleHasHint(currentPuzzle);
 
     if (isValidHint) {
         console.log('Hint detected. Activating UI.');
@@ -85,6 +94,10 @@ function loadHintState() {
         currentPuzzle.hintUsed = false;
         hintDisplayed = false;
     }
+    if (currentPuzzle && typeof currentTeamHintsUsed !== 'undefined' &&
+        currentTeamHintsUsed.has(Number(currentPuzzle.id))) {
+        currentPuzzle.hintUsed = true;
+    }
 }
 
 function saveHintState() {
@@ -102,7 +115,11 @@ function saveHintState() {
             team: currentTeam,
             puzzleId: currentPuzzle.id
         };
-        localStorage.setItem(CONFIG.STORAGE_KEYS.hintState, JSON.stringify(hintState));
+        try {
+            localStorage.setItem(CONFIG.STORAGE_KEYS.hintState, JSON.stringify(hintState));
+        } catch (e) {
+            console.warn('[Hint] Could not save hint state:', e);
+        }
     }
 }
 
@@ -117,10 +134,7 @@ function requestHint() {
         return;
     }
 
-    if (!currentPuzzleHint && currentPuzzle.hint) {
-        currentPuzzleHint = currentPuzzle.hint;
-    }
-    if (!currentPuzzleHint) {
+    if (!puzzleHasHint(currentPuzzle)) {
         showToast('No hint available for this puzzle.', 'info');
         return;
     }
@@ -376,14 +390,26 @@ function resumeHintPenalty() {
     console.log('Hint timer restarted after malpractice penalty.');
 }
 
-function showHint() {
+async function showHint() {
     if (!currentPuzzle) {
         showToast('No puzzle loaded for hint.', 'error');
         return;
     }
 
-    if (!currentPuzzleHint && currentPuzzle && currentPuzzle.hint) {
-        currentPuzzleHint = currentPuzzle.hint;
+    if (!currentPuzzleHint) {
+        if (typeof fetchHint !== 'function') {
+            showToast('Hint unavailable right now.', 'error');
+            return;
+        }
+        const requestedPuzzle = currentPuzzle;
+        const result = await fetchHint(requestedPuzzle.id);
+        // The player may have moved on while the request was in flight.
+        if (currentPuzzle !== requestedPuzzle) return;
+        if (!result.ok || !result.hint) {
+            showToast('Hint unavailable right now.', 'error');
+            return;
+        }
+        currentPuzzleHint = result.hint;
     }
     if (!currentPuzzleHint) {
         showToast('No hint available for this puzzle.', 'info');
@@ -447,7 +473,7 @@ function closeHintPopup() {
     // RE-VALIDATE before showing button again.
     // The button reappears even when the hint was already paid for: re-opening
     // is free (requestHint() short-circuits to showHint() once hintUsed is true).
-    const isValidHint = isHintValid(currentPuzzle && currentPuzzle.hint);
+    const isValidHint = puzzleHasHint(currentPuzzle);
 
     if (isValidHint) {
         const hintRequestBtn = document.getElementById('hintRequestBtn');

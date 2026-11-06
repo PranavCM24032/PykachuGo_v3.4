@@ -25,26 +25,37 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         return;
     }
 
-    // Verify team and security key
     const foundTeam = TEAMS.find(t => t.team.toLowerCase() === teamInput.toLowerCase());
-
-    if (!foundTeam) {
-        showFeedback('registrationFeedback', 'Trainer not found in database!', 'error');
-        triggerShake('teamName');
-        playSound('error');
-        return;
-    }
-
-    if (foundTeam.securityKey !== securityKeyInput) {
-        showFeedback('registrationFeedback', 'Incorrect security key!', 'error');
+    if (!foundTeam || String(foundTeam.securityKey || '').trim() !== securityKeyInput) {
+        showFeedback('registrationFeedback', 'Invalid team name or security key!', 'error');
         triggerShake('teamSecurityKey');
         playSound('error');
         return;
     }
 
+    // Check the roster key locally, then obtain a short-lived session from the
+    // server so subsequent game state and scoring requests stay authenticated.
+    const lookupTid = foundTeam.tid || '';
+
+    const login = await loginTeam(teamInput, lookupTid, securityKeyInput);
+    if (thisLoginFlow !== loginFlowId) return; // superseded by a newer login
+    if (!login.ok || !login.loginToken) {
+        const message = login.json?.status === 'rate_limited'
+            ? 'Too many attempts. Wait one minute and try again.'
+            : 'Invalid team name or security key!';
+        showFeedback('registrationFeedback', message, 'error');
+        triggerShake('teamSecurityKey');
+        playSound('error');
+        return;
+    }
+
+    loginToken = login.loginToken;
+    const resolvedTeamName = login.teamName || (foundTeam ? foundTeam.team : teamInput);
+    const resolvedTid = login.tid || lookupTid;
+
     const previousTeamKey = getRememberedTeamKey();
-    const nextTeamTid = foundTeam.tid || '';
-    const nextTeamKey = nextTeamTid || foundTeam.team;
+    const nextTeamTid = resolvedTid;
+    const nextTeamKey = nextTeamTid || resolvedTeamName;
     const isDifferentTeam = !previousTeamKey || previousTeamKey !== nextTeamKey;
 
     // A browser can be shared by multiple teams. Do not carry the previous
@@ -58,18 +69,18 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         localStorage.removeItem(CONFIG.STORAGE_KEYS.gameState);
     }
 
-    currentTeam = foundTeam.team;
-    currentTeamTid = nextTeamTid;
+    currentTeam = resolvedTeamName;
+    currentTeamTid = resolvedTid;
     currentMissionLevel = missionLevel;
     currentLanguage = codeLanguage;
     saveTeamInfo({
         teamName: currentTeam,
         tid: currentTeamTid,
-        securityKey: securityKeyInput,
         mission: missionLevel,
         language: codeLanguage
     });
     resetHintForNewTeam();
+    if (typeof resetNotebookMirror === 'function') resetNotebookMirror();
     loadTeamScoreState();
     gameStartTime = new Date();
 
@@ -77,17 +88,17 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         sessionId = generateSessionId();
     }
 
-    // The server snapshot is keyed by TID, so progress follows the user rather
-    // than the device used to log in. Do not block the first screen transition
-    // on network latency.
-    const serverStatePromise = fetchTeamState(currentTeamTid);
+    // The server snapshot is tied to the login session, so progress follows the
+    // authenticated team rather than the device. Capture the local version so a
+    // solve that happens while the request is in flight is not clobbered.
+    const versionAtLogin = progressVersion;
+    const serverStatePromise = fetchTeamState();
 
     submitToGoogleSheets('REGISTRATION', {
         teamName: currentTeam,
         tid: currentTeamTid,
         mission: missionLevel,
         language: currentLanguage,
-        securityKey: securityKeyInput,
         level: missionLevel.replace(/\D/g, '')
     });
 
@@ -104,7 +115,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         if (thisLoginFlow !== loginFlowId || currentTeamTid !== nextTeamTid || currentStep !== 2) {
             return;
         }
-        if (serverState) applyServerTeamState(serverState);
+        if (serverState) applyServerTeamState(serverState, versionAtLogin);
 
         document.getElementById('screen')?.classList.remove('premium-glow');
         // Universal link: skip QR scan and jump straight to that puzzle
@@ -128,7 +139,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
 // ==============================
 // STEP 3: UNLOCK VERIFICATION
 // ==============================
-document.getElementById('unlockForm').addEventListener('submit', function (e) {
+document.getElementById('unlockForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const code = standardizeString(document.getElementById('unlockCode').value);
 
@@ -142,23 +153,18 @@ document.getElementById('unlockForm').addEventListener('submit', function (e) {
         return;
     }
 
-    // A code is only ever asked for starting puzzles (those with a startCode).
-    // All other puzzles unlock directly once their QR is scanned / deep-linked.
+    // A code is only ever asked for starting puzzles. The start codes live on
+    // the server, so every entry is validated there (puzzleId 0 searches all).
     let puzzle = null;
+    const requestedPuzzle = (urlLockedPuzzle && isStartingPuzzle(urlLockedPuzzle)) ? urlLockedPuzzle : null;
+    const check = await verifyStartCode(code, requestedPuzzle ? requestedPuzzle.id : 0);
 
-    if (urlLockedPuzzle) {
-        if (isStartingPuzzle(urlLockedPuzzle)) {
-            // Starting puzzle - require the startCode
-            if (standardizeString(urlLockedPuzzle.startCode) === code) {
-                puzzle = urlLockedPuzzle;
-            }
-        } else if (isPuzzleAllowed(urlLockedPuzzle)) {
-            // Non-start puzzle reached via the unlock screen — no code needed
-            puzzle = urlLockedPuzzle;
+    if (check.ok && check.correct) {
+        const matchedId = Number(check.puzzleId) || (requestedPuzzle ? Number(requestedPuzzle.id) : 0);
+        const matched = PUZZLES.find(p => Number(p.id) === matchedId);
+        if (matched && isStartingPuzzle(matched)) {
+            puzzle = matched;
         }
-    } else {
-        // No URL lock - only a starting puzzle's startCode makes sense here
-        puzzle = PUZZLES.find(p => isStartingPuzzle(p) && standardizeString(p.startCode) === code);
     }
 
     if (puzzle) {
@@ -166,6 +172,10 @@ document.getElementById('unlockForm').addEventListener('submit', function (e) {
         showStep(3);
         playSound('success');
     } else {
+        if (check.json?.status === 'rate_limited') {
+            showFeedback('unlockFeedback', 'Too many start-key attempts. Wait one minute and try again.', 'error');
+            return;
+        }
         submitToGoogleSheets('UNLOCK_FAILED', {
             wrongCode: code,
             attemptedFor: urlLockedPuzzle ? urlLockedPuzzle.id : 'unknown',
@@ -214,7 +224,7 @@ function activatePuzzle(puzzle, unlockedVia) {
     }
 
     // Start the per-puzzle notebook (one request is made only on solve/abandon)
-    notepadStart();
+    notepadStart(puzzle);
 }
 
 // ==============================
@@ -302,7 +312,7 @@ function unlockAnswerInput() {
     answerLocked = false;
 }
 
-function submitPuzzleAnswer() {
+async function submitPuzzleAnswer() {
     const answerInput = document.getElementById('puzzleAnswer');
     if (!answerInput) return;
 
@@ -329,116 +339,38 @@ function submitPuzzleAnswer() {
         return;
     }
 
-    if (standardizeString(currentPuzzle.answer) === standardizeString(answer)) {
-        answerLocked = true;
-        playSound('victory');
-        showToast("SIGNAL DECRYPTED!", "success");
-
-        // Visual flair
-        document.getElementById('screen')?.classList.add('premium-glow');
-        setTimeout(() => document.getElementById('screen')?.classList.remove('premium-glow'), 2000);
-
-        // Prepare Success Step Data
-        const caughtImg = document.getElementById('capturePokemonImg') || document.getElementById('caughtPokemonImg');
-        if (caughtImg && currentPuzzle.pokemonId) {
-            caughtImg.onerror = () => {
-                caughtImg.onerror = null;
-                caughtImg.src = 'assets/img/pikachu.png';
-            };
-            caughtImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${currentPuzzle.pokemonId}.png`;
+    const puzzle = currentPuzzle;
+    // The server is the only authority on correctness and scoring. Ship the
+    // notebook summary along so telemetry and the solve land in one request.
+    const summary = (typeof notepadSummary === 'function') ? (notepadSummary(puzzle.id) || {}) : {};
+    const notebook = (typeof getPuzzleNotebook === 'function') ? getPuzzleNotebook() : null;
+    if (notebook) {
+        const entry = notebook[puzzle.id] || (typeof createNotepad === 'function' ? createNotepad(notebook, puzzle) : null);
+        if (entry) {
+            entry.pendingEventId = entry.pendingEventId || generateEventId();
+            savePuzzleNotebook(notebook);
+            summary.eventId = entry.pendingEventId;
         }
+    }
+    if (!summary.eventId) summary.eventId = generateEventId();
 
-        // Show ALL next puzzle locations (graph: nextPuzzleId may branch into many)
-        const nextPuzzles = getNextPuzzles(currentPuzzle);
+    // Block duplicate submissions while the network request is in flight.
+    answerLocked = true;
+    const result = await submitAnswerToServer(puzzle.id, answer, summary);
+    if (currentPuzzle !== puzzle) return;
 
-        // Delay move for satisfaction
-        const isEnd = !Array.isArray(currentPuzzle.nextPuzzleId) || currentPuzzle.nextPuzzleId.length === 0;
-
-        // Capture the puzzle this reveal belongs to. Without this the callback
-        // read the mutable global `currentPuzzle`, which logout nulls — and the
-        // timer still fired, showing a signed-out user the catch screen.
-        const solvedPuzzle = currentPuzzle;
-
-        clearTimeout(revealStepTimer);
-        revealStepTimer = setTimeout(() => {
-            // The user may have logged out inside this 500ms window.
-            if (!isLoggedIn() || currentPuzzle !== solvedPuzzle) return;
-
-            // Arm the end-of-chain celebration BEFORE showStep(4): the reveal
-            // starts inside showStep(4) and signals 'pykachu:reveal-open' at
-            // the frame the ball splits open, so confetti fires in sync with the
-            // reveal instead of drifting on a timer of its own.
-            if (isEnd) armFinalCelebration();
-
-            showStep(4);
-            playSound('hologram');
-
-            const nextBtn = document.getElementById('nextSignalBtn');
-            if (isEnd) {
-                if (nextBtn) nextBtn.classList.add('hidden');
-
-                const completionMessage = document.getElementById('completionMessage');
-                if (completionMessage) {
-                    completionMessage.classList.remove('hidden');
-
-                // Prefer the solved puzzle's OWN level (puzzle.json `level`
-                // field); fall back to the mission level only if missing.
-                const levelNum = (solvedPuzzle && typeof solvedPuzzle.level === 'number')
-                    ? solvedPuzzle.level
-                    : ((currentMissionLevel || "L1").split('_')[0].replace('L', '') || '1');
-                    const levelTitle = document.getElementById('completionLevelTitle');
-                    if (levelTitle) levelTitle.textContent = `LEVEL ${levelNum} CHAMPION`;
-
-                    const levelSub = document.getElementById('completionLevelSub');
-                    if (levelSub) levelSub.textContent = `YOU HAVE COMPLETED LEVEL ${levelNum}`;
-
-                    const trophyImg = document.getElementById('completionTrophyImg');
-                    if (trophyImg) trophyImg.src = 'assets/img/poketropy.png';
-                }
-
-                setTimeout(() => flushSessionBuffer(), 100);
-            } else {
-                if (nextBtn) nextBtn.classList.remove('hidden');
-            }
-
-            // Step 4's location card ALWAYS shows the NEXT locations resolved
-            // from nextPuzzleId (never the current puzzle's clue). count 0 →
-            // final puzzle → hides the card entirely.
-            renderNextLocations(nextPuzzles);
-
-        }, 500);
-
-        const firstSolve = !hasSolvedPuzzle(currentPuzzle.id);
-        const basePoints = currentPuzzle.points || 0;
-        // A puzzle can score only once. A repeat deducts its full value (100%)
-        // and is allowed to push the team's total below zero.
-        const pointsEarned = firstSolve
-            ? basePoints
-            : -basePoints;
-        recordPuzzleSolve(currentPuzzle.id, pointsEarned);
-
-        // ONE request per puzzle: the whole notepad (scans, wrong attempts,
-        // hints, tab switches, timings) ships inside the SOLVED summary.
-        flushPuzzleNotebook(currentPuzzle.id, true, {
-            answer: answer,
-            pointsEarned: pointsEarned,
-            points: pointsEarned,
-            repeatSolve: !firstSolve,
-            totalScore: currentTeamScore,
-            solvedIds: Array.from(currentTeamSolvedPuzzles),
-            queueIds: teamUnlockQueue,
-            score: currentTeamScore
-        });
-
-        if (firstSolve) {
-            showToast(`SIGNAL DECRYPTED! +${pointsEarned} pts`, 'success');
+    if (!result.ok) {
+        answerLocked = false;
+        if (result.rateLimited) {
+            showToast("TOO MANY ATTEMPTS — WAIT A MOMENT", "error");
         } else {
-            showToast(`REPEATED SOLVE: ${pointsEarned} pts`, 'info');
+            showToast("SERVER UNREACHABLE — TRY AGAIN", "error");
         }
+        return;
+    }
 
-        // Flush buffered events to Google Sheets
-        setTimeout(() => flushSessionBuffer(), 500);
-    } else {
+    if (!result.correct) {
+        answerLocked = false;
         playSound('error');
         showToast("DECRYPTION FAILED", "error");
 
@@ -449,8 +381,106 @@ function submitPuzzleAnswer() {
         answerInput.value = "";
         triggerShake('puzzleAnswer');
 
-        notepadBump('wrong');
+        notepadBump('wrong', puzzle);
+        return;
     }
+
+    // Correct — the server already persisted the SOLVED row and computed the
+    // authoritative score/solved/unlocked sets.
+    playSound('victory');
+    showToast("SIGNAL DECRYPTED!", "success");
+
+    // Visual flair
+    document.getElementById('screen')?.classList.add('premium-glow');
+    setTimeout(() => document.getElementById('screen')?.classList.remove('premium-glow'), 2000);
+
+    // Prepare Success Step Data
+    const caughtImg = document.getElementById('capturePokemonImg') || document.getElementById('caughtPokemonImg');
+    if (caughtImg && puzzle.pokemonId) {
+        caughtImg.onerror = () => {
+            caughtImg.onerror = null;
+            caughtImg.src = 'assets/img/pikachu.png';
+        };
+        caughtImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${puzzle.pokemonId}.png`;
+    }
+
+    // Show ALL next puzzle locations (graph: nextPuzzleId may branch into many)
+    const nextPuzzles = getNextPuzzles(puzzle);
+
+    // Delay move for satisfaction
+    const isEnd = !Array.isArray(puzzle.nextPuzzleId) || puzzle.nextPuzzleId.length === 0;
+
+    // Capture the puzzle this reveal belongs to. Without this the callback
+    // read the mutable global `currentPuzzle`, which logout nulls — and the
+    // timer still fired, showing a signed-out user the catch screen.
+    const solvedPuzzle = puzzle;
+
+    clearTimeout(revealStepTimer);
+    revealStepTimer = setTimeout(() => {
+        // The user may have logged out inside this 500ms window.
+        if (!isLoggedIn() || currentPuzzle !== solvedPuzzle) return;
+
+        // Arm the end-of-chain celebration BEFORE showStep(4): the reveal
+        // starts inside showStep(4) and signals 'pykachu:reveal-open' at
+        // the frame the ball splits open, so confetti fires in sync with the
+        // reveal instead of drifting on a timer of its own.
+        if (isEnd) armFinalCelebration();
+
+        showStep(4);
+        playSound('hologram');
+
+        const nextBtn = document.getElementById('nextSignalBtn');
+        if (isEnd) {
+            if (nextBtn) nextBtn.classList.add('hidden');
+
+            const completionMessage = document.getElementById('completionMessage');
+            if (completionMessage) {
+                completionMessage.classList.remove('hidden');
+
+            // Prefer the solved puzzle's OWN level (puzzle.json `level`
+            // field); fall back to the mission level only if missing.
+            const levelNum = (solvedPuzzle && typeof solvedPuzzle.level === 'number')
+                ? solvedPuzzle.level
+                : ((currentMissionLevel || "L1").split('_')[0].replace('L', '') || '1');
+                const levelTitle = document.getElementById('completionLevelTitle');
+                if (levelTitle) levelTitle.textContent = `LEVEL ${levelNum} CHAMPION`;
+
+                const levelSub = document.getElementById('completionLevelSub');
+                if (levelSub) levelSub.textContent = `YOU HAVE COMPLETED LEVEL ${levelNum}`;
+
+                const trophyImg = document.getElementById('completionTrophyImg');
+                if (trophyImg) trophyImg.src = 'assets/img/poketropy.png';
+            }
+
+            setTimeout(() => flushSessionBuffer(), 100);
+        } else {
+            if (nextBtn) nextBtn.classList.remove('hidden');
+        }
+
+        // Step 4's location card ALWAYS shows the NEXT locations resolved
+        // from nextPuzzleId (never the current puzzle's clue). count 0 →
+        // final puzzle → hides the card entirely.
+        renderNextLocations(nextPuzzles);
+
+    }, 500);
+
+    // Replace the local snapshot with the server's authoritative result and
+    // drop the notebook now that its summary has been persisted.
+    applyAuthoritativeSolve(result);
+    if (typeof deletePuzzleNotebook === 'function') deletePuzzleNotebook(puzzle.id);
+
+    const pointsEarned = (typeof result.points === 'number')
+        ? result.points
+        : (result.repeat ? -(puzzle.points || 0) : (puzzle.points || 0));
+
+    if (result.repeat) {
+        showToast(`REPEATED SOLVE: ${pointsEarned} pts`, 'info');
+    } else {
+        showToast(`SIGNAL DECRYPTED! +${pointsEarned} pts`, 'success');
+    }
+
+    // Flush buffered events to Google Sheets
+    setTimeout(() => flushSessionBuffer(), 500);
 }
 // Attach the submit handler
 document.getElementById('answerForm').addEventListener('submit', (e) => {

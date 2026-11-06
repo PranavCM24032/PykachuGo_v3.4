@@ -20,9 +20,15 @@ let tabSwitchCount = 0;
 // Team score and solve tracking
 let currentTeamScore = 0;
 let currentTeamSolvedPuzzles = new Set();
+let currentTeamHintsUsed = new Set();
 // Per-team ordered unlock queue (frontier): solving a puzzle pushes every id
 // in its nextPuzzleId here; only QUEUED puzzles are unlockable (no jumping).
 let teamUnlockQueue = [];
+// Server-issued login session. Every write is rejected without it.
+let loginToken = "";
+// Bumped whenever local progress changes so a slow login fetch cannot clobber
+// a solve that happened while the request was in flight.
+let progressVersion = 0;
 
 // Tab switching penalty system
 let penaltyActive = false;
@@ -78,7 +84,11 @@ function saveGameState() {
         sessionId,
         currentLanguage
     };
-    localStorage.setItem(CONFIG.STORAGE_KEYS.gameState, JSON.stringify(gameState));
+    try {
+        localStorage.setItem(CONFIG.STORAGE_KEYS.gameState, JSON.stringify(gameState));
+    } catch (e) {
+        console.warn('Could not save game state:', e);
+    }
 }
 
 function generateSessionId() {
@@ -113,6 +123,7 @@ function getRememberedTeamKey() {
 function loadTeamScoreState() {
     currentTeamScore = 0;
     currentTeamSolvedPuzzles = new Set();
+    currentTeamHintsUsed = new Set();
     teamUnlockQueue = [];
 
     if (!currentTeam) return;
@@ -156,7 +167,9 @@ function saveTeamScoreState() {
 function resetTeamScoreState() {
     currentTeamScore = 0;
     currentTeamSolvedPuzzles = new Set();
+    currentTeamHintsUsed = new Set();
     teamUnlockQueue = [];
+    progressVersion++;
     if (!currentTeam) return;
     try {
         const state = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.scoreState) || '{}');
@@ -193,24 +206,56 @@ function hasSolvedPuzzle(puzzleId) {
 
 // Replace the local snapshot with the state fetched for the logged-in TID. This
 // keeps a device's cached state from granting progress to another user.
-function applyServerTeamState(serverState) {
+function applyServerTeamState(serverState, expectedVersion) {
     if (!serverState || typeof serverState !== 'object') return;
+    if (typeof expectedVersion === 'number' && expectedVersion !== progressVersion) {
+        console.warn('[State] Skipped stale server state — local progress changed');
+        return;
+    }
     const solved = (Array.isArray(serverState.solved) ? serverState.solved : [])
         .map(Number).filter(n => Number.isFinite(n));
     const unlocked = (Array.isArray(serverState.unlocked) ? serverState.unlocked : [])
         .map(Number).filter(n => Number.isFinite(n));
+    const hintsUsed = (Array.isArray(serverState.hintsUsed) ? serverState.hintsUsed : [])
+        .map(Number).filter(n => Number.isFinite(n));
 
-    // Repeat-solve deductions are allowed to push the running total below zero,
-    // so no lower clamp here — the signed score is restored as-is.
-    currentTeamScore = Number(serverState.score || 0);
-    currentTeamSolvedPuzzles = new Set(solved);
-    teamUnlockQueue = unlocked.filter(id => !currentTeamSolvedPuzzles.has(id));
+    // Partial responses (e.g. SUBMIT_ANSWER) only carry the fields they change,
+    // so leave untouched fields alone rather than resetting them to empty.
+    if (serverState.score !== undefined && serverState.score !== null) {
+        // Repeat-solve deductions are allowed to push the running total below
+        // zero, so no lower clamp here — the signed score is restored as-is.
+        currentTeamScore = Number(serverState.score || 0);
+    }
+    if (Array.isArray(serverState.solved)) {
+        currentTeamSolvedPuzzles = new Set(solved);
+    }
+    if (Array.isArray(serverState.hintsUsed)) {
+        currentTeamHintsUsed = new Set(hintsUsed);
+    }
+    if (Array.isArray(serverState.unlocked)) {
+        teamUnlockQueue = unlocked.filter(id => !currentTeamSolvedPuzzles.has(id));
+    }
+
+    const currentPuzzleId = Number(serverState.currentPuzzle);
+    if (Number.isFinite(currentPuzzleId) && currentPuzzleId > 0) {
+        const found = PUZZLES.find(p => Number(p.id) === currentPuzzleId);
+        if (found) currentPuzzle = found;
+    }
     saveTeamScoreState();
+}
+
+// Apply the authoritative result returned by SUBMIT_ANSWER. The server has
+// already validated the answer and computed points/solved/unlocked.
+function applyAuthoritativeSolve(result) {
+    if (!result || typeof result !== 'object') return;
+    applyServerTeamState(result);
+    progressVersion++;
 }
 
 function recordPuzzleSolve(puzzleId, pointsEarned) {
     currentTeamSolvedPuzzles.add(puzzleId);
     currentTeamScore += pointsEarned;
+    progressVersion++;
 
     // Queue advance: solving a puzzle pushes its outgoing graph edges onto the
     // team's unlock queue (no duplicates, solved puzzles are excluded).
@@ -238,12 +283,10 @@ function standardizeString(str) {
 // appear in currentPuzzle.nextPuzzleId. Entry/starting puzzles are legitimate
 // chain entry points, NOT jumps, and bypass the queue gate.
 //
-// Entry is declared EXPLICITLY via `isStart` in puzzle.json. It was previously
-// inferred from `startCode && badgeId`, which silently promoted puzzle 4 (it
-// happens to carry both) to a bypass entry point — so `?linkid=XG04`, a QR
-// scan, or an OCR hit on the text "GRASS" skipped puzzles 2 and 3 entirely.
+// A non-empty startCode marks a puzzle as a start puzzle. This is the single
+// source of truth; puzzle.json does not need a separate isStart flag.
 function isStartingPuzzle(puzzle) {
-    return !!(puzzle && puzzle.isStart === true);
+    return !!(puzzle && typeof puzzle.startCode === 'string' && puzzle.startCode.trim());
 }
 
 function getNextPuzzle(puzzle) {
@@ -271,8 +314,7 @@ function isPuzzleAllowed(puzzle) {
 }
 
 function puzzleGateMessage(puzzle) {
-    const progressId = currentPuzzle ? currentPuzzle.id : 0;
-    if (puzzle && puzzle.id === progressId) {
+    if (puzzle && hasSolvedPuzzle(Number(puzzle.id))) {
         return '❌ Access Denied - This location is already completed';
     }
     if (isStartingPuzzle(puzzle)) {

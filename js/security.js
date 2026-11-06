@@ -16,6 +16,8 @@ const SecuritySystem = {
 
     // Cached element reference — avoids querySelector on every blur/focus event
     _screen: null,
+    // Remember whether we paused the music so release can resume it.
+    _musicWasPlaying: false,
 
     init() {
         console.log("🛡️ [Security] Extreme Blackout Mode Active");
@@ -48,7 +50,10 @@ const SecuritySystem = {
             screen.classList.add(this.config.stealthClass);
             // Block all input
             screen.style.pointerEvents = 'none';
-            if (window.bgMusic) window.bgMusic.pause();
+            if (window.bgMusic && !window.bgMusic.paused) {
+                this._musicWasPlaying = true;
+                window.bgMusic.pause();
+            }
         }
     },
 
@@ -60,6 +65,10 @@ const SecuritySystem = {
             if (document.hidden) return;
             screen.classList.remove(this.config.stealthClass);
             screen.style.pointerEvents = 'all';
+        }
+        if (this._musicWasPlaying && !window.isMuted && window.bgMusic) {
+            this._musicWasPlaying = false;
+            window.bgMusic.play().catch(() => { });
         }
     },
 
@@ -87,7 +96,14 @@ const SecuritySystem = {
         });
 
         // 2. WINDOW BLUR (Swipe down notifications / Control Center)
-        window.addEventListener('blur', () => this.activateLockdown());
+        // Defer the lockdown and re-check focus: opening a file picker or the
+        // password visibility toggle blurs the window for a moment, and the
+        // old immediate blackout made those interactions unusable.
+        window.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (!document.hasFocus() || document.hidden) this.activateLockdown();
+            }, 150);
+        });
         window.addEventListener('focus', () => {
             this.scheduleRelease(300);
         });
