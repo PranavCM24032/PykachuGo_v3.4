@@ -174,7 +174,6 @@
 .d-pad-direction:active,
 #hintRequestBtn:active {
     transform: scale(0.96) translateY(2px);
-    filter: brightness(0.9);
 }
 @media (hover: none) and (pointer: coarse) {
 

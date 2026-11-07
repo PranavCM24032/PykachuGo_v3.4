@@ -234,21 +234,21 @@ function showStep(stepNumber) {
     }
     const transitionId = ++stepTransitionId;
 
-    // Snappy Transition
+    // Instant transition: no fade-out (it made presses feel laggy) and an
+    // immediate reveal, so a tap shows the next screen on the same frame.
     const fadeOutMs = 0;
-    const fadeInMs = 90;
 
-    // Fade out all currently-active steps (except the target, which may already
+    // Hide all currently-active steps (except the target, which may already
     // be active on first paint — avoids the initial load flash).
     steps.forEach(step => {
         if (step !== targetStep && step.classList.contains('active')) {
-            step.style.transition = `all ${fadeOutMs}ms ease`;
+            step.style.transition = 'none';
             step.style.opacity = '0';
             step.style.transform = 'translateY(-10px)';
         }
     });
 
-    stepTransitionTimer = setTimeout(() => {
+    const reveal = () => {
         stepTransitionTimer = null;
         if (transitionId !== stepTransitionId) return;
 
@@ -258,16 +258,16 @@ function showStep(stepNumber) {
 
         targetStep.classList.add('active');
         targetStep.style.animation = 'none';
-        targetStep.style.opacity = '0';
-        targetStep.style.transform = 'translateY(10px)';
-        targetStep.style.transition = `all ${fadeInMs}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+        targetStep.style.transition = 'none';
+        targetStep.style.opacity = '1';
+        targetStep.style.transform = 'translateY(0)';
+    };
 
-        requestAnimationFrame(() => {
-            if (transitionId !== stepTransitionId) return;
-            targetStep.style.opacity = '1';
-            targetStep.style.transform = 'translateY(0)';
-        });
-    }, fadeOutMs);
+    if (fadeOutMs > 0) {
+        stepTransitionTimer = setTimeout(reveal, fadeOutMs);
+    } else {
+        reveal();
+    }
 
     currentStep = stepNumber;
 

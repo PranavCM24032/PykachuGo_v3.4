@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v2.0.15';
+const CACHE_NAME = 'pykachu-go-v2.0.16';
 const OPTIONAL_CACHE_NAME = 'pykachu-go-optional-v1';
 const ASSETS = [
     'index.html',
@@ -65,7 +65,12 @@ self.addEventListener('install', (event) => {
         caches.open(CACHE_NAME)
             .then((cache) =>
                 Promise.allSettled(
-                    ASSETS.map((asset) => cache.add(asset))
+                    // cache: 'reload' bypasses the browser HTTP cache so a
+                    // CACHE_NAME bump really pulls the new CSS/JS instead of
+                    // re-caching a stale copy from GitHub Pages' max-age.
+                    ASSETS.map((asset) => cache.add(
+                        new Request(new URL(asset, self.registration.scope), { cache: 'reload' })
+                    ))
                 ).then((results) => {
                     const failed = results
                         .map((r, i) => (r.status === 'rejected' ? ASSETS[i] : null))

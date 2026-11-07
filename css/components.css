@@ -275,7 +275,6 @@
 
 .flow-step.active {
     display: flex;
-    animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes fadeIn {

@@ -18,6 +18,14 @@ button,
     transition-duration: 0.07s !important;
 }
 
+/* Press SNAPS instantly on touch-down (no easing), then eases back on release. */
+.btn-pokedex:active,
+.pokedex-button-alt:active,
+.pokedex-button-bar:active,
+.d-pad-direction:active {
+    transition-duration: 0s !important;
+}
+
 .btn-pokedex {
     background: linear-gradient(145deg, #3b82f6, #2563eb);
     border: none;
