@@ -4,15 +4,15 @@
     border-radius: clamp(26px, 6vw, 44px);
     border: none;
     box-shadow:
-        /* outer drop + ambient */
-        0 26px 48px rgba(0, 0, 0, 0.62),
-        0 10px 20px rgba(0, 0, 0, 0.45),
-        /* soft light on the top-left edge */
-        inset 10px 10px 22px rgba(255, 255, 255, 0.26),
-        inset 2px 2px 3px rgba(255, 255, 255, 0.28),
-        /* deep soft shade on the bottom-right */
-        inset -12px -14px 30px rgba(0, 0, 0, 0.52),
-        inset -3px -4px 6px rgba(0, 0, 0, 0.40);
+        /* outer shadow in deep red (no black/white) */
+        0 26px 48px rgba(96, 0, 0, 0.55),
+        0 10px 20px rgba(70, 0, 0, 0.50),
+        /* light bevel from a brighter red */
+        inset 10px 10px 22px rgba(255, 122, 122, 0.42),
+        inset 2px 2px 3px rgba(255, 140, 140, 0.48),
+        /* shade from a darker maroon red */
+        inset -12px -14px 30px rgba(82, 0, 0, 0.60),
+        inset -3px -4px 6px rgba(72, 0, 0, 0.50);
     position: relative;
     display: flex;
     flex-direction: column;
@@ -54,8 +54,8 @@
     right: 0;
     height: clamp(16px, 4vmin, 30px);
     background: linear-gradient(to bottom,
-            rgba(255, 255, 255, 0.12) 0%,
-            rgba(255, 255, 255, 0.03) 55%,
+            rgba(255, 122, 122, 0.16) 0%,
+            rgba(255, 122, 122, 0.04) 55%,
             transparent 100%);
     border-radius: inherit;
     z-index: 1;
