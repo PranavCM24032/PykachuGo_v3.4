@@ -10,11 +10,6 @@
       <stop offset="60%" stop-color="#EDF2F7"/>
       <stop offset="100%" stop-color="#B8C2CC"/>
     </radialGradient>
-    <radialGradient id="buttonFace" cx="35%" cy="30%" r="70%">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="70%" stop-color="#E2E8F0"/>
-      <stop offset="100%" stop-color="#AEB8C4"/>
-    </radialGradient>
     <radialGradient id="sphereShade" cx="38%" cy="32%" r="72%">
       <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.42"/>
       <stop offset="48%" stop-color="#FFFFFF" stop-opacity="0"/>
@@ -36,9 +31,8 @@
   <rect x="48" y="242" width="416" height="8" fill="url(#bandSheen)" opacity="0.9"/>
 
   <circle cx="256" cy="256" r="68" fill="#0B1220"/>
-  <circle cx="256" cy="256" r="54" fill="url(#buttonFace)"/>
-  <circle cx="256" cy="256" r="31" fill="#0B1220"/>
-  <circle cx="256" cy="256" r="22" fill="url(#buttonFace)"/>
+  <path d="M272 196 L214 266 L248 266 L232 316 L298 242 L262 242 Z"
+    fill="#FFD60A" stroke="#FFB300" stroke-width="4" stroke-linejoin="round"/>
 
   <circle cx="256" cy="256" r="208" fill="url(#sphereShade)"/>
 
