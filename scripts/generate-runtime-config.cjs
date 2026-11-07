@@ -5,7 +5,7 @@ const root = path.resolve(__dirname, '..');
 const envPath = path.join(root, '.env');
 const outputPath = path.join(root, 'js', 'runtime-config.js');
 const vercelDefaults = {
-    googleScriptUrl: 'https://script.google.com/macros/s/AKfycbwloiCwYYeoQQvzjccERsb5YvI2j9MEq_7lBa68M8QaYIfspD-lfpUURfIOxi-ZlNF_/exec',
+    googleScriptUrl: 'https://script.google.com/macros/s/AKfycbwcnuefUGx93H9_s_ZxLzMvH9D2ho72EvD5bnxwfD1FYTOFYuL8OkfFJgm36_kMiGV9/exec',
     googleSheetUrl: 'https://docs.google.com/spreadsheets/d/1sXcAgdp9dDJ9ygx2xkBSdC3HyRlC-5TxDQ_y-Gyrg30/edit?gid=1056900225#gid=1056900225'
 };
 
