@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v2.0.21';
+const CACHE_NAME = 'pykachu-go-v2.0.22';
 const OPTIONAL_CACHE_NAME = 'pykachu-go-optional-v1';
 const ASSETS = [
     'index.html',
@@ -128,10 +128,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Config is regenerated on every deploy (URL/token can change). Serving a
-    // stale copy cache-first silently breaks all future writes for that device,
-    // so runtime-config.js must always hit the network (cache only as offline fallback).
-    if (url.pathname.endsWith('/js/runtime-config.js')) {
+    // Config and game data (puzzles, teams, config) must always hit the
+    // network first so players never get stuck on stale puzzles/teams.
+    // Cache is used as offline fallback only.
+    if (url.pathname.endsWith('/js/runtime-config.js') || url.pathname.includes('/data/')) {
         event.respondWith(
             fetch(event.request)
                 .then((response) => {

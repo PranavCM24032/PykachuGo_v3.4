@@ -163,6 +163,10 @@ function getTeamContext(ss, tid, teamName) {
 
   var solved = [];
   var points = 0;
+  var hintsUsed = [];
+  var currentPuzzle = null;
+  var latestPuzzleTimestamp = -1;
+
   ['L1', 'L2', 'L3'].forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (!sheet) return;
@@ -170,13 +174,33 @@ function getTeamContext(ss, tid, teamName) {
     for (var i = 1; i < rows.length; i++) {
       if (!teamRowMatches(rows[i], 0, 1, tid, teamName)) continue;
       var status = String(rows[i][9] || '');
-      if (status !== 'SOLVED' && status !== 'REPEAT_SOLVE') continue;
       var pid = Number(rows[i][3] || 0);
-      if (pid > 0) solved.push(pid);
-      points += Number(rows[i][8] || 0) || 0;
+
+      if (status === 'SOLVED' || status === 'REPEAT_SOLVE') {
+        if (pid > 0) solved.push(pid);
+        points += Number(rows[i][8] || 0) || 0;
+      }
+
+      if (pid > 0 && isHintFlag(rows[i][6])) {
+        hintsUsed.push(pid);
+      }
+
+      var rowTimestamp = new Date(rows[i][5]).getTime();
+      if (isNaN(rowTimestamp)) rowTimestamp = 0;
+      if (pid > 0 && rowTimestamp >= latestPuzzleTimestamp) {
+        latestPuzzleTimestamp = rowTimestamp;
+        currentPuzzle = pid;
+      }
     }
   });
-  var result = { solved: uniqueNumbers(solved), points: points };
+
+  var result = {
+    solved: uniqueNumbers(solved),
+    points: points,
+    hintsUsed: uniqueNumbers(hintsUsed),
+    currentPuzzle: currentPuzzle
+  };
+
   if (cKey !== 'ctx_') {
     try { cache.put(cKey, JSON.stringify(result), 180); } catch (e) { }
   }
@@ -193,23 +217,50 @@ function invalidateTeamContext(tid, teamName) {
 function getLoginSession(data) {
   var token = data && data.loginToken;
   if (!token) return null;
+
+  // 1. Fast cache check
   try {
     var raw = CacheService.getScriptCache().get('login_' + token);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
-  }
+    if (raw) return JSON.parse(raw);
+  } catch (e) { }
+
+  // 2. Cryptographic signature fallback: preserves sessions even if cache is evicted
+  try {
+    var parts = String(token).split('.');
+    if (parts.length === 2) {
+      var payloadBytes = Utilities.base64DecodeWebSafe(parts[0]);
+      var payload = Utilities.newBlob(payloadBytes).getDataAsString();
+      var secret = getPlayerToken() || 'pykachu_secret';
+      var expectedSig = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, secret));
+      if (parts[1] === expectedSig) {
+        var subParts = payload.split('::');
+        var session = { tid: subParts[0] || '', teamName: subParts[1] || '' };
+        try {
+          CacheService.getScriptCache().put('login_' + token, JSON.stringify(session), LOGIN_SESSION_TTL_SECS);
+        } catch (ce) { }
+        return session;
+      }
+    }
+  } catch (e) { }
+
+  return null;
 }
 
 function createLoginSession(tid, teamName) {
-  var token = Utilities.getUuid();
-  CacheService.getScriptCache().put(
-    'login_' + token,
-    JSON.stringify({ tid: tid || '', teamName: teamName || '' }),
-    LOGIN_SESSION_TTL_SECS
-  );
-  return token;
+  var secret = getPlayerToken() || 'pykachu_secret';
+  var payload = (tid || '') + '::' + (teamName || '');
+  var sig = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, secret));
+  var signedToken = Utilities.base64EncodeWebSafe(Utilities.newBlob(payload).getBytes()) + '.' + sig;
+
+  try {
+    CacheService.getScriptCache().put(
+      'login_' + signedToken,
+      JSON.stringify({ tid: tid || '', teamName: teamName || '' }),
+      LOGIN_SESSION_TTL_SECS
+    );
+  } catch (e) { }
+
+  return signedToken;
 }
 
 function getTeamRoster_() {
@@ -531,33 +582,13 @@ function doPost(e) {
       var ctx = getTeamContext(ss, qTid, qName);
       var solved = ctx.solved.slice();
       var unlocked = computeAllowedFromSolved(solved);
-      var hintsUsed = [];
-      var currentPuzzle = null;
-      var latestPuzzleTimestamp = -1;
-
-      ['L1', 'L2', 'L3'].forEach(function(name) {
-        var sheet = ss.getSheetByName(name);
-        if (!sheet) return;
-        var rows = sheet.getDataRange().getValues();
-        for (var i = 1; i < rows.length; i++) {
-          if (!teamRowMatches(rows[i], 0, 1, qTid, qName)) continue;
-          var pid = Number(rows[i][3] || 0);
-          if (pid > 0 && isHintFlag(rows[i][6])) hintsUsed.push(pid);
-          var rowTimestamp = new Date(rows[i][5]).getTime();
-          if (isNaN(rowTimestamp)) rowTimestamp = 0;
-          if (pid > 0 && rowTimestamp >= latestPuzzleTimestamp) {
-            latestPuzzleTimestamp = rowTimestamp;
-            currentPuzzle = pid;
-          }
-        }
-      });
 
       return jsonResponse_({
         status: 'success',
         solved: solved,
-        currentPuzzle: currentPuzzle,
+        currentPuzzle: ctx.currentPuzzle || null,
         unlocked: unlocked,
-        hintsUsed: uniqueNumbers(hintsUsed),
+        hintsUsed: ctx.hintsUsed || [],
         score: ctx.points
       });
     }

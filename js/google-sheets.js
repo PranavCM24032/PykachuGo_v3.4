@@ -354,12 +354,18 @@ async function fetchTeamState() {
     }
 }
 
-// Auto-flush buffer every 10 seconds for extra reliability
-setInterval(() => {
-    if (_bufferDirty && isValidTeam()) {
-        flushSessionBuffer();
-    }
-}, 10000);
+// Auto-flush buffer with randomized jitter (8s - 14s) to avoid thundering-herd pulses
+function scheduleNextBufferFlush() {
+    const delay = 8000 + Math.floor(Math.random() * 6000);
+    setTimeout(() => {
+        if (_bufferDirty && isValidTeam()) {
+            flushSessionBuffer().finally(scheduleNextBufferFlush);
+        } else {
+            scheduleNextBufferFlush();
+        }
+    }, delay);
+}
+scheduleNextBufferFlush();
 
 // Auto-flush on page unload (sends whatever is buffered)
 window.addEventListener('beforeunload', () => {

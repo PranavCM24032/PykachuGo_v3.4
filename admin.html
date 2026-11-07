@@ -464,7 +464,7 @@
             TOKEN: RUNTIME_CONFIG.googleScriptToken || '',
             SHEET_URL: RUNTIME_CONFIG.googleSheetUrl || '',
             REFRESH_RATE: 12000,
-            MAX_LOGS: 500,
+            MAX_LOGS: 10000,
             VERSION: '3.4.0'
         };
 
@@ -556,8 +556,13 @@
                         throw new Error(json.message || 'unauthorized');
                     }
                     state.adminSession = json.session;
-                    authModal.remove();
-                    await initializeAdmin();
+                    authModal.classList.add('hidden');
+                    if (!state.initialized) {
+                        state.initialized = true;
+                        await initializeAdmin();
+                    } else {
+                        fetchData();
+                    }
                 } catch (e) {
                     console.error('Admin auth failed:', e);
                     authError.textContent = 'ACCESS DENIED - INVALID ADMIN TOKEN';
@@ -734,6 +739,10 @@
                 } else {
                     console.warn('Server returned error:', rawData);
                     serverError = String(rawData && rawData.message || 'Unexpected server response');
+                    if (serverError.includes('admin login required')) {
+                        const modal = document.getElementById('adminAuthModal');
+                        if (modal) modal.classList.remove('hidden');
+                    }
                     if (state.logs.length === 0) {
                         const cached = localStorage.getItem('pykachuLogs');
                         if (cached) {
