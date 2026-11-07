@@ -62,6 +62,26 @@
         }
     </script>
 
+    <script>
+        // Instant press feedback. Mobile browsers can delay :active until they
+        // rule out scrolling; toggling .is-pressed on pointerdown paints the
+        // pressed state on the very first touch frame instead.
+        (function () {
+            var selector = '.btn-pokedex, .pokedex-button-alt, .pokedex-button-bar, .d-pad-direction, [role="button"], button';
+            var clear = function () {
+                var pressed = document.querySelectorAll('.is-pressed');
+                for (var i = 0; i < pressed.length; i++) pressed[i].classList.remove('is-pressed');
+            };
+            document.addEventListener('pointerdown', function (e) {
+                var el = e.target && e.target.closest ? e.target.closest(selector) : null;
+                if (el && !el.disabled) el.classList.add('is-pressed');
+            }, { passive: true });
+            document.addEventListener('pointerup', clear, { passive: true });
+            document.addEventListener('pointercancel', clear, { passive: true });
+            window.addEventListener('blur', clear);
+        })();
+    </script>
+
     <style>
         /* Mobile-specific optimizations */
         @media (max-width: 640px) {

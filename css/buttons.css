@@ -16,13 +16,22 @@ button,
 .pokedex-button-bar,
 .d-pad-direction {
     transition-duration: 0.07s !important;
+    will-change: transform;
+    contain: paint;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
-/* Press SNAPS instantly on touch-down (no easing), then eases back on release. */
+/* Press SNAPS instantly on touch-down (no easing), then eases back on release.
+   .is-pressed is set on pointerdown so feedback does not wait for :active. */
 .btn-pokedex:active,
+.btn-pokedex.is-pressed,
 .pokedex-button-alt:active,
+.pokedex-button-alt.is-pressed,
 .pokedex-button-bar:active,
-.d-pad-direction:active {
+.pokedex-button-bar.is-pressed,
+.d-pad-direction:active,
+.d-pad-direction.is-pressed {
     transition-duration: 0s !important;
 }
 
@@ -61,7 +70,8 @@ button,
         inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-.btn-pokedex:active {
+.btn-pokedex:active,
+.btn-pokedex.is-pressed {
     transform: translateY(2px);
     border-bottom-width: 2px;
     box-shadow:
@@ -187,10 +197,12 @@ select:focus {
     transform: translateY(-50%);
 }
 .btn-pokedex:active,
+.btn-pokedex.is-pressed,
 .d-pad-direction:active,
-#hintRequestBtn:active {
+.d-pad-direction.is-pressed,
+#hintRequestBtn:active,
+#hintRequestBtn.is-pressed {
     transform: scale(0.96) translateY(2px);
-    filter: brightness(0.9);
 }
 .pokedex-button-alt {
     background: linear-gradient(145deg, #2d3748, #1a202c);
@@ -211,7 +223,8 @@ select:focus {
     transform: scale(1.05);
 }
 
-.pokedex-button-alt:active {
+.pokedex-button-alt:active,
+.pokedex-button-alt.is-pressed {
     transform: scale(0.92);
     box-shadow:
         2px 2px 4px rgba(0, 0, 0, 0.4),
@@ -235,7 +248,8 @@ select:focus {
     background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
 }
 
-.pokedex-button-bar:active {
+.pokedex-button-bar:active,
+.pokedex-button-bar.is-pressed {
     transform: translateY(2px) scaleX(0.98);
     box-shadow:
         0 1px 2px rgba(0, 0, 0, 0.5),
