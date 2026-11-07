@@ -210,11 +210,8 @@
 
 @media (prefers-color-scheme: dark) {
     .pokedex-shell {
-        /* Keep the clay sheen while deepening the red for dark-mode devices. */
-        background:
-            radial-gradient(135% 110% at 24% 10%, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.10) 30%, rgba(255, 255, 255, 0) 60%),
-            radial-gradient(120% 120% at 85% 100%, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 62%),
-            linear-gradient(145deg, #e04a4a 0%, #b81a1a 44%, #6f0e0e 100%);
+        /* Same solid red, just a touch deeper for dark-mode devices. */
+        background: linear-gradient(180deg, #cf2323 0%, #b81a1a 55%, #ad1818 100%);
     }
 }
 

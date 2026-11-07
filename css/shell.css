@@ -1,24 +1,18 @@
 .pokedex-shell {
-    /* Claymorphism: thick puffy 3D body. Light hits the top-left, the
-       bottom-right falls into a deep soft shade, and the whole shell casts a
-       big ambient drop shadow. */
-    background:
-        radial-gradient(135% 110% at 24% 10%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.14) 30%, rgba(255, 255, 255, 0) 60%),
-        radial-gradient(120% 120% at 85% 100%, rgba(0, 0, 0, 0.50) 0%, rgba(0, 0, 0, 0) 62%),
-        linear-gradient(145deg, #f25a5a 0%, #d02121 44%, #8c1111 100%);
+    /* Solid Pokédex red — the 3D look comes from shadows, not a big gradient. */
+    background: linear-gradient(180deg, #d42424 0%, #c81e1e 55%, #bd1c1c 100%);
     border-radius: clamp(26px, 6vw, 44px);
     border: none;
     box-shadow:
-        /* outer ambient + drop */
-        0 28px 54px rgba(0, 0, 0, 0.62),
-        0 10px 22px rgba(0, 0, 0, 0.45),
-        -12px -12px 30px rgba(255, 255, 255, 0.10),
-        /* thick inner bevel: light from top-left */
-        inset 12px 12px 26px rgba(255, 255, 255, 0.40),
-        inset 16px 16px 40px rgba(255, 255, 255, 0.14),
-        /* deep soft shade bottom-right */
-        inset -14px -16px 34px rgba(0, 0, 0, 0.58),
-        inset -6px -8px 14px rgba(0, 0, 0, 0.40);
+        /* outer drop + ambient */
+        0 26px 48px rgba(0, 0, 0, 0.62),
+        0 10px 20px rgba(0, 0, 0, 0.45),
+        /* soft light on the top-left edge */
+        inset 10px 10px 22px rgba(255, 255, 255, 0.26),
+        inset 2px 2px 3px rgba(255, 255, 255, 0.28),
+        /* deep soft shade on the bottom-right */
+        inset -12px -14px 30px rgba(0, 0, 0, 0.52),
+        inset -3px -4px 6px rgba(0, 0, 0, 0.40);
     position: relative;
     display: flex;
     flex-direction: column;
@@ -58,13 +52,14 @@
     top: 0;
     left: 0;
     right: 0;
-    height: clamp(30px, 8vmin, 60px);
+    height: clamp(16px, 4vmin, 30px);
     background: linear-gradient(to bottom,
-            rgba(255, 255, 255, 0.1) 0%,
-            rgba(255, 255, 255, 0.05) 40%,
+            rgba(255, 255, 255, 0.12) 0%,
+            rgba(255, 255, 255, 0.03) 55%,
             transparent 100%);
     border-radius: inherit;
     z-index: 1;
+    pointer-events: none;
 }
 
 .pokedex-lens {
