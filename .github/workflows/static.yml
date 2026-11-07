@@ -35,7 +35,7 @@ jobs:
         env:
           GOOGLE_SCRIPT_URL: https://script.google.com/macros/s/AKfycbwcnuefUGx93H9_s_ZxLzMvH9D2ho72EvD5bnxwfD1FYTOFYuL8OkfFJgm36_kMiGV9/exec
           GOOGLE_SCRIPT_TOKEN: ${{ secrets.GOOGLE_SCRIPT_TOKEN }}
-          GOOGLE_SHEET_URL: https://docs.google.com/spreadsheets/d/1sXcAgdp9dDJ9ygx2xkBSdC3HyRlC-5TxDQ_y-Gyrg30/edit?gid=1056900225#gid=1056900225
+          GOOGLE_SHEET_URL: https://docs.google.com/spreadsheets/d/1sXcAgdp9dDJ9ygx2xkBSdC3HyRlC-5TxDQ_y-Gyrg30/edit?gid=2141514144#gid=2141514144
         run: >-
           node -e "const fs=require('fs');const config={googleScriptUrl:process.env.GOOGLE_SCRIPT_URL||'',googleScriptToken:process.env.GOOGLE_SCRIPT_TOKEN||'',googleSheetUrl:process.env.GOOGLE_SHEET_URL||''};fs.writeFileSync('js/runtime-config.js','window.PYKACHU_RUNTIME_CONFIG = '+JSON.stringify(config,null,4)+';\\n');"
       - name: Setup Pages
