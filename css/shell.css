@@ -1,11 +1,24 @@
 .pokedex-shell {
-    background: linear-gradient(165deg, #e63946 0%, #c91f1f 40%, #a81a1a 100%);
-    border-radius: clamp(12px, 3vw, 24px);
-    border: clamp(4px, 1vw, 8px) solid #000;
+    /* Claymorphism: thick puffy 3D body. Light hits the top-left, the
+       bottom-right falls into a deep soft shade, and the whole shell casts a
+       big ambient drop shadow. */
+    background:
+        radial-gradient(135% 110% at 24% 10%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.14) 30%, rgba(255, 255, 255, 0) 60%),
+        radial-gradient(120% 120% at 85% 100%, rgba(0, 0, 0, 0.50) 0%, rgba(0, 0, 0, 0) 62%),
+        linear-gradient(145deg, #f25a5a 0%, #d02121 44%, #8c1111 100%);
+    border-radius: clamp(26px, 6vw, 44px);
+    border: none;
     box-shadow:
-        inset 0 4px 12px rgba(255, 255, 255, 0.2),
-        inset 0 -10px 20px rgba(0, 0, 0, 0.5),
-        0 10px 30px rgba(0, 0, 0, 0.4);
+        /* outer ambient + drop */
+        0 28px 54px rgba(0, 0, 0, 0.62),
+        0 10px 22px rgba(0, 0, 0, 0.45),
+        -12px -12px 30px rgba(255, 255, 255, 0.10),
+        /* thick inner bevel: light from top-left */
+        inset 12px 12px 26px rgba(255, 255, 255, 0.40),
+        inset 16px 16px 40px rgba(255, 255, 255, 0.14),
+        /* deep soft shade bottom-right */
+        inset -14px -16px 34px rgba(0, 0, 0, 0.58),
+        inset -6px -8px 14px rgba(0, 0, 0, 0.40);
     position: relative;
     display: flex;
     flex-direction: column;

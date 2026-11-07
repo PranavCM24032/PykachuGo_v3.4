@@ -5,7 +5,7 @@
         height: calc(100svh - 8px);
         height: calc(100dvh - 8px);
         margin: 4px auto;
-        border-radius: 12px;
+        border-radius: 22px;
         border-width: 3px;
     }
 
@@ -41,7 +41,7 @@
     .pokedex-shell {
         padding: 8px;
         border-width: 3px;
-        border-radius: 10px;
+        border-radius: 18px;
     }
 
     /* Ultra-narrow header: shrink the avatar + signal dots and tighten the
@@ -210,7 +210,11 @@
 
 @media (prefers-color-scheme: dark) {
     .pokedex-shell {
-        background: linear-gradient(165deg, #b91c1c 0%, #991b1b 40%, #7f1d1d 100%);
+        /* Keep the clay sheen while deepening the red for dark-mode devices. */
+        background:
+            radial-gradient(135% 110% at 24% 10%, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.10) 30%, rgba(255, 255, 255, 0) 60%),
+            radial-gradient(120% 120% at 85% 100%, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 62%),
+            linear-gradient(145deg, #e04a4a 0%, #b81a1a 44%, #6f0e0e 100%);
     }
 }
 
