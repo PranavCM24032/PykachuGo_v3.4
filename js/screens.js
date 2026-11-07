@@ -236,7 +236,7 @@ function showStep(stepNumber) {
 
     // Snappy Transition
     const fadeOutMs = 0;
-    const fadeInMs = 140;
+    const fadeInMs = 90;
 
     // Fade out all currently-active steps (except the target, which may already
     // be active on first paint — avoids the initial load flash).

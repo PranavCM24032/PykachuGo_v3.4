@@ -1,3 +1,23 @@
+/* Remove the mobile tap delay on every control so presses register instantly. */
+button,
+[role="button"],
+.btn-pokedex,
+.pokedex-button-alt,
+.pokedex-button-bar,
+.d-pad-direction {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Tailwind utilities (loaded after this file) stretch these to 150ms; force
+   instant press feedback everywhere. */
+.btn-pokedex,
+.pokedex-button-alt,
+.pokedex-button-bar,
+.d-pad-direction {
+    transition-duration: 0.07s !important;
+}
+
 .btn-pokedex {
     background: linear-gradient(145deg, #3b82f6, #2563eb);
     border: none;
@@ -5,7 +25,7 @@
     border-radius: clamp(6px, 1.5vmin, 10px);
     color: white;
     font-family: 'Press Start 2P', cursive;
-    transition: all 0.1s ease;
+    transition: transform 0.07s ease, box-shadow 0.07s ease, border-bottom-width 0.07s ease;
     box-shadow:
         0 4px 8px rgba(0, 0, 0, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -172,7 +192,8 @@ select:focus {
         inset 1px 1px 2px rgba(255, 255, 255, 0.1);
     position: relative;
     overflow: hidden;
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: transform 0.09s ease, box-shadow 0.09s ease, filter 0.09s ease;
+    touch-action: manipulation;
     min-height: 32px;
     min-width: 32px;
 }
@@ -196,7 +217,8 @@ select:focus {
         0 4px 6px -1px rgba(0, 0, 0, 0.4),
         0 2px 4px -1px rgba(0, 0, 0, 0.3),
         inset 0 1px 1px rgba(255, 255, 255, 0.1);
-    transition: all 0.15s ease;
+    transition: transform 0.09s ease, box-shadow 0.09s ease, background-color 0.09s ease;
+    touch-action: manipulation;
     min-height: 32px;
     min-width: 44px;
 }
