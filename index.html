@@ -81,6 +81,10 @@
 
             function insideScroller(el) {
                 for (var n = el; n && n !== document.body; n = n.parentElement) {
+                    // #screen is the page's main scroller; a tap on a control
+                    // there should still act on touch-down. Only nested
+                    // scrollers (puzzle text, hint lists) opt out.
+                    if (n.id === 'screen') break;
                     var style = window.getComputedStyle(n);
                     if (style && /(auto|scroll)/.test(style.overflowY)) return true;
                 }

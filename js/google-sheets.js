@@ -22,9 +22,13 @@ function getLoginToken() {
 }
 
 // Sliding window rate limit for Google Sheets API calls (protects Apps Script quota).
+// The default minIntervalMs is windowMs/limit = 2000ms, which forced every
+// outbound call after the first one to wait 2s — the login/answer buttons felt
+// dead for seconds. Keep the 30-per-minute cap but let calls go out immediately.
 const sheetsRateLimiter = new SlidingWindowRateLimiter({
     limit: 30,               // max requests per window
     windowMs: 60000,         // 60s rolling window
+    minIntervalMs: 0,        // no artificial spacing between calls
     persistKey: 'pykachuSheetsRateLimit' // surviving reloads
 });
 
