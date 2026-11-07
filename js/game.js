@@ -4,6 +4,24 @@ function getPuzzleQuestion(puzzle) {
     return puzzle.questionPython || puzzle.questionCpp || '';
 }
 
+// Immediate feedback while an async submit waits on the network. The button is
+// disabled and (optionally) relabelled so the tap visibly registers on the same
+// frame instead of feeling dead until the Apps Script round-trip returns.
+function setSubmitBusy(form, label) {
+    const btn = form ? form.querySelector('button[type="submit"]') : null;
+    if (!btn) return () => { };
+    if (!btn.dataset.idleHtml) btn.dataset.idleHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    if (label) btn.textContent = label;
+    return function restore() {
+        if (!btn.dataset.idleHtml) return;
+        btn.innerHTML = btn.dataset.idleHtml;
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+    };
+}
+
 // ==============================
 // STEP 1: REGISTRATION
 // ==============================
@@ -37,7 +55,9 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     // resolve the team's stable ID and must not reject rotated server-side keys.
     const lookupTid = foundTeam.tid || '';
 
+    const restoreLoginBtn = setSubmitBusy(this, 'CONNECTING...');
     const login = await loginTeam(teamInput, lookupTid, securityKeyInput);
+    restoreLoginBtn();
     if (thisLoginFlow !== loginFlowId) return; // superseded by a newer login
     if (!login.ok || !login.loginToken) {
         const status = login.json?.status;
@@ -164,7 +184,9 @@ document.getElementById('unlockForm').addEventListener('submit', async function 
     // the server, so every entry is validated there (puzzleId 0 searches all).
     let puzzle = null;
     const requestedPuzzle = (urlLockedPuzzle && isStartingPuzzle(urlLockedPuzzle)) ? urlLockedPuzzle : null;
+    const restoreUnlockBtn = setSubmitBusy(this, 'VERIFYING...');
     const check = await verifyStartCode(code, requestedPuzzle ? requestedPuzzle.id : 0);
+    restoreUnlockBtn();
 
     if (check.ok && check.correct) {
         const matchedId = Number(check.puzzleId) || (requestedPuzzle ? Number(requestedPuzzle.id) : 0);
@@ -309,7 +331,7 @@ function renderNextLocations(nextPuzzles) {
 // ==============================
 let answerLocked = false;
 
-// The 500ms "move to step 4" delay. Stored so a logout (or a new submit) can
+// The "move to step 4" timer. Stored so a logout (or a new submit) can
 // cancel it instead of landing a signed-out user on the catch screen.
 let revealStepTimer = null;
 
@@ -363,7 +385,11 @@ async function submitPuzzleAnswer() {
 
     // Block duplicate submissions while the network request is in flight.
     answerLocked = true;
+    const answerForm = document.getElementById('answerForm');
+    const restoreAnswerBtn = setSubmitBusy(answerForm);
+    showToast('DECRYPTING...', 'info');
     const result = await submitAnswerToServer(puzzle.id, answer, summary);
+    restoreAnswerBtn();
     if (currentPuzzle !== puzzle) return;
 
     if (!result.ok) {
@@ -414,7 +440,8 @@ async function submitPuzzleAnswer() {
     // Show ALL next puzzle locations (graph: nextPuzzleId may branch into many)
     const nextPuzzles = getNextPuzzles(puzzle);
 
-    // Delay move for satisfaction
+    // Move immediately: the server already confirmed this solve, so making the
+    // player wait on a cosmetic timer just reads as lag.
     const isEnd = !Array.isArray(puzzle.nextPuzzleId) || puzzle.nextPuzzleId.length === 0;
 
     // Capture the puzzle this reveal belongs to. Without this the callback
@@ -424,7 +451,7 @@ async function submitPuzzleAnswer() {
 
     clearTimeout(revealStepTimer);
     revealStepTimer = setTimeout(() => {
-        // The user may have logged out inside this 500ms window.
+        // The user may have logged out inside this reveal window.
         if (!isLoggedIn() || currentPuzzle !== solvedPuzzle) return;
 
         // Arm the end-of-chain celebration BEFORE showStep(4): the reveal
@@ -469,7 +496,7 @@ async function submitPuzzleAnswer() {
         // final puzzle → hides the card entirely.
         renderNextLocations(nextPuzzles);
 
-    }, 500);
+    }, 0);
 
     // Replace the local snapshot with the server's authoritative result and
     // drop the notebook now that its summary has been persisted.

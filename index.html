@@ -63,22 +63,58 @@
     </script>
 
     <script>
-        // Instant press feedback. Mobile browsers can delay :active until they
-        // rule out scrolling; toggling .is-pressed on pointerdown paints the
-        // pressed state on the very first touch frame instead.
+        // Instant press feedback + instant navigation.
+        // 1) .is-pressed is set on pointerdown because mobile browsers can delay
+        //    :active until they rule out scrolling.
+        // 2) Plain navigation controls (not inside a form, not the custom
+        //    power button) run their action on touch-down too, so the terminal
+        //    reacts the moment the finger lands. Form/async submits keep the
+        //    native click so validation and network round-trips stay intact.
         (function () {
-            var selector = '.btn-pokedex, .pokedex-button-alt, .pokedex-button-bar, .d-pad-direction, [role="button"], button';
-            var clear = function () {
+            var selector = '.btn-pokedex, .pokedex-button-alt, .pokedex-button-bar, .d-pad-direction, button, [role="button"]';
+            var clickable = 'button, [role="button"]';
+
+            function clearPressed() {
                 var pressed = document.querySelectorAll('.is-pressed');
                 for (var i = 0; i < pressed.length; i++) pressed[i].classList.remove('is-pressed');
-            };
+            }
+
+            function insideScroller(el) {
+                for (var n = el; n && n !== document.body; n = n.parentElement) {
+                    var style = window.getComputedStyle(n);
+                    if (style && /(auto|scroll)/.test(style.overflowY)) return true;
+                }
+                return false;
+            }
+
             document.addEventListener('pointerdown', function (e) {
                 var el = e.target && e.target.closest ? e.target.closest(selector) : null;
                 if (el && !el.disabled) el.classList.add('is-pressed');
+
+                var actionEl = e.target && e.target.closest ? e.target.closest(clickable) : null;
+                if (!actionEl || actionEl.disabled) return;
+                if (actionEl.id === 'power-button') return;
+                if (actionEl.closest('form')) return;
+                if (insideScroller(actionEl)) return;
+
+                actionEl.__instantClick = true;
+                setTimeout(function () { actionEl.__instantClick = false; }, 700);
+                actionEl.click();
             }, { passive: true });
-            document.addEventListener('pointerup', clear, { passive: true });
-            document.addEventListener('pointercancel', clear, { passive: true });
-            window.addEventListener('blur', clear);
+
+            document.addEventListener('click', function (e) {
+                if (!e.isTrusted) return;
+                var el = e.target && e.target.closest ? e.target.closest(clickable) : null;
+                if (el && el.__instantClick) {
+                    el.__instantClick = false;
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                }
+            }, true);
+
+            document.addEventListener('pointerup', clearPressed, { passive: true });
+            document.addEventListener('pointercancel', clearPressed, { passive: true });
+            window.addEventListener('blur', clearPressed);
         })();
     </script>
 
