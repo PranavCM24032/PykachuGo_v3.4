@@ -57,8 +57,7 @@ async function loadPuzzles() {
         // Speed up UI by pre-caching all sprites
         AssetPreloader.preload();
 
-        // Validate puzzles have required public fields. Answers, start codes
-        // and hints are server-side only and intentionally absent here.
+        // Validate puzzles have the fields the local validator reads.
         PUZZLES.forEach((puzzle, index) => {
             if (!puzzle.id || (!puzzle.questionPython && !puzzle.questionCpp)) {
                 console.error(`Puzzle ${index + 1} is missing required fields`);
@@ -90,6 +89,85 @@ async function loadTeams() {
         showToast('Cannot load team data. Please refresh or contact administrator.', 'error');
         return false;
     }
+}
+
+async function loadConfig() {
+    try {
+        const response = await fetch('data/config.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const cfg = await response.json();
+        window.GAME_CONFIG = cfg;
+        console.log('Loaded game config from config.json');
+        populateMissionSelect(cfg);
+        populateLanguageSelect(cfg);
+        return true;
+    } catch (error) {
+        console.error('Could not load config.json:', error);
+        return false;
+    }
+}
+
+/**
+ * Populates #missionLevel <select> from config.json missionGroups.
+ * Also rebuilds the custom-select overlay if already enhanced.
+ */
+function populateMissionSelect(cfg) {
+    const sel = document.getElementById('missionLevel');
+    if (!sel || !Array.isArray(cfg.missionGroups)) return;
+
+    sel.innerHTML = '';
+    cfg.missionGroups.forEach(group => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = group.label;
+        optgroup.className = 'bg-[#0a0f1d]';
+
+        (group.missions || []).forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.value;
+            opt.className = 'bg-[#050810] text-gray-300';
+            if (m.icon) {
+                const img = document.createElement('img');
+                img.src = m.icon;
+                img.alt = m.label.split(' ')[0];
+                img.className = 'inline w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 align-middle';
+                opt.appendChild(img);
+            }
+            opt.appendChild(document.createTextNode(' ' + m.label));
+            optgroup.appendChild(opt);
+        });
+        sel.appendChild(optgroup);
+    });
+
+    // Rebuild the custom-select UI on top of the refreshed <select>
+    if (typeof window.rebuildSelect === 'function') window.rebuildSelect('missionLevel');
+}
+
+/**
+ * Populates #codeLanguage <select> from config.json languages.
+ */
+function populateLanguageSelect(cfg) {
+    const sel = document.getElementById('codeLanguage');
+    if (!sel || !Array.isArray(cfg.languages)) return;
+
+    sel.innerHTML = '';
+    cfg.languages.forEach(lang => {
+        const opt = document.createElement('option');
+        opt.value = lang.value;
+        opt.className = 'bg-[#050810] text-gray-300';
+        if (lang.icon) {
+            const img = document.createElement('img');
+            img.src = lang.icon;
+            img.alt = lang.label;
+            img.className = 'inline w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 align-middle';
+            opt.appendChild(img);
+        }
+        opt.appendChild(document.createTextNode(' ' + lang.label));
+        sel.appendChild(opt);
+    });
+
+    if (typeof window.rebuildSelect === 'function') window.rebuildSelect('codeLanguage');
 }
 
 async function loadMemes() {

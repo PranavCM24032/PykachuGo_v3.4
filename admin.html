@@ -337,13 +337,7 @@
                         <select id="typeFilter" onchange="renderLogs()"
                             class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg px-3 py-3 sm:py-2 focus:border-indigo-500 outline-none">
                             <option value="ALL">ALL TYPES</option>
-                            <option value="GRASS"><img src="assets/img/grass.png" alt="Grass" class="inline w-4 h-4 mr-1 align-middle"> GRASS</option>
-                            <option value="FIRE"><img src="assets/img/fire.png" alt="Fire" class="inline w-4 h-4 mr-1 align-middle"> FIRE</option>
-                            <option value="WATER"><img src="assets/img/water.png" alt="Water" class="inline w-4 h-4 mr-1 align-middle"> WATER</option>
-                            <option value="GROUND"><img src="assets/img/ground.png" alt="Ground" class="inline w-4 h-4 mr-1 align-middle"> GROUND</option>
-                            <option value="GHOST"><img src="assets/img/ghost.png" alt="Ghost" class="inline w-4 h-4 mr-1 align-middle"> GHOST</option>
-                            <option value="FAIRY"><img src="assets/img/fairy.png" alt="Fairy" class="inline w-4 h-4 mr-1 align-middle"> FAIRY</option>
-                            <option value="PIKACHU"><img src="assets/img/pikachu.png" alt="Pikachu" class="inline w-4 h-4 mr-1 align-middle"> PIKACHU</option>
+                            <!-- Type options populated from data/config.json -->
                         </select>
                     </div>
 
@@ -352,9 +346,7 @@
                         <select id="levelFilter" onchange="renderLogs()"
                             class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg px-3 py-3 sm:py-2 focus:border-indigo-500 outline-none">
                             <option value="ALL">ALL LEVELS</option>
-                            <option value="L1">LEVEL 1</option>
-                            <option value="L2">LEVEL 2</option>
-                            <option value="L3">LEVEL 3</option>
+                            <!-- Level options populated from data/config.json -->
                         </select>
                     </div>
 
@@ -471,7 +463,7 @@
             SCRIPT_URL: RUNTIME_CONFIG.googleScriptUrl || '',
             TOKEN: RUNTIME_CONFIG.googleScriptToken || '',
             SHEET_URL: RUNTIME_CONFIG.googleSheetUrl || '',
-            REFRESH_RATE: 5000,
+            REFRESH_RATE: 12000,
             MAX_LOGS: 500,
             VERSION: '3.4.0'
         };
@@ -595,7 +587,7 @@
                 console.warn('localStorage unavailable:', e);
             }
 
-            await loadTeams();
+            await Promise.all([loadTeams(), loadAdminConfig()]);
             if (cached) {
                 try {
                     state.logs = JSON.parse(cached);
@@ -630,6 +622,46 @@
             } catch (e) {
                 console.warn('Failed to load teams.json:', e);
                 state.teams = [];
+            }
+        }
+
+        async function loadAdminConfig() {
+            try {
+                const res = await fetch('data/config.json');
+                if (!res.ok) return;
+                const cfg = await res.json();
+                // Populate typeFilter with missionTypes from config.json
+                const sel = document.getElementById('typeFilter');
+                if (sel && Array.isArray(cfg.missionTypes)) {
+                    // Remove any previously injected options (keep the ALL TYPES option)
+                    Array.from(sel.options).forEach(o => { if (o.value !== 'ALL') o.remove(); });
+                    cfg.missionTypes.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.value;
+                        if (t.icon) {
+                            const img = document.createElement('img');
+                            img.src = t.icon;
+                            img.alt = t.label;
+                            img.className = 'inline w-4 h-4 mr-1 align-middle';
+                            opt.appendChild(img);
+                        }
+                        opt.appendChild(document.createTextNode(' ' + t.label));
+                        sel.appendChild(opt);
+                    });
+                }
+                // Populate levelFilter from missionGroups
+                const lvlSel = document.getElementById('levelFilter');
+                if (lvlSel && Array.isArray(cfg.missionGroups)) {
+                    Array.from(lvlSel.options).forEach(o => { if (o.value !== 'ALL') o.remove(); });
+                    cfg.missionGroups.forEach(g => {
+                        const opt = document.createElement('option');
+                        opt.value = g.level;
+                        opt.textContent = g.label.replace(/:.*/,'').trim();
+                        lvlSel.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                console.warn('Failed to load config.json for admin:', e);
             }
         }
 

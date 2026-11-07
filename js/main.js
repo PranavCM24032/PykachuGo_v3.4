@@ -43,7 +43,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [puzzlesLoaded, teamsLoaded, memesLoaded] = await Promise.all([
         loadPuzzles(),
         loadTeams(),
-        loadMemes()
+        loadMemes(),
+        loadConfig()
     ]);
     if (!puzzlesLoaded || !teamsLoaded) {
         showToast('Game data could not be loaded. Please refresh or contact administrator.', 'error');

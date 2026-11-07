@@ -4,24 +4,6 @@ function getPuzzleQuestion(puzzle) {
     return puzzle.questionPython || puzzle.questionCpp || '';
 }
 
-// Immediate feedback while an async submit waits on the network. The button is
-// disabled and (optionally) relabelled so the tap visibly registers on the same
-// frame instead of feeling dead until the Apps Script round-trip returns.
-function setSubmitBusy(form, label) {
-    const btn = form ? form.querySelector('button[type="submit"]') : null;
-    if (!btn) return () => { };
-    if (!btn.dataset.idleHtml) btn.dataset.idleHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.setAttribute('aria-busy', 'true');
-    if (label) btn.textContent = label;
-    return function restore() {
-        if (!btn.dataset.idleHtml) return;
-        btn.innerHTML = btn.dataset.idleHtml;
-        btn.disabled = false;
-        btn.removeAttribute('aria-busy');
-    };
-}
-
 // ==============================
 // STEP 1: REGISTRATION
 // ==============================
@@ -51,38 +33,24 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         return;
     }
 
-    // The backend owns team-key validation; the bundled roster is only used to
-    // resolve the team's stable ID and must not reject rotated server-side keys.
+    // Team keys live in data/teams.json, so the login is validated on-device and
+    // the app opens on the same frame as the tap. The Apps Script login still
+    // runs in the background to mint a telemetry session token, but the UI no
+    // longer waits on that round-trip.
     const lookupTid = foundTeam.tid || '';
 
-    const restoreLoginBtn = setSubmitBusy(this, 'CONNECTING...');
-    const login = await loginTeam(teamInput, lookupTid, securityKeyInput);
-    restoreLoginBtn();
-    if (thisLoginFlow !== loginFlowId) return; // superseded by a newer login
-    if (!login.ok || !login.loginToken) {
-        const status = login.json?.status;
-        const message = status === 'rate_limited'
-            ? 'Too many attempts. Wait one minute and try again.'
-            : status === 'configuration_error'
-                ? 'Sign-in is not configured. Please contact the organizer.'
-                : status === 'network_error'
-                    ? 'Could not reach the sign-in service. Check your connection and try again.'
-                    : status === 'error' && login.json?.message === 'unauthorized'
-                        ? 'The sign-in service is unavailable. Please contact the organizer.'
-                        : 'Invalid team name or security key!';
-        showFeedback('registrationFeedback', message, 'error');
+    if (standardizeString(securityKeyInput) !== standardizeString(foundTeam.securityKey)) {
+        showFeedback('registrationFeedback', 'Invalid team name or security key!', 'error');
         triggerShake('teamSecurityKey');
         playSound('error');
         return;
     }
 
-    loginToken = login.loginToken;
-    const resolvedTeamName = login.teamName || (foundTeam ? foundTeam.team : teamInput);
-    const resolvedTid = login.tid || lookupTid;
+    const resolvedTeamName = foundTeam.team;
+    const resolvedTid = lookupTid;
 
     const previousTeamKey = getRememberedTeamKey();
-    const nextTeamTid = resolvedTid;
-    const nextTeamKey = nextTeamTid || resolvedTeamName;
+    const nextTeamKey = resolvedTid || resolvedTeamName;
     const isDifferentTeam = !previousTeamKey || previousTeamKey !== nextTeamKey;
 
     // A browser can be shared by multiple teams. Do not carry the previous
@@ -115,20 +83,6 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         sessionId = generateSessionId();
     }
 
-    // The server snapshot is tied to the login session, so progress follows the
-    // authenticated team rather than the device. Capture the local version so a
-    // solve that happens while the request is in flight is not clobbered.
-    const versionAtLogin = progressVersion;
-    const serverStatePromise = fetchTeamState();
-
-    submitToGoogleSheets('REGISTRATION', {
-        teamName: currentTeam,
-        tid: currentTeamTid,
-        mission: missionLevel,
-        language: currentLanguage,
-        level: missionLevel.replace(/\D/g, '')
-    });
-
     updateTeamStatus();
     updatePowerLed();
     playSound('powerUp');
@@ -136,30 +90,63 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     showFeedback('registrationFeedback', `✓ Welcome back, ${currentTeam}`, 'success');
     showStep(2);
 
-    serverStatePromise.then(serverState => {
-        // A slow state response must not navigate a player who has already
-        // scanned a puzzle, solved it, or started another login.
-        if (thisLoginFlow !== loginFlowId || currentTeamTid !== nextTeamTid || currentStep !== 2) {
-            return;
-        }
-        if (serverState) applyServerTeamState(serverState, versionAtLogin);
+    // Background: exchange the key for a server session, then pull the
+    // authoritative snapshot. The screen is already open, so a slow or offline
+    // server never blocks play.
+    loginTeam(teamInput, lookupTid, securityKeyInput).then(login => {
+        if (thisLoginFlow !== loginFlowId || !login.ok || !login.loginToken) return;
+        loginToken = login.loginToken;
 
-        document.getElementById('screen')?.classList.remove('premium-glow');
-        // Universal link: skip QR scan and jump straight to that puzzle
-        if (urlLockedPuzzle) {
-            if (isStartingPuzzle(urlLockedPuzzle)) {
-                // Starting puzzle — ask for its start key
-                showStep('startcode');
-            } else {
-                // Non-start puzzle — unlock directly, no key entry needed
-                const via = currentPuzzle ? `Puzzle ${currentPuzzle.id}` : 'DIRECT';
-                activatePuzzle(urlLockedPuzzle, via);
-                showStep(3);
-            }
-        } else if (!isDifferentTeam) {
-            // Same team re-logging in: resume exactly where they left off
-            resumeToLastStep();
+        const canonicalName = login.teamName || currentTeam;
+        const canonicalTid = login.tid || currentTeamTid;
+        if (canonicalName !== currentTeam || canonicalTid !== currentTeamTid) {
+            currentTeam = canonicalName;
+            currentTeamTid = canonicalTid;
+            saveTeamInfo({
+                teamName: currentTeam,
+                tid: currentTeamTid,
+                mission: currentMissionLevel,
+                language: currentLanguage
+            });
+            updateTeamStatus();
         }
+
+        submitToGoogleSheets('REGISTRATION', {
+            teamName: currentTeam,
+            tid: currentTeamTid,
+            mission: currentMissionLevel,
+            language: currentLanguage,
+            level: currentMissionLevel.replace(/\D/g, '')
+        });
+
+        const versionAtLogin = progressVersion;
+        return fetchTeamState().then(serverState => {
+            // A slow state response must not navigate a player who has already
+            // scanned a puzzle, solved it, or started another login.
+            if (thisLoginFlow !== loginFlowId || currentTeamTid !== canonicalTid || currentStep !== 2) {
+                return;
+            }
+            if (serverState) applyServerTeamState(serverState, versionAtLogin);
+
+            document.getElementById('screen')?.classList.remove('premium-glow');
+            // Universal link: skip QR scan and jump straight to that puzzle
+            if (urlLockedPuzzle) {
+                if (isStartingPuzzle(urlLockedPuzzle)) {
+                    // Starting puzzle — ask for its start key
+                    showStep('startcode');
+                } else {
+                    // Non-start puzzle — unlock directly, no key entry needed
+                    const via = currentPuzzle ? `Puzzle ${currentPuzzle.id}` : 'DIRECT';
+                    activatePuzzle(urlLockedPuzzle, via);
+                    showStep(3);
+                }
+            } else if (!isDifferentTeam) {
+                // Same team re-logging in: resume exactly where they left off
+                resumeToLastStep();
+            }
+        });
+    }).catch(() => {
+        document.getElementById('screen')?.classList.remove('premium-glow');
     });
 });
 
@@ -180,41 +167,31 @@ document.getElementById('unlockForm').addEventListener('submit', async function 
         return;
     }
 
-    // A code is only ever asked for starting puzzles. The start codes live on
-    // the server, so every entry is validated there (puzzleId 0 searches all).
-    let puzzle = null;
+    // Start codes live in data/puzzle.json, so match locally and unlock on the
+    // same frame. The Apps Script call is now telemetry only.
     const requestedPuzzle = (urlLockedPuzzle && isStartingPuzzle(urlLockedPuzzle)) ? urlLockedPuzzle : null;
-    const restoreUnlockBtn = setSubmitBusy(this, 'VERIFYING...');
-    const check = await verifyStartCode(code, requestedPuzzle ? requestedPuzzle.id : 0);
-    restoreUnlockBtn();
+    const matched = PUZZLES.find(p => {
+        if (requestedPuzzle && Number(p.id) !== Number(requestedPuzzle.id)) return false;
+        return isStartingPuzzle(p) && standardizeString(p.startCode) === code;
+    });
 
-    if (check.ok && check.correct) {
-        const matchedId = Number(check.puzzleId) || (requestedPuzzle ? Number(requestedPuzzle.id) : 0);
-        const matched = PUZZLES.find(p => Number(p.id) === matchedId);
-        if (matched && isStartingPuzzle(matched)) {
-            puzzle = matched;
-        }
-    }
-
-    if (puzzle) {
-        activatePuzzle(puzzle, 'START');
+    if (matched) {
+        activatePuzzle(matched, 'START');
         showStep(3);
         playSound('success');
-    } else {
-        if (check.json?.status === 'rate_limited') {
-            showFeedback('unlockFeedback', 'Too many start-key attempts. Wait one minute and try again.', 'error');
-            return;
-        }
-        submitToGoogleSheets('UNLOCK_FAILED', {
-            wrongCode: code,
-            attemptedFor: urlLockedPuzzle ? urlLockedPuzzle.id : 'unknown',
-            puzzleLevel: urlLockedPuzzle ? urlLockedPuzzle.level : undefined,
-            attemptedLink: urlLockedPuzzle ? urlLockedPuzzle.linkid : 'unknown'
-        });
-        showFeedback('unlockFeedback', 'Incorrect key', 'error');
-        triggerShake('unlockCode');
-        playSound('error');
+        verifyStartCode(code, requestedPuzzle ? requestedPuzzle.id : 0).catch(() => { });
+        return;
     }
+
+    submitToGoogleSheets('UNLOCK_FAILED', {
+        wrongCode: code,
+        attemptedFor: urlLockedPuzzle ? urlLockedPuzzle.id : 'unknown',
+        puzzleLevel: urlLockedPuzzle ? urlLockedPuzzle.level : undefined,
+        attemptedLink: urlLockedPuzzle ? urlLockedPuzzle.linkid : 'unknown'
+    });
+    showFeedback('unlockFeedback', 'Incorrect key', 'error');
+    triggerShake('unlockCode');
+    playSound('error');
 });
 
 // ==============================
@@ -341,6 +318,22 @@ function unlockAnswerInput() {
     answerLocked = false;
 }
 
+// Mirror the server's unlock rule from the local JSON: every start puzzle plus
+// every solved puzzle and its outgoing edges.
+function computeLocalUnlocked(solvedIds) {
+    const allowed = new Set();
+    PUZZLES.forEach(p => {
+        if (isStartingPuzzle(p)) allowed.add(Number(p.id));
+    });
+    solvedIds.forEach(id => {
+        const p = PUZZLES.find(x => Number(x.id) === Number(id));
+        if (!p) return;
+        allowed.add(Number(p.id));
+        (p.nextPuzzleId || []).forEach(n => allowed.add(Number(n)));
+    });
+    return Array.from(allowed).sort((a, b) => a - b);
+}
+
 async function submitPuzzleAnswer() {
     const answerInput = document.getElementById('puzzleAnswer');
     if (!answerInput) return;
@@ -369,8 +362,6 @@ async function submitPuzzleAnswer() {
     }
 
     const puzzle = currentPuzzle;
-    // The server is the only authority on correctness and scoring. Ship the
-    // notebook summary along so telemetry and the solve land in one request.
     const summary = (typeof notepadSummary === 'function') ? (notepadSummary(puzzle.id) || {}) : {};
     const notebook = (typeof getPuzzleNotebook === 'function') ? getPuzzleNotebook() : null;
     if (notebook) {
@@ -383,26 +374,13 @@ async function submitPuzzleAnswer() {
     }
     if (!summary.eventId) summary.eventId = generateEventId();
 
-    // Block duplicate submissions while the network request is in flight.
+    // One submit per puzzle.
     answerLocked = true;
-    const answerForm = document.getElementById('answerForm');
-    const restoreAnswerBtn = setSubmitBusy(answerForm);
-    showToast('DECRYPTING...', 'info');
-    const result = await submitAnswerToServer(puzzle.id, answer, summary);
-    restoreAnswerBtn();
-    if (currentPuzzle !== puzzle) return;
 
-    if (!result.ok) {
-        answerLocked = false;
-        if (result.rateLimited) {
-            showToast("TOO MANY ATTEMPTS — WAIT A MOMENT", "error");
-        } else {
-            showToast("SERVER UNREACHABLE — TRY AGAIN", "error");
-        }
-        return;
-    }
-
-    if (!result.correct) {
+    // Correctness lives in data/puzzle.json, so decide on-device and update the
+    // screen on the same frame. The server request below is reconciliation +
+    // telemetry, not a gate.
+    if (standardizeString(answerInput.value) !== standardizeString(puzzle.answer)) {
         answerLocked = false;
         playSound('error');
         showToast("DECRYPTION FAILED", "error");
@@ -415,13 +393,26 @@ async function submitPuzzleAnswer() {
         triggerShake('puzzleAnswer');
 
         notepadBump('wrong', puzzle);
+        setTimeout(() => flushSessionBuffer(), 250);
         return;
     }
 
-    // Correct — the server already persisted the SOLVED row and computed the
-    // authoritative score/solved/unlocked sets.
+    const repeat = hasSolvedPuzzle(puzzle.id);
+    const pointsEarned = repeat ? -(puzzle.points || 0) : (puzzle.points || 0);
+    const solvedIds = Array.from(currentTeamSolvedPuzzles);
+    if (!repeat) solvedIds.push(Number(puzzle.id));
+    const optimisticResult = {
+        correct: true,
+        repeat,
+        points: pointsEarned,
+        score: currentTeamScore + pointsEarned,
+        solved: solvedIds,
+        unlocked: computeLocalUnlocked(solvedIds)
+    };
+
+    // Correct — reveal immediately from the local result.
     playSound('victory');
-    showToast("SIGNAL DECRYPTED!", "success");
+    showToast(repeat ? `REPEATED SOLVE: ${pointsEarned} pts` : `SIGNAL DECRYPTED! +${pointsEarned} pts`, repeat ? 'info' : 'success');
 
     // Visual flair
     document.getElementById('screen')?.classList.add('premium-glow');
@@ -498,23 +489,22 @@ async function submitPuzzleAnswer() {
 
     }, 0);
 
-    // Replace the local snapshot with the server's authoritative result and
-    // drop the notebook now that its summary has been persisted.
-    applyAuthoritativeSolve(result);
+    // Apply the local result now and drop the notebook; its summary is already
+    // in the telemetry payload.
+    applyAuthoritativeSolve(optimisticResult);
     if (typeof deletePuzzleNotebook === 'function') deletePuzzleNotebook(puzzle.id);
 
-    const pointsEarned = (typeof result.points === 'number')
-        ? result.points
-        : (result.repeat ? -(puzzle.points || 0) : (puzzle.points || 0));
-
-    if (result.repeat) {
-        showToast(`REPEATED SOLVE: ${pointsEarned} pts`, 'info');
-    } else {
-        showToast(`SIGNAL DECRYPTED! +${pointsEarned} pts`, 'success');
-    }
+    // Reconcile against the server without blocking play. Ignore the reply if
+    // the player has already made newer local progress.
+    const versionAfterLocal = progressVersion;
+    submitAnswerToServer(puzzle.id, answer, summary).then(result => {
+        if (result && result.ok && result.correct && progressVersion === versionAfterLocal) {
+            applyAuthoritativeSolve(result);
+        }
+    }).catch(() => { });
 
     // Flush buffered events to Google Sheets
-    setTimeout(() => flushSessionBuffer(), 500);
+    setTimeout(() => flushSessionBuffer(), 250);
 }
 // Attach the submit handler
 document.getElementById('answerForm').addEventListener('submit', (e) => {

@@ -241,6 +241,34 @@
         return sel;
     };
 
+    /**
+     * Tears down the existing custom-select wrapper for the given select id
+     * and rebuilds it from scratch. Call this after programmatically changing
+     * the <select>'s <option> children (e.g. after loading from JSON).
+     */
+    window.rebuildSelect = function (id) {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+
+        // Remove the stale custom-select wrapper and show the raw <select> again
+        const container = sel.parentElement;
+        const oldWrap = container.querySelector('.custom-select');
+        if (oldWrap) oldWrap.remove();
+        // Remove the stale floating menu (appended to <body>)
+        document.querySelectorAll('.custom-select-menu').forEach(m => {
+            // Only remove orphaned menus (the wrap that owned them is gone)
+            if (!document.body.contains(m.previousElementSibling)) m.remove();
+        });
+        // Detach the built flag so build() runs fresh
+        delete sel.dataset.customSelectBuilt;
+        const oldIcon = container.querySelector('.material-symbols-rounded');
+        if (oldIcon) oldIcon.style.display = '';
+        sel.style.display = '';
+        enhanced.delete(sel);
+
+        build(sel);
+    };
+
 window.refreshSelectDisplay = function (el, attempts) {
         attempts = attempts || 0;
         const entry = enhanced.get(el);

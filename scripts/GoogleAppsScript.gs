@@ -36,34 +36,73 @@ function getSpreadsheet_() {
 }
 
 // ── Server-authoritative puzzle catalogue ────────────────────────────────
-// Answers, start codes, hints and point values live HERE, never in the
-// client-served data/puzzle.json. The client asks the server to validate.
-// To rotate secrets without editing code, set PUZZLE_SECRETS_JSON in Script
-// Properties to a JSON object with the same shape as PUZZLE_SECRETS.
-var PUZZLE_SECRETS = {
-  1: { level: 1, points: 10, answer: '-5', startCode: 'START', next: [2, 6], hint: 'BODMAS' },
-  2: { level: 1, points: 10, answer: '4', next: [3], hint: 'Simple arithmetic' },
-  3: { level: 1, points: 10, answer: '13', next: [4], hint: 'Power of 2' },
-  4: { level: 1, points: 10, answer: '4', startCode: 'GRASS', next: [5], hint: 'Linear function: work out func(2) and func(3) first, then subtract.' },
-  5: { level: 2, points: 20, answer: '17', next: [6], hint: 'Conditional logic' },
-  6: { level: 2, points: 20, answer: '32', next: [7, 3], hint: 'Sum of series' },
-  7: { level: 3, points: 30, answer: '23', next: [], hint: null }
-};
+// data/puzzle.json (the file the client also loads) is the single source of
+// truth. The server reads that same file so answers, start codes, points and
+// the puzzle graph are never duplicated here. Set PUZZLE_SECRETS_JSON in
+// Script Properties only to rotate secrets without republishing the JSON.
+var DEFAULT_DATA_BASE_URL = 'https://pranavcm24032.github.io/PykachuGo_v3.4/';
 
 var LOGIN_SESSION_TTL_SECS = 21600;
 var LOGIN_RATE_LIMIT = 10;
 var START_CODE_RATE_LIMIT = 10;
 var AUTH_RATE_WINDOW_SECS = 60;
 
+function getDataBaseUrl_() {
+  var configured = PropertiesService.getScriptProperties().getProperty('DATA_BASE_URL');
+  var base = String(configured || DEFAULT_DATA_BASE_URL).trim();
+  if (base && base.charAt(base.length - 1) !== '/') base += '/';
+  return base;
+}
+
+// Fetch one of the public data/*.json files (cached briefly) so the client and
+// server always agree on the puzzle graph, answers and team roster. Set
+// DATA_BASE_URL in Script Properties if the app is served from another origin.
+function readDataJson_(file) {
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'datajson:' + file;
+  var cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) { }
+  }
+  var url = getDataBaseUrl_() + 'data/' + file;
+  var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+  if (res.getResponseCode() !== 200) {
+    throw new Error('Could not load ' + url + ' (HTTP ' + res.getResponseCode() + ')');
+  }
+  var text = res.getContentText();
+  cache.put(cacheKey, text, 21600); // 6 hours (entire event duration)
+  return JSON.parse(text);
+}
+
 function getPuzzleCatalogue_() {
   var raw = PropertiesService.getScriptProperties().getProperty('PUZZLE_SECRETS_JSON');
-  if (!raw) return PUZZLE_SECRETS;
+  if (raw) {
+    try {
+      var parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (e) {
+      Logger.log('Invalid PUZZLE_SECRETS_JSON: ' + e);
+    }
+  }
   try {
-    var parsed = JSON.parse(raw);
-    return (parsed && typeof parsed === 'object') ? parsed : PUZZLE_SECRETS;
+    var list = readDataJson_('puzzle.json');
+    var catalogue = {};
+    (Array.isArray(list) ? list : []).forEach(function(p) {
+      var id = Number(p && p.id);
+      if (!id) return;
+      catalogue[id] = {
+        level: p.level,
+        points: p.points,
+        answer: p.answer,
+        startCode: p.startCode,
+        next: p.nextPuzzleId || [],
+        hint: p.hint
+      };
+    });
+    return catalogue;
   } catch (e) {
-    Logger.log('Invalid PUZZLE_SECRETS_JSON: ' + e);
-    return PUZZLE_SECRETS;
+    Logger.log('Could not build puzzle catalogue from data/puzzle.json: ' + e);
+    return {};
   }
 }
 
@@ -115,6 +154,13 @@ function teamRowMatches(row, tidIndex, teamIndex, tid, teamName) {
 }
 
 function getTeamContext(ss, tid, teamName) {
+  var cache = CacheService.getScriptCache();
+  var cKey = 'ctx_' + String(tid || teamName || '').replace(/[^A-Za-z0-9_]/g, '_');
+  var cached = cKey !== 'ctx_' ? cache.get(cKey) : null;
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) { }
+  }
+
   var solved = [];
   var points = 0;
   ['L1', 'L2', 'L3'].forEach(function(name) {
@@ -130,7 +176,18 @@ function getTeamContext(ss, tid, teamName) {
       points += Number(rows[i][8] || 0) || 0;
     }
   });
-  return { solved: uniqueNumbers(solved), points: points };
+  var result = { solved: uniqueNumbers(solved), points: points };
+  if (cKey !== 'ctx_') {
+    try { cache.put(cKey, JSON.stringify(result), 180); } catch (e) { }
+  }
+  return result;
+}
+
+function invalidateTeamContext(tid, teamName) {
+  try {
+    var cKey = 'ctx_' + String(tid || teamName || '').replace(/[^A-Za-z0-9_]/g, '_');
+    if (cKey !== 'ctx_') CacheService.getScriptCache().remove(cKey);
+  } catch (e) { }
 }
 
 function getLoginSession(data) {
@@ -155,17 +212,27 @@ function createLoginSession(tid, teamName) {
   return token;
 }
 
+function getTeamRoster_() {
+  try {
+    var list = readDataJson_('teams.json');
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    Logger.log('Could not load data/teams.json: ' + e);
+    return [];
+  }
+}
+
 function resolveTeamKey_(tid, teamName) {
   var raw = PropertiesService.getScriptProperties().getProperty('TEAM_KEYS_JSON');
   if (raw) {
     try {
       var map = JSON.parse(raw) || {};
-      var tId = String(tid || '').trim().toUpperCase();
-      var tName = String(teamName || '').trim().toUpperCase();
+      var configuredId = String(tid || '').trim().toUpperCase();
+      var configuredName = String(teamName || '').trim().toUpperCase();
       var keys = Object.keys(map);
       for (var i = 0; i < keys.length; i++) {
         var k = String(keys[i]).trim().toUpperCase();
-        if ((tId && k === tId) || (tName && k === tName)) return String(map[keys[i]] || '');
+        if ((configuredId && k === configuredId) || (configuredName && k === configuredName)) return String(map[keys[i]] || '');
       }
       return '';
     } catch (e) {
@@ -173,39 +240,61 @@ function resolveTeamKey_(tid, teamName) {
       return '';
     }
   }
-  // Migration fallback until TEAM_KEYS_JSON is configured in Script Properties.
-  return String(PropertiesService.getScriptProperties().getProperty('DEFAULT_TEAM_KEY') || '123');
+
+  // Fallback: keys live in data/teams.json, the same roster the client loads.
+  var tId = String(tid || '').trim().toUpperCase();
+  var tName = String(teamName || '').trim().toUpperCase();
+  var roster = getTeamRoster_();
+  for (var r = 0; r < roster.length; r++) {
+    var row = roster[r] || {};
+    var rowTid = String(row.tid || '').trim().toUpperCase();
+    var rowName = String(row.team || '').trim().toUpperCase();
+    if ((tId && rowTid === tId) || (tName && rowName === tName)) {
+      return String(row.securityKey == null ? '' : row.securityKey);
+    }
+  }
+  return '';
 }
 
 function getTeamRateIdentity_(tid, teamName) {
   var raw = PropertiesService.getScriptProperties().getProperty('TEAM_KEYS_JSON');
-  if (!raw) {
-    var fallbackIdentity = String(tid || teamName || 'unknown').trim().toUpperCase();
-    return 'fallback_' + fallbackIdentity.replace(/[^A-Za-z0-9_]/g, '_').substring(0, 120);
+  var tId = String(tid || '').trim().toUpperCase();
+  var tName = String(teamName || '').trim().toUpperCase();
+
+  if (raw) {
+    try {
+      var map = JSON.parse(raw) || {};
+      var keys = Object.keys(map);
+      // Match the same precedence as LOGIN: a configured name key wins over TID.
+      for (var i = 0; i < keys.length; i++) {
+        if (tName && String(keys[i]).trim().toUpperCase() === tName) {
+          return 'team_' + String(keys[i]).replace(/[^A-Za-z0-9_]/g, '_');
+        }
+      }
+      for (var j = 0; j < keys.length; j++) {
+        if (tId && String(keys[j]).trim().toUpperCase() === tId) {
+          return 'team_' + String(keys[j]).replace(/[^A-Za-z0-9_]/g, '_');
+        }
+      }
+      // Unknown names share one bucket, so varying arbitrary names cannot reset it.
+      return 'unknown';
+    } catch (e) {
+      Logger.log('Invalid TEAM_KEYS_JSON while rate limiting: ' + e);
+      return 'unknown';
+    }
   }
 
-  try {
-    var map = JSON.parse(raw) || {};
-    var tId = String(tid || '').trim().toUpperCase();
-    var tName = String(teamName || '').trim().toUpperCase();
-    var keys = Object.keys(map);
-    // Match the same precedence as LOGIN: a configured name key wins over TID.
-    for (var i = 0; i < keys.length; i++) {
-      if (tName && String(keys[i]).trim().toUpperCase() === tName) {
-        return 'team_' + String(keys[i]).replace(/[^A-Za-z0-9_]/g, '_');
-      }
+  // Fallback: derive a stable bucket from data/teams.json.
+  var roster = getTeamRoster_();
+  for (var r = 0; r < roster.length; r++) {
+    var row = roster[r] || {};
+    var rowTid = String(row.tid || '').trim().toUpperCase();
+    var rowName = String(row.team || '').trim().toUpperCase();
+    if ((tName && rowName === tName) || (tId && rowTid === tId)) {
+      return 'team_' + String(rowTid || rowName).replace(/[^A-Za-z0-9_]/g, '_');
     }
-    for (var j = 0; j < keys.length; j++) {
-      if (tId && String(keys[j]).trim().toUpperCase() === tId) {
-        return 'team_' + String(keys[j]).replace(/[^A-Za-z0-9_]/g, '_');
-      }
-    }
-    // Unknown names share one bucket, so varying arbitrary names cannot reset it.
-    return 'unknown';
-  } catch (e) {
-    Logger.log('Invalid TEAM_KEYS_JSON while rate limiting: ' + e);
-    return 'unknown';
   }
+  return 'unknown';
 }
 
 function checkSlidingWindowRate_(scope, identity, limit) {
@@ -592,6 +681,7 @@ function doPost(e) {
       if (answerRowIdx > 0) {
         writeRow(answerSheet, answerRows, answerRowIdx);
         if (answerEventId) markEventProcessed(answerEventId);
+        invalidateTeamContext(answerTid, answerTeamName);
       }
       SpreadsheetApp.flush();
 
@@ -643,6 +733,7 @@ function doPost(e) {
           writeRow(sheet, rows, Number(idx));
         });
         applied.forEach(markEventProcessed);
+        invalidateTeamContext(writeSession.tid, writeSession.teamName);
       });
     } else {
       data.tid = writeSession.tid || data.tid;

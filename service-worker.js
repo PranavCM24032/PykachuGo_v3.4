@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v2.0.20';
+const CACHE_NAME = 'pykachu-go-v2.0.21';
 const OPTIONAL_CACHE_NAME = 'pykachu-go-optional-v1';
 const ASSETS = [
     'index.html',
@@ -45,6 +45,7 @@ const ASSETS = [
     'data/puzzle.json',
     'data/teams.json',
     'data/meme.json',
+    'data/config.json',
     'service-worker.js',
     'assets/img/pokeball.svg',
     'assets/img/apple-touch-icon.png',

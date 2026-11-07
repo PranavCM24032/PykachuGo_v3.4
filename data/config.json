@@ -1,0 +1,45 @@
+{
+    "languages": [
+        { "value": "PYTHON", "label": "PYTHON", "icon": "assets/img/python.png" },
+        { "value": "CPP",    "label": "C++",    "icon": "assets/img/C++.png"    }
+    ],
+    "missionTypes": [
+        { "value": "GRASS",   "label": "GRASS",   "icon": "assets/img/grass.png"   },
+        { "value": "FIRE",    "label": "FIRE",    "icon": "assets/img/fire.png"    },
+        { "value": "WATER",   "label": "WATER",   "icon": "assets/img/water.png"   },
+        { "value": "GROUND",  "label": "GROUND",  "icon": "assets/img/ground.png"  },
+        { "value": "GHOST",   "label": "GHOST",   "icon": "assets/img/ghost.png"   },
+        { "value": "FAIRY",   "label": "FAIRY",   "icon": "assets/img/fairy.png"   },
+        { "value": "PIKACHU", "label": "PIKACHU", "icon": "assets/img/pikachu.png" }
+    ],
+    "missionGroups": [
+        {
+            "label": "LEVEL 1: ELEMENTAL",
+            "level": "L1",
+            "labelClass": "text-blue-400",
+            "missions": [
+                { "value": "L1_GRASS",  "label": "GRASS SECTOR",  "icon": "assets/img/grass.png"  },
+                { "value": "L1_FIRE",   "label": "FIRE SECTOR",   "icon": "assets/img/fire.png"   },
+                { "value": "L1_WATER",  "label": "WATER SECTOR",  "icon": "assets/img/water.png"  },
+                { "value": "L1_GROUND", "label": "GROUND SECTOR", "icon": "assets/img/ground.png" }
+            ]
+        },
+        {
+            "label": "LEVEL 2: ELITE",
+            "level": "L2",
+            "labelClass": "text-yellow-500",
+            "missions": [
+                { "value": "L2_GHOST", "label": "GHOST ASCENT", "icon": "assets/img/ghost.png" },
+                { "value": "L2_FAIRY", "label": "FAIRY STRIKE", "icon": "assets/img/fairy.png" }
+            ]
+        },
+        {
+            "label": "LEVEL 3: ULTIMATE",
+            "level": "L3",
+            "labelClass": "text-red-500",
+            "missions": [
+                { "value": "L3_PIKACHU", "label": "PIKACHU GO", "icon": "assets/img/pikachu.png" }
+            ]
+        }
+    ]
+}

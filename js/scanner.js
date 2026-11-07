@@ -505,13 +505,9 @@ async function handleQRScanResult(qrData) {
     const normalizedInput = standardizeString(linkId);
     urlLockedPuzzle = PUZZLES.find(p => standardizeString(p.linkid) === normalizedInput);
 
-    // Allow direct start-code entry. Codes are server-side only, so the
-    // scanned text is checked against the backend (puzzleId 0 = search all).
-    if (!urlLockedPuzzle && typeof verifyStartCode === 'function') {
-        const codeResult = await verifyStartCode(normalizedInput, 0);
-        if (codeResult.ok && codeResult.correct && codeResult.puzzleId) {
-            urlLockedPuzzle = PUZZLES.find(p => Number(p.id) === Number(codeResult.puzzleId)) || null;
-        }
+    // Allow direct start-code entry. Codes live in data/puzzle.json.
+    if (!urlLockedPuzzle) {
+        urlLockedPuzzle = PUZZLES.find(p => isStartingPuzzle(p) && standardizeString(p.startCode) === normalizedInput) || null;
     }
 
     if (urlLockedPuzzle) {

@@ -11,8 +11,7 @@ function isHintValid(hint) {
     return false;
 }
 
-// The hint TEXT is server-side only; the public puzzle data just says whether
-// one exists (`hasHint`). Older cached data may still carry `hint`.
+// Hint text ships in data/puzzle.json alongside the rest of the puzzle.
 function puzzleHasHint(puzzle) {
     if (!puzzle) return false;
     if (puzzle.hasHint === true) return true;
@@ -31,7 +30,7 @@ function setupHintSystem() {
 
     if (!hintContainer) return;
 
-    // The actual hint text is fetched from the server only when requested.
+    // The hint text is read from the puzzle JSON when requested.
     currentPuzzleHint = null;
 
     // VALIDATION: no hint for this puzzle → no hint button
@@ -397,19 +396,7 @@ async function showHint() {
     }
 
     if (!currentPuzzleHint) {
-        if (typeof fetchHint !== 'function') {
-            showToast('Hint unavailable right now.', 'error');
-            return;
-        }
-        const requestedPuzzle = currentPuzzle;
-        const result = await fetchHint(requestedPuzzle.id);
-        // The player may have moved on while the request was in flight.
-        if (currentPuzzle !== requestedPuzzle) return;
-        if (!result.ok || !result.hint) {
-            showToast('Hint unavailable right now.', 'error');
-            return;
-        }
-        currentPuzzleHint = result.hint;
+        currentPuzzleHint = isHintValid(currentPuzzle.hint) ? currentPuzzle.hint : null;
     }
     if (!currentPuzzleHint) {
         showToast('No hint available for this puzzle.', 'info');

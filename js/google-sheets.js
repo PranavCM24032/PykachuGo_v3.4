@@ -246,17 +246,28 @@ async function flushSessionBuffer() {
         return;
     }
 
+    // Chunk to max 10 events per batch to avoid holding the backend lock too long
+    const batch = buffer.slice(0, 10);
+    const remaining = buffer.slice(10);
+
     try {
         const result = await postToGoogleSheets({
             action: 'SESSION_BATCH',
-            events: buffer,
+            events: batch,
             sessionId: sessionId,
             teamName: currentTeam,
             tid: currentTeamTid
         }, 'SESSION_BATCH');
         if (isSheetsSuccess(result)) {
-            console.log(`[Sheets] Flushed ${buffer.length} buffered events`);
-            clearSessionBuffer();
+            console.log(`[Sheets] Flushed ${batch.length} buffered events`);
+            if (remaining.length > 0) {
+                try {
+                    localStorage.setItem(SESSION_BUFFER_KEY, JSON.stringify(remaining));
+                    _bufferDirty = true;
+                } catch (e) { }
+            } else {
+                clearSessionBuffer();
+            }
         } else {
             console.warn('[Sheets] Flush rejected by server, keeping buffer for retry:', (result && result.json && result.json.message) || result);
         }
@@ -288,7 +299,7 @@ async function loginTeam(teamName, tid, securityKey) {
     }
 }
 
-// Server-side answer validation. The client never sees the expected answer.
+// Reconcile a locally-validated answer with the server's stored score.
 async function submitAnswerToServer(puzzleId, answer, extra = {}) {
     if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
         return { ok: false, json: null };
@@ -325,24 +336,6 @@ async function verifyStartCode(startCode, puzzleId = 0) {
         return { ok: false, json: (result && result.json) || null };
     } catch (error) {
         console.warn('[Sheets] Start code check failed:', error);
-        return { ok: false, json: null };
-    }
-}
-
-// Fetch a hint only for a puzzle the team is allowed to see.
-async function fetchHint(puzzleId) {
-    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
-        return { ok: false, json: null };
-    }
-    try {
-        const result = await postToGoogleSheets({
-            action: 'GET_HINT',
-            puzzleId: Number(puzzleId) || 0
-        }, 'GET_HINT');
-        if (isSheetsSuccess(result) && result.json) return { ok: true, ...result.json };
-        return { ok: false, json: (result && result.json) || null };
-    } catch (error) {
-        console.warn('[Sheets] Hint fetch failed:', error);
         return { ok: false, json: null };
     }
 }

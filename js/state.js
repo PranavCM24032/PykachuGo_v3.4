@@ -96,7 +96,7 @@ function generateSessionId() {
 }
 
 function getTeamStorageKey() {
-    return currentTeamTid ? currentTeamTid : currentTeam;
+    return (currentTeamTid ? currentTeamTid : currentTeam).toString().trim().toUpperCase();
 }
 
 function getTeamInfo() {
