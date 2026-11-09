@@ -15,6 +15,11 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     const missionLevel = document.getElementById('missionLevel').value;
     const codeLanguage = document.getElementById('codeLanguage').value;
 
+    if (!missionLevel || !codeLanguage) {
+        showFeedback('registrationFeedback', 'Game options are unavailable. Refresh and try again.', 'error');
+        return;
+    }
+
     if (!teamInput || !securityKeyInput) {
         showFeedback('registrationFeedback', 'Team name and security key are required!', 'error');
         return;

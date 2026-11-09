@@ -98,6 +98,11 @@ async function loadConfig() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const cfg = await response.json();
+        if (!cfg || !Array.isArray(cfg.languages) || cfg.languages.length === 0 ||
+            !Array.isArray(cfg.missionGroups) ||
+            !cfg.missionGroups.some(group => Array.isArray(group.missions) && group.missions.length > 0)) {
+            throw new Error('config.json is missing language or mission options');
+        }
         window.GAME_CONFIG = cfg;
         console.log('Loaded game config from config.json');
         populateMissionSelect(cfg);

@@ -40,18 +40,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // localStorage.removeItem(CONFIG.STORAGE_KEYS.gameState); 
     // localStorage.removeItem(CONFIG.STORAGE_KEYS.teamInfo); 
 
-    const [puzzlesLoaded, teamsLoaded, memesLoaded] = await Promise.all([
+    const [puzzlesLoaded, teamsLoaded, memesLoaded, configLoaded] = await Promise.all([
         loadPuzzles(),
         loadTeams(),
         loadMemes(),
         loadConfig()
     ]);
-    if (!puzzlesLoaded || !teamsLoaded) {
+    if (!puzzlesLoaded || !teamsLoaded || !configLoaded) {
         showToast('Game data could not be loaded. Please refresh or contact administrator.', 'error');
         console.error('[Startup] Required game data failed to load.', {
             puzzlesLoaded,
             teamsLoaded,
-            memesLoaded
+            memesLoaded,
+            configLoaded
         });
         return;
     }
@@ -395,16 +396,11 @@ function logoutCurrentUser() {
     playSound('click');
     if ('vibrate' in navigator) navigator.vibrate(40);
 
-    // Push every unsent mid-game detail (open puzzle notebook + session buffer)
-    // to the backend BEFORE the session is cleared, so logout never loses data.
-    // Both senders capture globals synchronously at call time (keepalive fetch);
-    // anything still blocked by the rate limiter stays buffered for next login.
+    // Push unsent puzzle details before clearing the active session. Buffered
+    // events stay persisted until confirmed, so a delayed flush can retry with
+    // the original team's captured login token.
     flushPuzzleNotebooksOnUnload();
-    // flushSessionBuffer captures the queue synchronously before its first
-    // await, so clearing here guarantees a later team's login can never flush
-    // the previous team's events under the new team's session.
     flushSessionBuffer();
-    if (typeof clearSessionBuffer === 'function') clearSessionBuffer();
 
     stopQRScanner();
     destroyMemePlayer();

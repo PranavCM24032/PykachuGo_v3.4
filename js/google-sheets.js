@@ -52,6 +52,9 @@ function isRetryableSheetsFailure(response, json) {
 }
 
 async function postToGoogleSheets(body, action) {
+    // Capture credentials before waiting for a rate-limit slot: logout may
+    // clear the active team's globals while this request is queued.
+    const requestLoginToken = body.loginToken || getLoginToken();
     for (let attempt = 0; attempt <= SHEETS_RETRY_DELAYS_MS.length; attempt++) {
         await waitForSheetsSlot();
         let response;
@@ -66,7 +69,7 @@ async function postToGoogleSheets(body, action) {
                 body: JSON.stringify({
                     ...body,
                     token: GOOGLE_SCRIPT_TOKEN,
-                    loginToken: body.loginToken || getLoginToken()
+                    loginToken: requestLoginToken
                 })
             });
             json = await response.json();
@@ -117,6 +120,70 @@ function clearSessionBuffer() {
         localStorage.removeItem(SESSION_BUFFER_KEY);
         _bufferDirty = false;
     } catch (e) { }
+}
+
+function getBufferedTeamKey(event) {
+    const tid = String(event && event.tid || '').trim().toUpperCase();
+    if (tid) return `tid:${tid}`;
+    const teamName = String(event && event.teamName || '').trim().toUpperCase();
+    return teamName ? `team:${teamName}` : '';
+}
+
+function buildBufferedBatch() {
+    const buffer = getSessionBuffer();
+    if (buffer.length === 0) return null;
+
+    const first = buffer[0];
+    const teamKey = getBufferedTeamKey(first);
+    if (!teamKey) return null;
+
+    // A batch uses one server login session. Never combine different teams:
+    // Apps Script binds every event in the batch to that session's identity.
+    const batch = [];
+    for (const event of buffer) {
+        if (getBufferedTeamKey(event) !== teamKey || batch.length >= 10) break;
+        batch.push(event);
+    }
+
+    const currentTeamKey = getBufferedTeamKey({
+        tid: typeof currentTeamTid !== 'undefined' ? currentTeamTid : '',
+        teamName: typeof currentTeam !== 'undefined' ? currentTeam : ''
+    });
+    const batchLoginToken = batch.find(event => event.loginToken)?.loginToken ||
+        (currentTeamKey === teamKey ? getLoginToken() : '');
+    if (!batchLoginToken) {
+        console.warn('[Sheets] Buffered events are waiting for their team login session.');
+        return null;
+    }
+
+    return {
+        action: 'SESSION_BATCH',
+        events: batch,
+        sessionId: first.sessionId || sessionId,
+        teamName: first.teamName,
+        tid: first.tid || '',
+        loginToken: batchLoginToken
+    };
+}
+
+function removeFlushedEvents(batch) {
+    const eventIds = new Set(batch.map(event => event.eventId).filter(Boolean));
+    if (eventIds.size !== batch.length) {
+        console.warn('[Sheets] Cannot safely remove buffered events without unique event IDs.');
+        return;
+    }
+
+    const remaining = getSessionBuffer().filter(event => !eventIds.has(event.eventId));
+    try {
+        if (remaining.length > 0) {
+            localStorage.setItem(SESSION_BUFFER_KEY, JSON.stringify(remaining));
+            _bufferDirty = true;
+        } else {
+            clearSessionBuffer();
+        }
+    } catch (e) {
+        console.warn('[Buffer] Could not update localStorage after flush:', e);
+    }
 }
 
 function isValidTeam() {
@@ -235,39 +302,19 @@ async function sendToGoogleSheets(payload) {
 }
 
 async function flushSessionBuffer() {
-    const buffer = getSessionBuffer();
-    if (buffer.length === 0) return;
-    if (!isValidTeam()) {
-        clearSessionBuffer();
-        return;
-    }
     if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
         console.warn("[Sheets] URL missing. Keeping buffer for later.");
         return;
     }
 
-    // Chunk to max 10 events per batch to avoid holding the backend lock too long
-    const batch = buffer.slice(0, 10);
-    const remaining = buffer.slice(10);
+    const request = buildBufferedBatch();
+    if (!request) return;
 
     try {
-        const result = await postToGoogleSheets({
-            action: 'SESSION_BATCH',
-            events: batch,
-            sessionId: sessionId,
-            teamName: currentTeam,
-            tid: currentTeamTid
-        }, 'SESSION_BATCH');
+        const result = await postToGoogleSheets(request, 'SESSION_BATCH');
         if (isSheetsSuccess(result)) {
-            console.log(`[Sheets] Flushed ${batch.length} buffered events`);
-            if (remaining.length > 0) {
-                try {
-                    localStorage.setItem(SESSION_BUFFER_KEY, JSON.stringify(remaining));
-                    _bufferDirty = true;
-                } catch (e) { }
-            } else {
-                clearSessionBuffer();
-            }
+            console.log(`[Sheets] Flushed ${request.events.length} buffered events`);
+            removeFlushedEvents(request.events);
         } else {
             console.warn('[Sheets] Flush rejected by server, keeping buffer for retry:', (result && result.json && result.json.message) || result);
         }
@@ -358,7 +405,7 @@ async function fetchTeamState() {
 function scheduleNextBufferFlush() {
     const delay = 8000 + Math.floor(Math.random() * 6000);
     setTimeout(() => {
-        if (_bufferDirty && isValidTeam()) {
+        if (_bufferDirty) {
             flushSessionBuffer().finally(scheduleNextBufferFlush);
         } else {
             scheduleNextBufferFlush();
@@ -374,8 +421,8 @@ window.addEventListener('beforeunload', () => {
         if (typeof flushPuzzleNotebooksOnUnload === 'function') {
             flushPuzzleNotebooksOnUnload();
         }
-        const buffer = getSessionBuffer();
-        if (buffer.length > 0) {
+        const request = buildBufferedBatch();
+        if (request) {
             // Non-blocking slot check — never hold up page unload
             if (sheetsRateLimiter.tryAcquire() !== null) {
                 fetch(GOOGLE_SCRIPT_URL, {
@@ -385,22 +432,19 @@ window.addEventListener('beforeunload', () => {
                     keepalive: true,
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({
-                        action: 'SESSION_BATCH',
-                        events: buffer,
-                        sessionId: sessionId,
-                        teamName: currentTeam,
-                        tid: currentTeamTid,
+                        ...request,
                         token: GOOGLE_SCRIPT_TOKEN,
-                        loginToken: getLoginToken()
                     })
                 })
                     .then(r => r.json())
                     .then(json => {
-                        if (json && !json.rateLimited && (json.status === 'success' || json.status === 'OK')) clearSessionBuffer();
+                        if (json && !json.rateLimited && (json.status === 'success' || json.status === 'OK')) {
+                            removeFlushedEvents(request.events);
+                        }
                     })
                     .catch(() => { });
             } else {
-                // Keep the buffer so the next session's 10s flush retries it
+                // Keep the buffer so a later same-team session can retry it.
                 console.log('[Sheets] Unload flush skipped — rate limit reached');
             }
         }
