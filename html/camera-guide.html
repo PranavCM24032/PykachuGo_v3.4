@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Camera Access Guide — Pykachu Go</title>
+    <meta name="theme-color" content="#050810">
+    <meta name="robots" content="noindex">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@300;400;600&display=swap">
+    <link rel="preload" href="../assets/fonts/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="../css/base.css">
+    <link rel="stylesheet" href="../css/overlays.css">
+    <link rel="stylesheet" href="../css/buttons.css">
+    <link rel="stylesheet" href="../css/tailwind.css">
+    <link rel="icon" href="../assets/img/pokeball.svg" type="image/svg+xml">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: radial-gradient(circle at 50% 0%, #0b1220 0%, #050810 70%);
+            color: #e5e7eb;
+        }
+    </style>
+</head>
+
+<body>
+    <main id="guideCard"
+        class="w-full max-w-xs sm:max-w-sm bg-gray-900/95 border-2 rounded-2xl p-4 sm:p-5 text-center shadow-2xl"
+        style="border-color: rgba(245, 158, 11, 0.6); backdrop-filter: blur(12px);">
+
+        <!-- In-app browser panel -->
+        <section id="inappPanel" class="hidden">
+            <div class="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-3"
+                style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4);">
+                <span class="material-symbols-rounded text-2xl sm:text-3xl" style="color:#fbbf24;">no_photography</span>
+            </div>
+            <h1 class="font-pixel text-xs sm:text-sm mb-2 uppercase tracking-wider" style="color:#fbbf24;">
+                CAMERA BLOCKED BY <span id="inappName">IN-APP BROWSER</span>
+            </h1>
+            <p class="text-gray-300 text-[11px] sm:text-xs mb-3 leading-relaxed">
+                <span id="inappNameText">This app</span>'s in-app browser does not support camera scanning. Open the game
+                in a real browser:
+            </p>
+
+            <div class="bg-black/60 rounded-xl p-2.5 mb-3 text-left space-y-1.5 text-[10px] sm:text-[11px] text-gray-200 font-mono"
+                style="border: 1px solid rgba(245, 158, 11, 0.3);">
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#fbbf24;">1.</span>
+                    <span>Tap the <b class="text-white" id="inappMenuHint">⋮ (3 dots)</b> icon in the corner.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#fbbf24;">2.</span>
+                    <span>Select <b style="color:#fcd34d;" id="inappOpenHint">Open in Chrome</b>.</span>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <button type="button" onclick="copyGameUrl()"
+                    class="btn-pokedex w-full flex items-center justify-center gap-2 py-2.5 text-xs sm:text-sm">
+                    <span class="material-symbols-rounded text-sm sm:text-base">content_copy</span>
+                    COPY GAME LINK
+                </button>
+                <button type="button" onclick="backToGame()"
+                    class="w-full py-2.5 text-[10px] sm:text-xs text-blue-400 hover:text-white rounded-xl transition-all uppercase font-mono font-bold flex items-center justify-center gap-1.5"
+                    style="border: 1px solid rgba(96, 165, 250, 0.4); background: rgba(59, 130, 246, 0.1);">
+                    <span class="material-symbols-rounded text-sm">arrow_back</span>
+                    BACK TO GAME
+                </button>
+            </div>
+        </section>
+
+        <!-- Permission denied panel -->
+        <section id="permissionPanel" class="hidden">
+            <div class="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2.5"
+                style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4);">
+                <span class="material-symbols-rounded text-2xl sm:text-3xl" style="color:#f87171;">videocam_off</span>
+            </div>
+            <h1 class="font-pixel text-xs sm:text-sm mb-1 uppercase tracking-wider" style="color:#f87171;">
+                CAMERA ACCESS BLOCKED
+            </h1>
+            <p class="text-gray-400 text-[10px] sm:text-xs mb-3">
+                Permission was denied by your browser. Follow these steps to allow it:
+            </p>
+
+            <!-- Platform tabs -->
+            <div class="flex rounded-lg bg-black/60 p-1 mb-3 text-[10px]"
+                style="border: 1px solid #1e293b;">
+                <button type="button" id="guideTabAndroid" onclick="switchGuideTab('android')"
+                    class="flex-1 py-1.5 rounded-md transition-all text-[10px]">ANDROID (CHROME)</button>
+                <button type="button" id="guideTabIOS" onclick="switchGuideTab('ios')"
+                    class="flex-1 py-1.5 rounded-md transition-all text-[10px]">IPHONE (SAFARI)</button>
+            </div>
+
+            <!-- Android guide -->
+            <div id="guideContentAndroid"
+                class="text-left bg-black/50 rounded-xl p-2.5 mb-3 text-[10px] sm:text-[11px] text-gray-300 font-mono space-y-1.5"
+                style="border: 1px solid #1e293b;">
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#60a5fa;">1.</span>
+                    <span>Tap the <b class="text-white">🔒 Lock</b> or <b class="text-white">tune</b> icon beside the URL.
+                    </span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#60a5fa;">2.</span>
+                    <span>Tap <b class="text-white">Permissions</b> (or Site Settings).</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#60a5fa;">3.</span>
+                    <span>Toggle <b style="color:#34d399;">Camera</b> to <b style="color:#34d399;">ALLOW</b>.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#60a5fa;">4.</span>
+                    <span>Tap <b style="color:#fde047;">Reload</b> to scan.</span>
+                </div>
+            </div>
+
+            <!-- iOS guide -->
+            <div id="guideContentIOS"
+                class="hidden text-left bg-black/50 rounded-xl p-2.5 mb-3 text-[10px] sm:text-[11px] text-gray-300 font-mono space-y-1.5"
+                style="border: 1px solid #1e293b;">
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#60a5fa;">1.</span>
+                    <span>Tap <b class="text-white">aA</b> on the left of Safari's address bar.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#60a5fa;">2.</span>
+                    <span>Tap <b class="text-white">Website Settings</b>.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#60a5fa;">3.</span>
+                    <span>Set <b style="color:#34d399;">Camera</b> to <b style="color:#34d399;">Allow</b>.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="font-bold" style="color:#60a5fa;">4.</span>
+                    <span>Tap <b style="color:#fde047;">Reload</b> to start scanning.</span>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <button type="button" onclick="reloadPage()"
+                    class="btn-pokedex w-full flex items-center justify-center gap-2 py-2.5 text-xs sm:text-sm">
+                    <span class="material-symbols-rounded text-sm sm:text-base">refresh</span>
+                    RELOAD PAGE
+                </button>
+                <button type="button" onclick="backToGame()"
+                    class="w-full py-2.5 text-[10px] sm:text-xs rounded-xl transition-all uppercase font-mono font-bold flex items-center justify-center gap-1.5"
+                    style="color:#facc15; border: 1px solid rgba(234, 179, 8, 0.4); background: rgba(234, 179, 8, 0.1);">
+                    <span class="material-symbols-rounded text-sm">arrow_back</span>
+                    BACK TO GAME
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // ==============================
+        // IN-APP BROWSER & CAMERA PERMISSION GUIDANCE
+        // Standalone page the game opens when camera access is blocked.
+        // ==============================
+
+        function detectInAppBrowser() {
+            const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
+            const isIOS = /iphone|ipad|ipod/.test(ua);
+            const isAndroid = /android/.test(ua);
+
+            let appName = '';
+            if (ua.includes('whatsapp')) appName = 'WhatsApp';
+            else if (ua.includes('instagram')) appName = 'Instagram';
+            else if (ua.includes('fbav') || ua.includes('fban') || ua.includes('messenger')) appName = 'Facebook';
+            else if (ua.includes('telegram')) appName = 'Telegram';
+            else if (ua.includes('twitter') || ua.includes('x/')) appName = 'X (Twitter)';
+            else if (ua.includes('micromessenger')) appName = 'WeChat';
+            else if (ua.includes('line/')) appName = 'Line';
+            else if (ua.includes('snapchat')) appName = 'Snapchat';
+            else if (isAndroid && (ua.includes('; wv') || (ua.includes('version/') && ua.includes('chrome') && !ua.includes('mobile safari')))) {
+                appName = 'In-App Browser';
+            } else if (isIOS && !ua.includes('safari') && ua.includes('applewebkit')) {
+                appName = 'In-App Browser';
+            }
+
+            return {
+                isInApp: Boolean(appName),
+                appName: appName || 'In-App Browser',
+                isIOS,
+                isAndroid
+            };
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const info = detectInAppBrowser();
+
+        // Prefer an explicit ?reason from the game, otherwise infer it.
+        const reason = params.get('reason') || (info.isInApp ? 'inapp' : 'permission');
+        const returnUrl = params.get('return') || '../index.html';
+        const paramApp = params.get('app');
+
+        function gameUrl() {
+            // The link to hand to a real browser: the game URL without the hash.
+            return returnUrl.split('#')[0];
+        }
+
+        function copyGameUrl() {
+            const url = gameUrl();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(showCopied).catch(() => fallbackCopyUrl(url));
+            } else {
+                fallbackCopyUrl(url);
+            }
+        }
+
+        function fallbackCopyUrl(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            try {
+                document.execCommand('copy');
+                showCopied();
+            } catch (e) {
+                prompt('Copy this link and open it in Chrome or Safari:', text);
+            }
+            ta.remove();
+        }
+
+        function showCopied() {
+            const btn = document.querySelector('#inappPanel button');
+            if (!btn) return;
+            const original = btn.innerHTML;
+            btn.innerHTML = '<span class="material-symbols-rounded text-sm sm:text-base">check_circle</span> LINK COPIED!';
+            setTimeout(() => { btn.innerHTML = original; }, 2000);
+        }
+
+        function reloadPage() {
+            window.location.reload();
+        }
+
+        function backToGame() {
+            window.location.href = returnUrl;
+        }
+
+        function switchGuideTab(platform) {
+            const tabAndroid = document.getElementById('guideTabAndroid');
+            const tabIOS = document.getElementById('guideTabIOS');
+            const contentAndroid = document.getElementById('guideContentAndroid');
+            const contentIOS = document.getElementById('guideContentIOS');
+            if (!tabAndroid || !tabIOS || !contentAndroid || !contentIOS) return;
+
+            const active = 'flex-1 py-1.5 rounded-md bg-blue-600 text-white font-bold shadow text-[10px] transition-all';
+            const inactive = 'flex-1 py-1.5 rounded-md text-gray-400 hover:text-white font-bold text-[10px] transition-all';
+
+            if (platform === 'ios') {
+                tabIOS.className = active;
+                tabAndroid.className = inactive;
+                contentIOS.classList.remove('hidden');
+                contentAndroid.classList.add('hidden');
+            } else {
+                tabAndroid.className = active;
+                tabIOS.className = inactive;
+                contentAndroid.classList.remove('hidden');
+                contentIOS.classList.add('hidden');
+            }
+        }
+
+        function init() {
+            const inappPanel = document.getElementById('inappPanel');
+            const permissionPanel = document.getElementById('permissionPanel');
+            const card = document.getElementById('guideCard');
+
+            if (reason === 'inapp' || info.isInApp) {
+                const appName = paramApp || info.appName;
+                document.getElementById('inappName').textContent = appName.toUpperCase();
+                document.getElementById('inappNameText').textContent = appName;
+                document.getElementById('inappMenuHint').textContent = info.isIOS ? '⋯ or Share' : '⋮ (3 dots)';
+                document.getElementById('inappOpenHint').textContent = info.isIOS ? 'Open in Safari' : 'Open in Chrome';
+                inappPanel.classList.remove('hidden');
+                card.style.borderColor = 'rgba(245, 158, 11, 0.6)';
+            } else {
+                permissionPanel.classList.remove('hidden');
+                card.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                switchGuideTab(info.isIOS ? 'ios' : 'android');
+            }
+        }
+
+        window.copyGameUrl = copyGameUrl;
+        window.backToGame = backToGame;
+        window.reloadPage = reloadPage;
+        window.switchGuideTab = switchGuideTab;
+
+        init();
+    </script>
+</body>
+
+</html>

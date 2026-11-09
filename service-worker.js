@@ -1,8 +1,9 @@
-const CACHE_NAME = 'pykachu-go-v2.0.23';
+const CACHE_NAME = 'pykachu-go-v2.0.25';
 const OPTIONAL_CACHE_NAME = 'pykachu-go-optional-v1';
 const ASSETS = [
     'index.html',
     '404.html',
+    'html/camera-guide.html',
     'css/base.css',
     'css/shell.css',
     'css/buttons.css',
@@ -39,6 +40,7 @@ const ASSETS = [
     'html/hint.html',
     'html/meme.html',
     'html/loader.html',
+    'html/signout.html',
     'css/loader.css',
     'js/loader.js',
     'manifest.json',

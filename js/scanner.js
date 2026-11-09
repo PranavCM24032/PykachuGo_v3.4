@@ -1,6 +1,20 @@
 // ==============================
 // STEP 2: QR SCANNER
 // ==============================
+// Camera blocked (in-app browser, denied permission, missing camera API):
+// send the trainer to the dedicated guidance page, carrying the game URL so
+// they can return once access is fixed.
+function openCameraGuide() {
+    try {
+        const url = new URL('html/camera-guide.html', window.location.href);
+        url.searchParams.set('reason', 'permission');
+        url.searchParams.set('return', window.location.href);
+        window.location.href = url.href;
+    } catch (e) {
+        window.location.href = 'html/camera-guide.html';
+    }
+}
+
 function loadScript(src) {
     return new Promise((resolve, reject) => {
         const existing = document.querySelector(`script[src="${src}"]`);
@@ -102,13 +116,6 @@ async function startQRScanner() {
     let stream = null;
 
     try {
-        const inApp = (typeof detectInAppBrowser === 'function') ? detectInAppBrowser() : { isInApp: false };
-        if (inApp.isInApp && (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function')) {
-            stopQRScanner();
-            if (typeof showInAppBrowserModal === 'function') showInAppBrowserModal();
-            return;
-        }
-
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
             const error = new Error('Camera API unavailable');
             error.name = window.isSecureContext ? 'NotSupportedError' : 'SecurityError';
@@ -209,11 +216,10 @@ async function startQRScanner() {
         // Never leave a live camera running on the failure path.
         stopQRScanner();
 
-        const inApp = (typeof detectInAppBrowser === 'function') ? detectInAppBrowser() : { isInApp: false };
-        if (inApp.isInApp && typeof showInAppBrowserModal === 'function') {
-            showInAppBrowserModal();
-        } else if (['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(error && error.name) && typeof showCameraPermissionGuide === 'function') {
-            showCameraPermissionGuide(error);
+        // Camera blocked (in-app browser, denied permission, no camera API):
+        // hand off to the dedicated guidance page instead of a modal.
+        if (['NotAllowedError', 'PermissionDeniedError', 'SecurityError', 'NotSupportedError'].includes(error && error.name)) {
+            openCameraGuide();
         } else {
             showToast(cameraErrorMessage(error), 'error');
             showManualEntry();

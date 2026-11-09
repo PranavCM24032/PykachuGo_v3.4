@@ -1,0 +1,24 @@
+<!-- Sign Out Confirmation Overlay -->
+<div id="signoutOverlay"
+    class="hidden absolute inset-0 z-[90] glass-panel flex flex-col items-center justify-center p-4 confirm-dialog-overlay"
+    role="dialog" aria-modal="true" aria-labelledby="signoutTitle"
+    onclick="if (event.target === this) cancelSignOut()">
+    <div class="bg-gray-900/90 border-2 border-red-600/50 rounded-xl p-4 sm:p-5 w-full max-w-xs sm:max-w-sm text-center">
+        <span class="material-symbols-rounded text-red-500 text-3xl sm:text-4xl">power_settings_new</span>
+        <h3 id="signoutTitle" class="font-pixel text-red-500 text-sm sm:text-base my-3">SIGN OUT</h3>
+        <p class="text-gray-400 text-xs sm:text-sm mb-4 leading-relaxed">
+            Trainer <span id="signOutTeam" class="text-white font-bold">Trainer</span><br>
+            Your progress is backed up before sign-out. Continue?
+        </p>
+        <div class="flex gap-2 sm:gap-3">
+            <button type="button" onclick="playSound('click'); confirmSignOut();"
+                class="bg-red-600 text-white hover:bg-red-700 font-bold flex-1 py-3 sm:py-4 rounded-lg text-sm sm:text-base transition-colors min-h-[44px]">
+                <span class="flex items-center justify-center gap-2"><span class="material-symbols-rounded text-base">logout</span>LOGOUT</span>
+            </button>
+            <button type="button" onclick="playSound('click'); cancelSignOut();"
+                class="bg-gray-800 text-white flex-1 py-3 sm:py-4 rounded-lg text-sm sm:text-base hover:bg-gray-700 transition-colors min-h-[44px]">
+                <span class="flex items-center justify-center gap-2"><span class="material-symbols-rounded text-base">close</span>STAY</span>
+            </button>
+        </div>
+    </div>
+</div>

@@ -120,7 +120,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateTeamStatus();
     prefillRegistrationForm();
     updatePowerLed();
-    if (typeof initInAppBrowserNotice === 'function') initInAppBrowserNotice();
 
     // Flow: Loader -> Step 0 (Oak's master rules) -> button click -> Step 1 (Login form)
     showStep(0);
@@ -168,6 +167,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             handlePowerTap();
         });
     }
+
+    // Escape cancels the sign-out confirmation, mirroring the old dialog.
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const overlay = document.getElementById('signoutOverlay');
+        if (overlay && !overlay.classList.contains('hidden')) cancelSignOut();
+    });
 
     // Auto-play memes for ?memid=M01 deep links (overlays the start screen)
     if (meme) {
@@ -324,6 +330,18 @@ function prefillRegistrationForm() {
 
 function handlePowerTap() {
     if (isLoggedIn()) {
+        showSignOutDialog();
+    } else {
+        showToast('Trainer sign-in required', 'info');
+        showStep(1);
+    }
+}
+
+function showSignOutDialog() {
+    const overlay = document.getElementById('signoutOverlay');
+    if (!overlay) {
+        // Partial not injected yet (or missing): fall back to the dynamic dialog
+        // so sign-out still asks for confirmation instead of firing blindly.
         showConfirmDialog({
             title: 'SIGN OUT',
             message: `Trainer ${currentTeam}\nYour progress is backed up before sign-out. Continue?`,
@@ -336,20 +354,38 @@ function handlePowerTap() {
             okText: 'LOGOUT',
             cancelText: 'STAY'
         }).then((ok) => {
-            if (ok) {
-                logoutCurrentUser();
-            } else {
-                showToast('Stay in battle, trainer!', 'info');
-            }
+            if (ok) logoutCurrentUser();
+            else showToast('Stay in battle, trainer!', 'info');
         });
-    } else {
-        showToast('Trainer sign-in required', 'info');
-        showStep(1);
+        return;
     }
+    if (!overlay.classList.contains('hidden')) return;
+
+    const teamLabel = document.getElementById('signOutTeam');
+    if (teamLabel) teamLabel.textContent = currentTeam || 'Trainer';
+
+    overlay.classList.remove('hidden');
+    playSound('click');
+}
+
+function confirmSignOut() {
+    closeSignOutDialog();
+    logoutCurrentUser();
+}
+
+function cancelSignOut() {
+    closeSignOutDialog();
+    showToast('Stay in battle, trainer!', 'info');
+}
+
+function closeSignOutDialog() {
+    const overlay = document.getElementById('signoutOverlay');
+    if (overlay) overlay.classList.add('hidden');
 }
 
 function logoutCurrentUser() {
     if (!isLoggedIn()) return;
+    closeSignOutDialog();
     loginFlowId++;
 
     // Leaving mid-riddle is captured by flushPuzzleNotebooksOnUnload() below
