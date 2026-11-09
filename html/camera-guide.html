@@ -11,155 +11,736 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@300;400;600&display=swap">
-    <link rel="preload" href="../assets/fonts/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@300;400;600;700&display=swap">
     <link rel="stylesheet" href="../css/base.css">
-    <link rel="stylesheet" href="../css/overlays.css">
-    <link rel="stylesheet" href="../css/buttons.css">
     <link rel="stylesheet" href="../css/tailwind.css">
     <link rel="icon" href="../assets/img/pokeball.svg" type="image/svg+xml">
     <style>
+        html,
+        body {
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
         body {
             margin: 0;
-            min-height: 100vh;
+            height: auto;
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 16px;
-            background: radial-gradient(circle at 50% 0%, #0b1220 0%, #050810 70%);
+            padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+            background:
+                radial-gradient(900px 500px at 50% -10%, rgba(59, 130, 246, 0.16), transparent 60%),
+                radial-gradient(700px 420px at 100% 110%, rgba(239, 68, 68, 0.14), transparent 60%),
+                #050810;
             color: #e5e7eb;
+            position: relative;
+        }
+
+        /* Faint grid overlay */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+            background-size: 28px 28px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Inline SVG icon sizing */
+        .icon {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            fill: currentColor;
+            flex-shrink: 0;
+            vertical-align: middle;
+        }
+
+        .guide-shell {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .guide-card {
+            position: relative;
+            border-radius: 26px;
+            padding: 22px 20px 20px;
+            background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(8, 12, 22, 0.97));
+            border: 2px solid rgba(245, 158, 11, 0.45);
+            box-shadow:
+                0 24px 60px -20px rgba(0, 0, 0, 0.9),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            overflow: hidden;
+            transition: border-color 0.4s ease;
+        }
+
+        /* Top accent line */
+        .guide-card::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent, #f59e0b), transparent);
+            opacity: 0.9;
+        }
+
+        .guide-card.is-permission {
+            border-color: rgba(239, 68, 68, 0.45);
+            --accent: #ef4444;
+        }
+
+        .brand-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: #93c5fd;
+            text-transform: uppercase;
+        }
+
+        .brand img {
+            width: 18px;
+            height: 18px;
+            filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.7));
+        }
+
+        .brand-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #64748b;
+            border: 1px solid rgba(100, 116, 139, 0.35);
+            border-radius: 999px;
+            padding: 3px 8px;
+        }
+
+        /* Hero icon */
+        .hero {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .hero-badge {
+            position: relative;
+            width: 74px;
+            height: 74px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 14px;
+            background: radial-gradient(circle at 50% 35%, rgba(245, 158, 11, 0.32), rgba(245, 158, 11, 0.06));
+            border: 1px solid rgba(245, 158, 11, 0.45);
+            box-shadow: 0 0 30px -6px rgba(245, 158, 11, 0.55);
+        }
+
+        .hero-badge .icon {
+            width: 38px;
+            height: 38px;
+            color: #fbbf24;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-badge::before,
+        .hero-badge::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(245, 158, 11, 0.5);
+            animation: pulseRing 2.6s ease-out infinite;
+        }
+
+        .hero-badge::after {
+            animation-delay: 1.3s;
+        }
+
+        .is-permission .hero-badge {
+            background: radial-gradient(circle at 50% 35%, rgba(239, 68, 68, 0.32), rgba(239, 68, 68, 0.06));
+            border-color: rgba(239, 68, 68, 0.45);
+            box-shadow: 0 0 30px -6px rgba(239, 68, 68, 0.55);
+        }
+
+        .is-permission .hero-badge .icon {
+            color: #f87171;
+        }
+
+        .is-permission .hero-badge::before,
+        .is-permission .hero-badge::after {
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        @keyframes pulseRing {
+            0% {
+                transform: scale(1);
+                opacity: 0.55;
+            }
+
+            100% {
+                transform: scale(1.55);
+                opacity: 0;
+            }
+        }
+
+        .hero-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            line-height: 1.6;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #fbbf24;
+            margin: 0 0 8px;
+        }
+
+        .is-permission .hero-title {
+            color: #f87171;
+        }
+
+        .hero-sub {
+            font-size: 12px;
+            line-height: 1.55;
+            color: #94a3b8;
+            margin: 0 0 18px;
+            max-width: 300px;
+        }
+
+        .hero-sub b {
+            color: #f1f5f9;
+        }
+
+        /* Status chip */
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            padding: 5px 10px;
+            border-radius: 999px;
+            margin-bottom: 16px;
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #fcd34d;
+        }
+
+        .is-permission .status-chip {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .status-chip .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 8px currentColor;
+            animation: blink 1.6s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.25;
+            }
+        }
+
+        /* Steps */
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            text-align: left;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.55);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .step:hover {
+            border-color: rgba(148, 163, 184, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .step-num {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            color: #0b1220;
+            background: linear-gradient(180deg, #fcd34d, #f59e0b);
+            box-shadow: 0 0 10px -2px rgba(245, 158, 11, 0.8);
+        }
+
+        .is-permission .step-num {
+            color: #fff;
+            background: linear-gradient(180deg, #f87171, #dc2626);
+            box-shadow: 0 0 10px -2px rgba(239, 68, 68, 0.8);
+        }
+
+        .step-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .step-body p {
+            margin: 0;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #cbd5e1;
+        }
+
+        .step-body b {
+            color: #f8fafc;
+            font-weight: 700;
+        }
+
+        .step-icon {
+            width: 18px !important;
+            height: 18px !important;
+            color: #64748b;
+            margin-top: 1px;
+        }
+
+        .is-permission .step-icon {
+            color: #94a3b8;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            margin-bottom: 14px;
+        }
+
+        .tab {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 6px;
+            border: 0;
+            border-radius: 10px;
+            background: transparent;
+            color: #94a3b8;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab .icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        .tab:hover {
+            color: #e2e8f0;
+        }
+
+        .tab.is-active {
+            color: #fff;
+            background: linear-gradient(180deg, #3b82f6, #2563eb);
+            box-shadow: 0 6px 16px -6px rgba(37, 99, 235, 0.9);
+        }
+
+        /* Buttons */
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            border: 0;
+            border-radius: 14px;
+            padding: 13px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        }
+
+        .btn:active {
+            transform: translateY(1px) scale(0.99);
+        }
+
+        .btn .icon {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn-primary {
+            color: #0b1220;
+            background: linear-gradient(180deg, #fcd34d, #f59e0b);
+            box-shadow: 0 10px 26px -10px rgba(245, 158, 11, 0.9);
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.06);
+        }
+
+        .is-permission .btn-primary {
+            color: #fff;
+            background: linear-gradient(180deg, #f87171, #dc2626);
+            box-shadow: 0 10px 26px -10px rgba(239, 68, 68, 0.9);
+        }
+
+        .btn-ghost {
+            color: #cbd5e1;
+            background: rgba(148, 163, 184, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+        }
+
+        .btn-ghost:hover {
+            color: #fff;
+            background: rgba(148, 163, 184, 0.16);
+        }
+
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        .hint {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0.3px;
+            color: #475569;
+            text-align: center;
+        }
+
+        .hint .icon {
+            width: 14px;
+            height: 14px;
+            color: #64748b;
+        }
+
+        .panel {
+            animation: fadeUp 0.35s ease both;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (min-width: 640px) {
+            .guide-card {
+                padding: 26px 24px 24px;
+            }
+
+            .hero-title {
+                font-size: 13px;
+            }
+
+            .step-body p {
+                font-size: 12px;
+            }
         }
     </style>
 </head>
 
 <body>
-    <main id="guideCard"
-        class="w-full max-w-xs sm:max-w-sm bg-gray-900/95 border-2 rounded-2xl p-4 sm:p-5 text-center shadow-2xl"
-        style="border-color: rgba(245, 158, 11, 0.6); backdrop-filter: blur(12px);">
+    <!-- Inline SVG icon sprite (self-contained, no icon-font subset needed) -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <symbol id="i-camera-off" viewBox="0 -960 960 960">
+            <path d="M880-680v400q0 20-12.5 30T840-240q-15 0-27.5-10.5T800-281v-399H673q-17 0-32.5-6.5T614-706l-49-54H395l-10 11q-11 13-28.5 13T327-748q-11-11-11.5-27t10.5-28l10-11q11-12 26.5-19t32.5-7h170q17 0 32.5 7t26.5 19l50 54h126q33 0 56.5 23.5T880-680ZM160-120q-33 0-56.5-23.5T80-200v-480q0-33 23.5-56.5T160-760h41l80 80H160v480h601l80 80H160Zm466-215q-25 34-62.5 54.5T480-260q-75 0-127.5-52.5T300-440q0-46 20.5-83.5T375-586l58 58q-24 13-38.5 36T380-440q0 42 29 71t71 29q29 0 52-14.5t36-38.5l58 58Zm-18-233q25 24 38.5 57t13.5 71v12q0 6-1 12L456-619q6-1 12-1h12q38 0 71 13.5t57 38.5ZM791-57 55-792q-12-12-12-28.5T55-849q12-12 28.5-12t28.5 12l736 736q12 12 12 28t-12 28q-12 12-28.5 12T791-57ZM407-440Zm171-57Z" />
+        </symbol>
+        <symbol id="i-videocam-off" viewBox="0 -960 960 960">
+            <path d="m720-540 126-126q10-10 22-5t12 19v344q0 14-12 19t-22-5L720-420q0 17-11.5 28.5T680-380q-17 0-28.5-11.5T640-420v-300H360q-20 0-30-12.5T320-760q0-15 10-27.5t30-12.5h280q33 0 56.5 23.5T720-720v180Zm74 486L54-794q-11-11-11-28t11-28q11-11 28-11t28 11l740 740q11 11 11 28t-11 28q-11 11-28 11t-28-11ZM498-575ZM382-464ZM160-800l80 80h-80v480h480v-80l80 80q0 33-23.5 56.5T640-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Z" />
+        </symbol>
+        <symbol id="i-more-horiz" viewBox="0 -960 960 960">
+            <path d="M240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400Z" />
+        </symbol>
+        <symbol id="i-open-in-new" viewBox="0 -960 960 960">
+            <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h240q17 0 28.5 11.5T480-800q0 17-11.5 28.5T440-760H200v560h560v-240q0-17 11.5-28.5T800-480q17 0 28.5 11.5T840-440v240q0 33-23.5 56.5T760-120H200Zm560-584L416-360q-11 11-28 11t-28-11q-11-11-11-28t11-28l344-344H600q-17 0-28.5-11.5T560-800q0-17 11.5-28.5T600-840h200q17 0 28.5 11.5T840-800v200q0 17-11.5 28.5T800-560q-17 0-28.5-11.5T760-600v-104Z" />
+        </symbol>
+        <symbol id="i-paste" viewBox="0 -960 960 960">
+            <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h167q11-35 43-57.5t70-22.5q40 0 71.5 22.5T594-840h166q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560h-80v80q0 17-11.5 28.5T640-640H320q-17 0-28.5-11.5T280-680v-80h-80v560Zm308.5-571.5Q520-783 520-800t-11.5-28.5Q497-840 480-840t-28.5 11.5Q440-817 440-800t11.5 28.5Q463-760 480-760t28.5-11.5Z" />
+        </symbol>
+        <symbol id="i-copy" viewBox="0 -960 960 960">
+            <path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-520q0-17 11.5-28.5T160-720q17 0 28.5 11.5T200-680v520h400q17 0 28.5 11.5T640-120q0 17-11.5 28.5T600-80H200Zm160-240v-480 480Z" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 -960 960 960">
+            <path d="m424-408-86-86q-11-11-28-11t-28 11q-11 11-11 28t11 28l114 114q12 12 28 12t28-12l226-226q11-11 11-28t-11-28q-11-11-28-11t-28 11L424-408Zm56 328q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z" />
+        </symbol>
+        <symbol id="i-back" viewBox="0 -960 960 960">
+            <path d="m313-440 196 196q12 12 11.5 28T508-188q-12 11-28 11.5T452-188L188-452q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l264-264q11-11 27.5-11t28.5 11q12 12 12 28.5T508-715L313-520h447q17 0 28.5 11.5T800-480q0 17-11.5 28.5T760-440H313Z" />
+        </symbol>
+        <symbol id="i-android" viewBox="0 -960 960 960">
+            <path d="M40-240q10-105 64-191t139-140l-77-129q-9-14-4.5-30t18.5-24q14-9 30-5t24 18l80 133q38-16 79.5-24t86.5-8q45 0 86.5 8t79.5 24l80-133q8-14 24-18t30 5q14 8 18 24t-4 30l-77 129q85 54 139 140t64 191H40Zm680.5-151.5Q722-409 711-426t-27-22q-16-5-29 4t-15 26q-2 17 9 34t27.5 22.5Q693-356 706-365t14.5-26.5ZM284-362q16-5 27-22t9.5-34.5Q319-436 306-445t-29.5-3.5Q260-443 249-426t-9 34q2 17 15 26t29 4Z" />
+        </symbol>
+        <symbol id="i-iphone" viewBox="0 -960 960 960">
+            <path d="M280-40q-33 0-56.5-23.5T200-120v-720q0-33 23.5-56.5T280-920h400q33 0 56.5 23.5T760-840v124q18 7 29 22t11 34v80q0 19-11 34t-29 22v404q0 33-23.5 56.5T680-40H280Zm0-80h400v-720H280v720Zm0 0v-720 720Zm120-40h160q17 0 28.5-11.5T600-200q0-17-11.5-28.5T560-240H400q-17 0-28.5 11.5T360-200q0 17 11.5 28.5T400-160Z" />
+        </symbol>
+        <symbol id="i-lock" viewBox="0 -960 960 960">
+            <path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z" />
+        </symbol>
+        <symbol id="i-settings" viewBox="0 -960 960 960">
+            <path d="M433-80q-27 0-46.5-18T363-142l-9-66q-13-5-24.5-12T307-235l-62 26q-25 11-50 2t-39-32l-47-82q-14-23-8-49t27-43l53-40q-1-7-1-13.5v-27q0-6.5 1-13.5l-53-40q-21-17-27-43t8-49l47-82q14-23 39-32t50 2l62 26q11-8 23-15t24-12l9-66q4-26 23.5-44t46.5-18h94q27 0 46.5 18t23.5 44l9 66q13 5 24.5 12t22.5 15l62-26q25-11 50-2t39 32l47 82q14 23 8 49t-27 43l-53 40q1 7 1 13.5v27q0 6.5-2 13.5l53 40q21 17 27 43t-8 49l-48 82q-14 23-39 32t-50-2l-60-26q-11 8-23 15t-24 12l-9 66q-4 26-23.5 44T527-80h-94Zm7-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z" />
+        </symbol>
+        <symbol id="i-videocam" viewBox="0 -960 960 960">
+            <path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h480q33 0 56.5 23.5T720-720v180l126-126q10-10 22-5t12 19v344q0 14-12 19t-22-5L720-420v180q0 33-23.5 56.5T640-160H160Zm0-80h480v-480H160v480Zm0 0v-480 480Z" />
+        </symbol>
+        <symbol id="i-refresh" viewBox="0 -960 960 960">
+            <path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-70q0-17 11.5-28.5T760-800q17 0 28.5 11.5T800-760v200q0 17-11.5 28.5T760-520H560q-17 0-28.5-11.5T520-560q0-17 11.5-28.5T560-600h128q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q68 0 124.5-34.5T692-367q8-14 22.5-19.5t29.5-.5q16 5 23 21t-1 30q-41 80-117 128t-169 48Z" />
+        </symbol>
+        <symbol id="i-text-fields" viewBox="0 -960 960 960">
+            <path d="M297.5-177.5Q280-195 280-220v-460H140q-25 0-42.5-17.5T80-740q0-25 17.5-42.5T140-800h400q25 0 42.5 17.5T600-740q0 25-17.5 42.5T540-680H400v460q0 25-17.5 42.5T340-160q-25 0-42.5-17.5Zm360 0Q640-195 640-220v-260h-60q-25 0-42.5-17.5T520-540q0-25 17.5-42.5T580-600h240q25 0 42.5 17.5T880-540q0 25-17.5 42.5T820-480h-60v260q0 25-17.5 42.5T700-160q-25 0-42.5-17.5Z" />
+        </symbol>
+        <symbol id="i-shield" viewBox="0 -960 960 960">
+            <path d="M467-85q-6-1-12-3-135-45-215-166.5T160-516v-189q0-25 14.5-45t37.5-29l240-90q14-5 28-5t28 5l240 90q23 9 37.5 29t14.5 45v189q0 140-80 261.5T505-88q-6 2-12 3t-13 1q-7 0-13-1Zm13-79q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Zm0-316Z" />
+        </symbol>
+    </svg>
 
-        <!-- In-app browser panel -->
-        <section id="inappPanel" class="hidden">
-            <div class="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-3"
-                style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4);">
-                <span class="material-symbols-rounded text-2xl sm:text-3xl" style="color:#fbbf24;">no_photography</span>
-            </div>
-            <h1 class="font-pixel text-xs sm:text-sm mb-2 uppercase tracking-wider" style="color:#fbbf24;">
-                CAMERA BLOCKED BY <span id="inappName">IN-APP BROWSER</span>
-            </h1>
-            <p class="text-gray-300 text-[11px] sm:text-xs mb-3 leading-relaxed">
-                <span id="inappNameText">This app</span>'s in-app browser does not support camera scanning. Open the game
-                in a real browser:
-            </p>
-
-            <div class="bg-black/60 rounded-xl p-2.5 mb-3 text-left space-y-1.5 text-[10px] sm:text-[11px] text-gray-200 font-mono"
-                style="border: 1px solid rgba(245, 158, 11, 0.3);">
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#fbbf24;">1.</span>
-                    <span>Tap the <b class="text-white" id="inappMenuHint">⋮ (3 dots)</b> icon in the corner.</span>
+    <div class="guide-shell">
+        <main id="guideCard" class="guide-card" aria-live="polite">
+            <div class="brand-row">
+                <div class="brand">
+                    <img src="../assets/img/pokeball.svg" alt="">
+                    Pykachu Go
                 </div>
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#fbbf24;">2.</span>
-                    <span>Select <b style="color:#fcd34d;" id="inappOpenHint">Open in Chrome</b>.</span>
-                </div>
-            </div>
-
-            <div class="space-y-2">
-                <button type="button" onclick="copyGameUrl()"
-                    class="btn-pokedex w-full flex items-center justify-center gap-2 py-2.5 text-xs sm:text-sm">
-                    <span class="material-symbols-rounded text-sm sm:text-base">content_copy</span>
-                    COPY GAME LINK
-                </button>
-                <button type="button" onclick="backToGame()"
-                    class="w-full py-2.5 text-[10px] sm:text-xs text-blue-400 hover:text-white rounded-xl transition-all uppercase font-mono font-bold flex items-center justify-center gap-1.5"
-                    style="border: 1px solid rgba(96, 165, 250, 0.4); background: rgba(59, 130, 246, 0.1);">
-                    <span class="material-symbols-rounded text-sm">arrow_back</span>
-                    BACK TO GAME
-                </button>
-            </div>
-        </section>
-
-        <!-- Permission denied panel -->
-        <section id="permissionPanel" class="hidden">
-            <div class="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2.5"
-                style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4);">
-                <span class="material-symbols-rounded text-2xl sm:text-3xl" style="color:#f87171;">videocam_off</span>
-            </div>
-            <h1 class="font-pixel text-xs sm:text-sm mb-1 uppercase tracking-wider" style="color:#f87171;">
-                CAMERA ACCESS BLOCKED
-            </h1>
-            <p class="text-gray-400 text-[10px] sm:text-xs mb-3">
-                Permission was denied by your browser. Follow these steps to allow it:
-            </p>
-
-            <!-- Platform tabs -->
-            <div class="flex rounded-lg bg-black/60 p-1 mb-3 text-[10px]"
-                style="border: 1px solid #1e293b;">
-                <button type="button" id="guideTabAndroid" onclick="switchGuideTab('android')"
-                    class="flex-1 py-1.5 rounded-md transition-all text-[10px]">ANDROID (CHROME)</button>
-                <button type="button" id="guideTabIOS" onclick="switchGuideTab('ios')"
-                    class="flex-1 py-1.5 rounded-md transition-all text-[10px]">IPHONE (SAFARI)</button>
+                <span class="brand-tag">Camera Support</span>
             </div>
 
-            <!-- Android guide -->
-            <div id="guideContentAndroid"
-                class="text-left bg-black/50 rounded-xl p-2.5 mb-3 text-[10px] sm:text-[11px] text-gray-300 font-mono space-y-1.5"
-                style="border: 1px solid #1e293b;">
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#60a5fa;">1.</span>
-                    <span>Tap the <b class="text-white">🔒 Lock</b> or <b class="text-white">tune</b> icon beside the URL.
-                    </span>
+            <!-- In-app browser panel -->
+            <section id="inappPanel" class="panel hidden">
+                <div class="hero">
+                    <div class="hero-badge">
+                        <svg class="icon"><use href="#i-camera-off"></use></svg>
+                    </div>
+                    <h1 class="hero-title">
+                        Camera blocked by <span id="inappName">in-app browser</span>
+                    </h1>
+                    <p class="hero-sub">
+                        <span id="inappNameText">This app</span>'s built-in browser can't use the camera.
+                        Open the game in <b>Chrome</b> or <b>Safari</b> to scan QR signals.
+                    </p>
+                    <div class="status-chip">
+                        <span class="dot"></span>
+                        <span id="inappStatus">In-app browser detected</span>
+                    </div>
                 </div>
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#60a5fa;">2.</span>
-                    <span>Tap <b class="text-white">Permissions</b> (or Site Settings).</span>
-                </div>
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#60a5fa;">3.</span>
-                    <span>Toggle <b style="color:#34d399;">Camera</b> to <b style="color:#34d399;">ALLOW</b>.</span>
-                </div>
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#60a5fa;">4.</span>
-                    <span>Tap <b style="color:#fde047;">Reload</b> to scan.</span>
-                </div>
-            </div>
 
-            <!-- iOS guide -->
-            <div id="guideContentIOS"
-                class="hidden text-left bg-black/50 rounded-xl p-2.5 mb-3 text-[10px] sm:text-[11px] text-gray-300 font-mono space-y-1.5"
-                style="border: 1px solid #1e293b;">
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#60a5fa;">1.</span>
-                    <span>Tap <b class="text-white">aA</b> on the left of Safari's address bar.</span>
+                <div class="steps">
+                    <div class="step">
+                        <span class="step-num">1</span>
+                        <div class="step-body">
+                            <p>Tap the <b id="inappMenuHint">⋮ (3 dots)</b> menu in the corner.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-more-horiz"></use></svg>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">2</span>
+                        <div class="step-body">
+                            <p>Choose <b id="inappOpenHint">Open in Chrome</b> to launch a real browser.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-open-in-new"></use></svg>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">3</span>
+                        <div class="step-body">
+                            <p>Paste the game link if it doesn't open automatically.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-paste"></use></svg>
+                    </div>
                 </div>
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#60a5fa;">2.</span>
-                    <span>Tap <b class="text-white">Website Settings</b>.</span>
-                </div>
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#60a5fa;">3.</span>
-                    <span>Set <b style="color:#34d399;">Camera</b> to <b style="color:#34d399;">Allow</b>.</span>
-                </div>
-                <div class="flex items-start gap-2">
-                    <span class="font-bold" style="color:#60a5fa;">4.</span>
-                    <span>Tap <b style="color:#fde047;">Reload</b> to start scanning.</span>
-                </div>
-            </div>
 
-            <div class="space-y-2">
-                <button type="button" onclick="reloadPage()"
-                    class="btn-pokedex w-full flex items-center justify-center gap-2 py-2.5 text-xs sm:text-sm">
-                    <span class="material-symbols-rounded text-sm sm:text-base">refresh</span>
-                    RELOAD PAGE
-                </button>
-                <button type="button" onclick="backToGame()"
-                    class="w-full py-2.5 text-[10px] sm:text-xs rounded-xl transition-all uppercase font-mono font-bold flex items-center justify-center gap-1.5"
-                    style="color:#facc15; border: 1px solid rgba(234, 179, 8, 0.4); background: rgba(234, 179, 8, 0.1);">
-                    <span class="material-symbols-rounded text-sm">arrow_back</span>
-                    BACK TO GAME
-                </button>
+                <div class="actions">
+                    <button type="button" id="copyGameBtn" onclick="copyGameUrl()" class="btn btn-primary">
+                        <svg class="icon"><use href="#i-copy"></use></svg>
+                        Copy game link
+                    </button>
+                    <button type="button" onclick="backToGame()" class="btn btn-ghost">
+                        <svg class="icon"><use href="#i-back"></use></svg>
+                        Back to game
+                    </button>
+                </div>
+            </section>
+
+            <!-- Permission denied panel -->
+            <section id="permissionPanel" class="panel hidden">
+                <div class="hero">
+                    <div class="hero-badge">
+                        <svg class="icon"><use href="#i-videocam-off"></use></svg>
+                    </div>
+                    <h1 class="hero-title">Camera access blocked</h1>
+                    <p class="hero-sub">
+                        Permission was denied by your browser. Follow these quick steps to allow the
+                        camera, then reload.
+                    </p>
+                    <div class="status-chip">
+                        <span class="dot"></span>
+                        <span>Permission required</span>
+                    </div>
+                </div>
+
+                <!-- Platform tabs -->
+                <div class="tabs" role="tablist" aria-label="Choose your device">
+                    <button type="button" id="guideTabAndroid" role="tab" onclick="switchGuideTab('android')"
+                        class="tab">
+                        <svg class="icon"><use href="#i-android"></use></svg>
+                        Android
+                    </button>
+                    <button type="button" id="guideTabIOS" role="tab" onclick="switchGuideTab('ios')"
+                        class="tab">
+                        <svg class="icon"><use href="#i-iphone"></use></svg>
+                        iPhone
+                    </button>
+                </div>
+
+                <!-- Android guide -->
+                <div id="guideContentAndroid" class="steps">
+                    <div class="step">
+                        <span class="step-num">1</span>
+                        <div class="step-body">
+                            <p>Tap the <b>🔒 Lock</b> or <b>tune</b> icon beside the address bar.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-lock"></use></svg>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">2</span>
+                        <div class="step-body">
+                            <p>Tap <b>Permissions</b> (or <b>Site settings</b>).</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-settings"></use></svg>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">3</span>
+                        <div class="step-body">
+                            <p>Set <b>Camera</b> to <b>Allow</b>.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-videocam"></use></svg>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">4</span>
+                        <div class="step-body">
+                            <p>Tap <b>Reload</b> below and scan again.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-refresh"></use></svg>
+                    </div>
+                </div>
+
+                <!-- iOS guide -->
+                <div id="guideContentIOS" class="steps hidden">
+                    <div class="step">
+                        <span class="step-num">1</span>
+                        <div class="step-body">
+                            <p>Tap the <b>aA</b> button on the left of Safari's address bar.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-text-fields"></use></svg>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">2</span>
+                        <div class="step-body">
+                            <p>Open <b>Website Settings</b>.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-settings"></use></svg>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">3</span>
+                        <div class="step-body">
+                            <p>Set <b>Camera</b> to <b>Allow</b>.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-videocam"></use></svg>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">4</span>
+                        <div class="step-body">
+                            <p>Tap <b>Reload</b> below and scan again.</p>
+                        </div>
+                        <svg class="icon step-icon"><use href="#i-refresh"></use></svg>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button type="button" onclick="reloadPage()" class="btn btn-primary">
+                        <svg class="icon"><use href="#i-refresh"></use></svg>
+                        Reload page
+                    </button>
+                    <button type="button" onclick="backToGame()" class="btn btn-ghost">
+                        <svg class="icon"><use href="#i-back"></use></svg>
+                        Back to game
+                    </button>
+                </div>
+            </section>
+
+            <div class="hint">
+                <svg class="icon"><use href="#i-shield"></use></svg>
+                Camera is only used to scan QR signals — never recorded.
             </div>
-        </section>
-    </main>
+        </main>
+    </div>
 
     <script>
         // ==============================
@@ -235,10 +816,10 @@
         }
 
         function showCopied() {
-            const btn = document.querySelector('#inappPanel button');
+            const btn = document.getElementById('copyGameBtn');
             if (!btn) return;
             const original = btn.innerHTML;
-            btn.innerHTML = '<span class="material-symbols-rounded text-sm sm:text-base">check_circle</span> LINK COPIED!';
+            btn.innerHTML = '<svg class="icon"><use href="#i-check"></use></svg> Link copied!';
             setTimeout(() => { btn.innerHTML = original; }, 2000);
         }
 
@@ -257,17 +838,14 @@
             const contentIOS = document.getElementById('guideContentIOS');
             if (!tabAndroid || !tabIOS || !contentAndroid || !contentIOS) return;
 
-            const active = 'flex-1 py-1.5 rounded-md bg-blue-600 text-white font-bold shadow text-[10px] transition-all';
-            const inactive = 'flex-1 py-1.5 rounded-md text-gray-400 hover:text-white font-bold text-[10px] transition-all';
-
             if (platform === 'ios') {
-                tabIOS.className = active;
-                tabAndroid.className = inactive;
+                tabIOS.classList.add('is-active');
+                tabAndroid.classList.remove('is-active');
                 contentIOS.classList.remove('hidden');
                 contentAndroid.classList.add('hidden');
             } else {
-                tabAndroid.className = active;
-                tabIOS.className = inactive;
+                tabAndroid.classList.add('is-active');
+                tabIOS.classList.remove('is-active');
                 contentAndroid.classList.remove('hidden');
                 contentIOS.classList.add('hidden');
             }
@@ -280,15 +858,15 @@
 
             if (reason === 'inapp' || info.isInApp) {
                 const appName = paramApp || info.appName;
-                document.getElementById('inappName').textContent = appName.toUpperCase();
+                document.getElementById('inappName').textContent = appName.toLowerCase();
                 document.getElementById('inappNameText').textContent = appName;
+                document.getElementById('inappStatus').textContent = appName + ' detected';
                 document.getElementById('inappMenuHint').textContent = info.isIOS ? '⋯ or Share' : '⋮ (3 dots)';
                 document.getElementById('inappOpenHint').textContent = info.isIOS ? 'Open in Safari' : 'Open in Chrome';
                 inappPanel.classList.remove('hidden');
-                card.style.borderColor = 'rgba(245, 158, 11, 0.6)';
             } else {
+                card.classList.add('is-permission');
                 permissionPanel.classList.remove('hidden');
-                card.style.borderColor = 'rgba(239, 68, 68, 0.5)';
                 switchGuideTab(info.isIOS ? 'ios' : 'android');
             }
         }
