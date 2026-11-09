@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v2.0.26';
+const CACHE_NAME = 'pykachu-go-v2.0.27';
 const OPTIONAL_CACHE_NAME = 'pykachu-go-optional-v1';
 const ASSETS = [
     'index.html',
@@ -24,6 +24,7 @@ const ASSETS = [
     'js/google-sheets.js',
     'js/ui.js',
     'js/screens.js',
+    'js/camera-guide.js',
     'js/scanner.js',
     'js/meme.js',
     'js/penalty.js',

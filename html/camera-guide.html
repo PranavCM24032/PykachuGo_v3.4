@@ -1,516 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
+<!-- Camera access guidance overlay (shown inside the Pokédex screen) -->
+<div id="cameraGuideOverlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="cameraGuideTitle"
+    onclick="if (event.target === this) closeCameraGuide()">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Camera Access Guide — Pykachu Go</title>
-    <meta name="theme-color" content="#050810">
-    <meta name="robots" content="noindex">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@300;400;600;700&display=swap">
-    <link rel="stylesheet" href="../css/base.css">
-    <link rel="stylesheet" href="../css/tailwind.css">
-    <link rel="icon" href="../assets/img/pokeball.svg" type="image/svg+xml">
-    <style>
-        html,
-        body {
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-
-        body {
-            margin: 0;
-            height: auto;
-            min-height: 100dvh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
-            background:
-                radial-gradient(900px 500px at 50% -10%, rgba(59, 130, 246, 0.16), transparent 60%),
-                radial-gradient(700px 420px at 100% 110%, rgba(239, 68, 68, 0.14), transparent 60%),
-                #050810;
-            color: #e5e7eb;
-            position: relative;
-        }
-
-        /* Faint grid overlay */
-        body::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-            background-size: 28px 28px;
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        /* Inline SVG icon sizing */
-        .icon {
-            display: inline-block;
-            width: 1em;
-            height: 1em;
-            fill: currentColor;
-            flex-shrink: 0;
-            vertical-align: middle;
-        }
-
-        .guide-shell {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            max-width: 420px;
-        }
-
-        .guide-card {
-            position: relative;
-            border-radius: 26px;
-            padding: 22px 20px 20px;
-            background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(8, 12, 22, 0.97));
-            border: 2px solid rgba(245, 158, 11, 0.45);
-            box-shadow:
-                0 24px 60px -20px rgba(0, 0, 0, 0.9),
-                inset 0 1px 0 rgba(255, 255, 255, 0.06);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            overflow: hidden;
-            transition: border-color 0.4s ease;
-        }
-
-        /* Top accent line */
-        .guide-card::after {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, transparent, var(--accent, #f59e0b), transparent);
-            opacity: 0.9;
-        }
-
-        .guide-card.is-permission {
-            border-color: rgba(239, 68, 68, 0.45);
-            --accent: #ef4444;
-        }
-
-        .brand-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            margin-bottom: 18px;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            font-family: 'Press Start 2P', cursive;
-            font-size: 9px;
-            letter-spacing: 1px;
-            color: #93c5fd;
-            text-transform: uppercase;
-        }
-
-        .brand img {
-            width: 18px;
-            height: 18px;
-            filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.7));
-        }
-
-        .brand-tag {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 8px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            color: #64748b;
-            border: 1px solid rgba(100, 116, 139, 0.35);
-            border-radius: 999px;
-            padding: 3px 8px;
-        }
-
-        /* Hero icon */
-        .hero {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-        }
-
-        .hero-badge {
-            position: relative;
-            width: 74px;
-            height: 74px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 14px;
-            background: radial-gradient(circle at 50% 35%, rgba(245, 158, 11, 0.32), rgba(245, 158, 11, 0.06));
-            border: 1px solid rgba(245, 158, 11, 0.45);
-            box-shadow: 0 0 30px -6px rgba(245, 158, 11, 0.55);
-        }
-
-        .hero-badge .icon {
-            width: 38px;
-            height: 38px;
-            color: #fbbf24;
-            position: relative;
-            z-index: 2;
-        }
-
-        .hero-badge::before,
-        .hero-badge::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            border: 1px solid rgba(245, 158, 11, 0.5);
-            animation: pulseRing 2.6s ease-out infinite;
-        }
-
-        .hero-badge::after {
-            animation-delay: 1.3s;
-        }
-
-        .is-permission .hero-badge {
-            background: radial-gradient(circle at 50% 35%, rgba(239, 68, 68, 0.32), rgba(239, 68, 68, 0.06));
-            border-color: rgba(239, 68, 68, 0.45);
-            box-shadow: 0 0 30px -6px rgba(239, 68, 68, 0.55);
-        }
-
-        .is-permission .hero-badge .icon {
-            color: #f87171;
-        }
-
-        .is-permission .hero-badge::before,
-        .is-permission .hero-badge::after {
-            border-color: rgba(239, 68, 68, 0.5);
-        }
-
-        @keyframes pulseRing {
-            0% {
-                transform: scale(1);
-                opacity: 0.55;
-            }
-
-            100% {
-                transform: scale(1.55);
-                opacity: 0;
-            }
-        }
-
-        .hero-title {
-            font-family: 'Press Start 2P', cursive;
-            font-size: 12px;
-            line-height: 1.6;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            color: #fbbf24;
-            margin: 0 0 8px;
-        }
-
-        .is-permission .hero-title {
-            color: #f87171;
-        }
-
-        .hero-sub {
-            font-size: 12px;
-            line-height: 1.55;
-            color: #94a3b8;
-            margin: 0 0 18px;
-            max-width: 300px;
-        }
-
-        .hero-sub b {
-            color: #f1f5f9;
-        }
-
-        /* Status chip */
-        .status-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 9px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            padding: 5px 10px;
-            border-radius: 999px;
-            margin-bottom: 16px;
-            background: rgba(245, 158, 11, 0.1);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-            color: #fcd34d;
-        }
-
-        .is-permission .status-chip {
-            background: rgba(239, 68, 68, 0.1);
-            border-color: rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-        }
-
-        .status-chip .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: currentColor;
-            box-shadow: 0 0 8px currentColor;
-            animation: blink 1.6s ease-in-out infinite;
-        }
-
-        @keyframes blink {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.25;
-            }
-        }
-
-        /* Steps */
-        .steps {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 18px;
-        }
-
-        .step {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            text-align: left;
-            padding: 10px 12px;
-            border-radius: 14px;
-            background: rgba(2, 6, 23, 0.55);
-            border: 1px solid rgba(148, 163, 184, 0.14);
-            transition: border-color 0.2s ease, transform 0.2s ease;
-        }
-
-        .step:hover {
-            border-color: rgba(148, 163, 184, 0.3);
-            transform: translateY(-1px);
-        }
-
-        .step-num {
-            flex-shrink: 0;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            font-weight: 700;
-            color: #0b1220;
-            background: linear-gradient(180deg, #fcd34d, #f59e0b);
-            box-shadow: 0 0 10px -2px rgba(245, 158, 11, 0.8);
-        }
-
-        .is-permission .step-num {
-            color: #fff;
-            background: linear-gradient(180deg, #f87171, #dc2626);
-            box-shadow: 0 0 10px -2px rgba(239, 68, 68, 0.8);
-        }
-
-        .step-body {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .step-body p {
-            margin: 0;
-            font-size: 11px;
-            line-height: 1.5;
-            color: #cbd5e1;
-        }
-
-        .step-body b {
-            color: #f8fafc;
-            font-weight: 700;
-        }
-
-        .step-icon {
-            width: 18px !important;
-            height: 18px !important;
-            color: #64748b;
-            margin-top: 1px;
-        }
-
-        .is-permission .step-icon {
-            color: #94a3b8;
-        }
-
-        /* Tabs */
-        .tabs {
-            display: flex;
-            gap: 4px;
-            padding: 4px;
-            border-radius: 14px;
-            background: rgba(2, 6, 23, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.16);
-            margin-bottom: 14px;
-        }
-
-        .tab {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            padding: 9px 6px;
-            border: 0;
-            border-radius: 10px;
-            background: transparent;
-            color: #94a3b8;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: 0.4px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .tab .icon {
-            width: 16px;
-            height: 16px;
-        }
-
-        .tab:hover {
-            color: #e2e8f0;
-        }
-
-        .tab.is-active {
-            color: #fff;
-            background: linear-gradient(180deg, #3b82f6, #2563eb);
-            box-shadow: 0 6px 16px -6px rgba(37, 99, 235, 0.9);
-        }
-
-        /* Buttons */
-        .btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            width: 100%;
-            border: 0;
-            border-radius: 14px;
-            padding: 13px 16px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.6px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease;
-        }
-
-        .btn:active {
-            transform: translateY(1px) scale(0.99);
-        }
-
-        .btn .icon {
-            width: 18px;
-            height: 18px;
-        }
-
-        .btn-primary {
-            color: #0b1220;
-            background: linear-gradient(180deg, #fcd34d, #f59e0b);
-            box-shadow: 0 10px 26px -10px rgba(245, 158, 11, 0.9);
-        }
-
-        .btn-primary:hover {
-            filter: brightness(1.06);
-        }
-
-        .is-permission .btn-primary {
-            color: #fff;
-            background: linear-gradient(180deg, #f87171, #dc2626);
-            box-shadow: 0 10px 26px -10px rgba(239, 68, 68, 0.9);
-        }
-
-        .btn-ghost {
-            color: #cbd5e1;
-            background: rgba(148, 163, 184, 0.08);
-            border: 1px solid rgba(148, 163, 184, 0.22);
-        }
-
-        .btn-ghost:hover {
-            color: #fff;
-            background: rgba(148, 163, 184, 0.16);
-        }
-
-        .actions {
-            display: flex;
-            flex-direction: column;
-            gap: 9px;
-        }
-
-        .hint {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            margin-top: 16px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 9px;
-            letter-spacing: 0.3px;
-            color: #475569;
-            text-align: center;
-        }
-
-        .hint .icon {
-            width: 14px;
-            height: 14px;
-            color: #64748b;
-        }
-
-        .panel {
-            animation: fadeUp 0.35s ease both;
-        }
-
-        @keyframes fadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @media (min-width: 640px) {
-            .guide-card {
-                padding: 26px 24px 24px;
-            }
-
-            .hero-title {
-                font-size: 13px;
-            }
-
-            .step-body p {
-                font-size: 12px;
-            }
-        }
-    </style>
-</head>
-
-<body>
     <!-- Inline SVG icon sprite (self-contained, no icon-font subset needed) -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <symbol id="i-camera-off" viewBox="0 -960 960 960">
@@ -534,8 +25,8 @@
         <symbol id="i-check" viewBox="0 -960 960 960">
             <path d="m424-408-86-86q-11-11-28-11t-28 11q-11 11-11 28t11 28l114 114q12 12 28 12t28-12l226-226q11-11 11-28t-11-28q-11-11-28-11t-28 11L424-408Zm56 328q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z" />
         </symbol>
-        <symbol id="i-back" viewBox="0 -960 960 960">
-            <path d="m313-440 196 196q12 12 11.5 28T508-188q-12 11-28 11.5T452-188L188-452q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l264-264q11-11 27.5-11t28.5 11q12 12 12 28.5T508-715L313-520h447q17 0 28.5 11.5T800-480q0 17-11.5 28.5T760-440H313Z" />
+        <symbol id="i-close" viewBox="0 -960 960 960">
+            <path d="M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z" />
         </symbol>
         <symbol id="i-android" viewBox="0 -960 960 960">
             <path d="M40-240q10-105 64-191t139-140l-77-129q-9-14-4.5-30t18.5-24q14-9 30-5t24 18l80 133q38-16 79.5-24t86.5-8q45 0 86.5 8t79.5 24l80-133q8-14 24-18t30 5q14 8 18 24t-4 30l-77 129q85 54 139 140t64 191H40Zm680.5-151.5Q722-409 711-426t-27-22q-16-5-29 4t-15 26q-2 17 9 34t27.5 22.5Q693-356 706-365t14.5-26.5ZM284-362q16-5 27-22t9.5-34.5Q319-436 306-445t-29.5-3.5Q260-443 249-426t-9 34q2 17 15 26t29 4Z" />
@@ -563,321 +54,666 @@
         </symbol>
     </svg>
 
-    <div class="guide-shell">
-        <main id="guideCard" class="guide-card" aria-live="polite">
-            <div class="brand-row">
-                <div class="brand">
-                    <img src="../assets/img/pokeball.svg" alt="">
-                    Pykachu Go
+    <style>
+        /* Scoped so none of this leaks into the rest of the Pokédex UI */
+        #cameraGuideOverlay {
+            position: absolute;
+            inset: 0;
+            z-index: 140;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            overflow-y: auto;
+            background: rgba(2, 6, 23, 0.82);
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+        }
+
+        #cameraGuideOverlay.hidden,
+        #cameraGuideOverlay .hidden {
+            display: none !important;
+        }
+
+        #cameraGuideOverlay .cg-card {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            max-height: calc(100% - 8px);
+            overflow-y: auto;
+            border-radius: 24px;
+            padding: 22px 20px 20px;
+            background: linear-gradient(180deg, rgba(17, 24, 39, 0.97), rgba(8, 12, 22, 0.98));
+            border: 2px solid rgba(245, 158, 11, 0.5);
+            box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            transition: border-color 0.4s ease;
+            animation: cgFadeUp 0.3s ease both;
+            scrollbar-width: none;
+        }
+
+        #cameraGuideOverlay .cg-card::-webkit-scrollbar {
+            display: none;
+        }
+
+        #cameraGuideOverlay .cg-card::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--cg-accent, #f59e0b), transparent);
+        }
+
+        #cameraGuideOverlay .cg-card.is-permission {
+            border-color: rgba(239, 68, 68, 0.5);
+            --cg-accent: #ef4444;
+        }
+
+        #cameraGuideOverlay .icon {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            fill: currentColor;
+            flex-shrink: 0;
+            vertical-align: middle;
+        }
+
+        #cameraGuideOverlay .cg-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: 50%;
+            background: rgba(148, 163, 184, 0.12);
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        #cameraGuideOverlay .cg-close:hover {
+            color: #fff;
+            background: rgba(148, 163, 184, 0.24);
+        }
+
+        #cameraGuideOverlay .cg-close .icon {
+            width: 18px;
+            height: 18px;
+        }
+
+        #cameraGuideOverlay .cg-brand-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 18px;
+            padding-right: 28px;
+        }
+
+        #cameraGuideOverlay .cg-brand {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: #93c5fd;
+            text-transform: uppercase;
+        }
+
+        #cameraGuideOverlay .cg-brand img {
+            width: 18px;
+            height: 18px;
+            filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.7));
+        }
+
+        #cameraGuideOverlay .cg-brand-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #64748b;
+            border: 1px solid rgba(100, 116, 139, 0.35);
+            border-radius: 999px;
+            padding: 3px 8px;
+            white-space: nowrap;
+        }
+
+        #cameraGuideOverlay .cg-hero {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        #cameraGuideOverlay .cg-hero-badge {
+            position: relative;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 14px;
+            background: radial-gradient(circle at 50% 35%, rgba(245, 158, 11, 0.32), rgba(245, 158, 11, 0.06));
+            border: 1px solid rgba(245, 158, 11, 0.45);
+            box-shadow: 0 0 30px -6px rgba(245, 158, 11, 0.55);
+        }
+
+        #cameraGuideOverlay .cg-hero-badge .icon {
+            width: 36px;
+            height: 36px;
+            color: #fbbf24;
+            position: relative;
+            z-index: 2;
+        }
+
+        #cameraGuideOverlay .cg-hero-badge::before,
+        #cameraGuideOverlay .cg-hero-badge::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(245, 158, 11, 0.5);
+            animation: cgPulseRing 2.6s ease-out infinite;
+        }
+
+        #cameraGuideOverlay .cg-hero-badge::after {
+            animation-delay: 1.3s;
+        }
+
+        #cameraGuideOverlay .cg-card.is-permission .cg-hero-badge {
+            background: radial-gradient(circle at 50% 35%, rgba(239, 68, 68, 0.32), rgba(239, 68, 68, 0.06));
+            border-color: rgba(239, 68, 68, 0.45);
+            box-shadow: 0 0 30px -6px rgba(239, 68, 68, 0.55);
+        }
+
+        #cameraGuideOverlay .cg-card.is-permission .cg-hero-badge .icon {
+            color: #f87171;
+        }
+
+        #cameraGuideOverlay .cg-card.is-permission .cg-hero-badge::before,
+        #cameraGuideOverlay .cg-card.is-permission .cg-hero-badge::after {
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        #cameraGuideOverlay .cg-hero-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            line-height: 1.6;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #fbbf24;
+            margin: 0 0 8px;
+        }
+
+        #cameraGuideOverlay .cg-card.is-permission .cg-hero-title {
+            color: #f87171;
+        }
+
+        #cameraGuideOverlay .cg-hero-sub {
+            font-size: 12px;
+            line-height: 1.55;
+            color: #94a3b8;
+            margin: 0 0 16px;
+            max-width: 300px;
+        }
+
+        #cameraGuideOverlay .cg-hero-sub b {
+            color: #f1f5f9;
+        }
+
+        #cameraGuideOverlay .cg-status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            padding: 5px 10px;
+            border-radius: 999px;
+            margin-bottom: 16px;
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #fcd34d;
+        }
+
+        #cameraGuideOverlay .cg-card.is-permission .cg-status-chip {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        #cameraGuideOverlay .cg-status-chip .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 8px currentColor;
+            animation: cgBlink 1.6s ease-in-out infinite;
+        }
+
+        #cameraGuideOverlay .cg-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        #cameraGuideOverlay .cg-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            text-align: left;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.55);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+        }
+
+        #cameraGuideOverlay .cg-step-num {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            color: #0b1220;
+            background: linear-gradient(180deg, #fcd34d, #f59e0b);
+        }
+
+        #cameraGuideOverlay .cg-card.is-permission .cg-step-num {
+            color: #fff;
+            background: linear-gradient(180deg, #f87171, #dc2626);
+        }
+
+        #cameraGuideOverlay .cg-step-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        #cameraGuideOverlay .cg-step-body p {
+            margin: 0;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #cbd5e1;
+        }
+
+        #cameraGuideOverlay .cg-step-body b {
+            color: #f8fafc;
+            font-weight: 700;
+        }
+
+        #cameraGuideOverlay .cg-step-icon {
+            width: 18px !important;
+            height: 18px !important;
+            color: #64748b;
+            margin-top: 1px;
+        }
+
+        #cameraGuideOverlay .cg-card.is-permission .cg-step-icon {
+            color: #94a3b8;
+        }
+
+        #cameraGuideOverlay .cg-tabs {
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            margin-bottom: 14px;
+        }
+
+        #cameraGuideOverlay .cg-tab {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 6px;
+            border: 0;
+            border-radius: 10px;
+            background: transparent;
+            color: #94a3b8;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        #cameraGuideOverlay .cg-tab .icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        #cameraGuideOverlay .cg-tab:hover {
+            color: #e2e8f0;
+        }
+
+        #cameraGuideOverlay .cg-tab.is-active {
+            color: #fff;
+            background: linear-gradient(180deg, #3b82f6, #2563eb);
+            box-shadow: 0 6px 16px -6px rgba(37, 99, 235, 0.9);
+        }
+
+        #cameraGuideOverlay .cg-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            border: 0;
+            border-radius: 14px;
+            padding: 13px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: transform 0.12s ease, filter 0.2s ease, background 0.2s ease;
+        }
+
+        #cameraGuideOverlay .cg-btn:active {
+            transform: translateY(1px) scale(0.99);
+        }
+
+        #cameraGuideOverlay .cg-btn .icon {
+            width: 18px;
+            height: 18px;
+        }
+
+        #cameraGuideOverlay .cg-btn-primary {
+            color: #0b1220;
+            background: linear-gradient(180deg, #fcd34d, #f59e0b);
+            box-shadow: 0 10px 26px -10px rgba(245, 158, 11, 0.9);
+        }
+
+        #cameraGuideOverlay .cg-btn-primary:hover {
+            filter: brightness(1.06);
+        }
+
+        #cameraGuideOverlay .cg-card.is-permission .cg-btn-primary {
+            color: #fff;
+            background: linear-gradient(180deg, #f87171, #dc2626);
+            box-shadow: 0 10px 26px -10px rgba(239, 68, 68, 0.9);
+        }
+
+        #cameraGuideOverlay .cg-btn-ghost {
+            color: #cbd5e1;
+            background: rgba(148, 163, 184, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+        }
+
+        #cameraGuideOverlay .cg-btn-ghost:hover {
+            color: #fff;
+            background: rgba(148, 163, 184, 0.16);
+        }
+
+        #cameraGuideOverlay .cg-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        #cameraGuideOverlay .cg-hint {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0.3px;
+            color: #475569;
+            text-align: center;
+        }
+
+        #cameraGuideOverlay .cg-hint .icon {
+            width: 14px;
+            height: 14px;
+            color: #64748b;
+        }
+
+        @keyframes cgFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes cgPulseRing {
+            0% {
+                transform: scale(1);
+                opacity: 0.55;
+            }
+
+            100% {
+                transform: scale(1.55);
+                opacity: 0;
+            }
+        }
+
+        @keyframes cgBlink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.25;
+            }
+        }
+
+        @media (min-width: 640px) {
+            #cameraGuideOverlay .cg-hero-title {
+                font-size: 13px;
+            }
+
+            #cameraGuideOverlay .cg-step-body p {
+                font-size: 12px;
+            }
+        }
+    </style>
+
+    <div id="cameraGuideCard" class="cg-card">
+        <button type="button" class="cg-close" onclick="closeCameraGuide()" aria-label="Close">
+            <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+
+        <div class="cg-brand-row">
+            <div class="cg-brand">
+                <img src="assets/img/pokeball.svg" alt="">
+                Pykachu Go
+            </div>
+            <span class="cg-brand-tag">Camera Support</span>
+        </div>
+
+        <!-- In-app browser panel -->
+        <section id="cameraGuideInappPanel" class="cg-panel hidden">
+            <div class="cg-hero">
+                <div class="cg-hero-badge">
+                    <svg class="icon"><use href="#i-camera-off"></use></svg>
                 </div>
-                <span class="brand-tag">Camera Support</span>
+                <h2 id="cameraGuideTitle" class="cg-hero-title">
+                    Camera blocked by <span id="cameraGuideInappName">in-app browser</span>
+                </h2>
+                <p class="cg-hero-sub">
+                    <span id="cameraGuideInappNameText">This app</span>'s built-in browser can't use the camera.
+                    Open the game in <b>Chrome</b> or <b>Safari</b> to scan QR signals.
+                </p>
+                <div class="cg-status-chip">
+                    <span class="dot"></span>
+                    <span id="cameraGuideInappStatus">In-app browser detected</span>
+                </div>
             </div>
 
-            <!-- In-app browser panel -->
-            <section id="inappPanel" class="panel hidden">
-                <div class="hero">
-                    <div class="hero-badge">
-                        <svg class="icon"><use href="#i-camera-off"></use></svg>
+            <div class="cg-steps">
+                <div class="cg-step">
+                    <span class="cg-step-num">1</span>
+                    <div class="cg-step-body">
+                        <p>Tap the <b id="cameraGuideMenuHint">⋮ (3 dots)</b> menu in the corner.</p>
                     </div>
-                    <h1 class="hero-title">
-                        Camera blocked by <span id="inappName">in-app browser</span>
-                    </h1>
-                    <p class="hero-sub">
-                        <span id="inappNameText">This app</span>'s built-in browser can't use the camera.
-                        Open the game in <b>Chrome</b> or <b>Safari</b> to scan QR signals.
-                    </p>
-                    <div class="status-chip">
-                        <span class="dot"></span>
-                        <span id="inappStatus">In-app browser detected</span>
-                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-more-horiz"></use></svg>
                 </div>
-
-                <div class="steps">
-                    <div class="step">
-                        <span class="step-num">1</span>
-                        <div class="step-body">
-                            <p>Tap the <b id="inappMenuHint">⋮ (3 dots)</b> menu in the corner.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-more-horiz"></use></svg>
+                <div class="cg-step">
+                    <span class="cg-step-num">2</span>
+                    <div class="cg-step-body">
+                        <p>Choose <b id="cameraGuideOpenHint">Open in Chrome</b> to launch a real browser.</p>
                     </div>
-                    <div class="step">
-                        <span class="step-num">2</span>
-                        <div class="step-body">
-                            <p>Choose <b id="inappOpenHint">Open in Chrome</b> to launch a real browser.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-open-in-new"></use></svg>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">3</span>
-                        <div class="step-body">
-                            <p>Paste the game link if it doesn't open automatically.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-paste"></use></svg>
-                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-open-in-new"></use></svg>
                 </div>
-
-                <div class="actions">
-                    <button type="button" id="copyGameBtn" onclick="copyGameUrl()" class="btn btn-primary">
-                        <svg class="icon"><use href="#i-copy"></use></svg>
-                        Copy game link
-                    </button>
-                    <button type="button" onclick="backToGame()" class="btn btn-ghost">
-                        <svg class="icon"><use href="#i-back"></use></svg>
-                        Back to game
-                    </button>
+                <div class="cg-step">
+                    <span class="cg-step-num">3</span>
+                    <div class="cg-step-body">
+                        <p>Paste the game link if it doesn't open automatically.</p>
+                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-paste"></use></svg>
                 </div>
-            </section>
-
-            <!-- Permission denied panel -->
-            <section id="permissionPanel" class="panel hidden">
-                <div class="hero">
-                    <div class="hero-badge">
-                        <svg class="icon"><use href="#i-videocam-off"></use></svg>
-                    </div>
-                    <h1 class="hero-title">Camera access blocked</h1>
-                    <p class="hero-sub">
-                        Permission was denied by your browser. Follow these quick steps to allow the
-                        camera, then reload.
-                    </p>
-                    <div class="status-chip">
-                        <span class="dot"></span>
-                        <span>Permission required</span>
-                    </div>
-                </div>
-
-                <!-- Platform tabs -->
-                <div class="tabs" role="tablist" aria-label="Choose your device">
-                    <button type="button" id="guideTabAndroid" role="tab" onclick="switchGuideTab('android')"
-                        class="tab">
-                        <svg class="icon"><use href="#i-android"></use></svg>
-                        Android
-                    </button>
-                    <button type="button" id="guideTabIOS" role="tab" onclick="switchGuideTab('ios')"
-                        class="tab">
-                        <svg class="icon"><use href="#i-iphone"></use></svg>
-                        iPhone
-                    </button>
-                </div>
-
-                <!-- Android guide -->
-                <div id="guideContentAndroid" class="steps">
-                    <div class="step">
-                        <span class="step-num">1</span>
-                        <div class="step-body">
-                            <p>Tap the <b>🔒 Lock</b> or <b>tune</b> icon beside the address bar.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-lock"></use></svg>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">2</span>
-                        <div class="step-body">
-                            <p>Tap <b>Permissions</b> (or <b>Site settings</b>).</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-settings"></use></svg>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">3</span>
-                        <div class="step-body">
-                            <p>Set <b>Camera</b> to <b>Allow</b>.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-videocam"></use></svg>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">4</span>
-                        <div class="step-body">
-                            <p>Tap <b>Reload</b> below and scan again.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-refresh"></use></svg>
-                    </div>
-                </div>
-
-                <!-- iOS guide -->
-                <div id="guideContentIOS" class="steps hidden">
-                    <div class="step">
-                        <span class="step-num">1</span>
-                        <div class="step-body">
-                            <p>Tap the <b>aA</b> button on the left of Safari's address bar.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-text-fields"></use></svg>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">2</span>
-                        <div class="step-body">
-                            <p>Open <b>Website Settings</b>.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-settings"></use></svg>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">3</span>
-                        <div class="step-body">
-                            <p>Set <b>Camera</b> to <b>Allow</b>.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-videocam"></use></svg>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">4</span>
-                        <div class="step-body">
-                            <p>Tap <b>Reload</b> below and scan again.</p>
-                        </div>
-                        <svg class="icon step-icon"><use href="#i-refresh"></use></svg>
-                    </div>
-                </div>
-
-                <div class="actions">
-                    <button type="button" onclick="reloadPage()" class="btn btn-primary">
-                        <svg class="icon"><use href="#i-refresh"></use></svg>
-                        Reload page
-                    </button>
-                    <button type="button" onclick="backToGame()" class="btn btn-ghost">
-                        <svg class="icon"><use href="#i-back"></use></svg>
-                        Back to game
-                    </button>
-                </div>
-            </section>
-
-            <div class="hint">
-                <svg class="icon"><use href="#i-shield"></use></svg>
-                Camera is only used to scan QR signals — never recorded.
             </div>
-        </main>
+
+            <div class="cg-actions">
+                <button type="button" id="cameraGuideCopyBtn" onclick="copyGameUrl()" class="cg-btn cg-btn-primary">
+                    <svg class="icon"><use href="#i-copy"></use></svg>
+                    Copy game link
+                </button>
+                <button type="button" onclick="closeCameraGuide()" class="cg-btn cg-btn-ghost">
+                    <svg class="icon"><use href="#i-close"></use></svg>
+                    Close
+                </button>
+            </div>
+        </section>
+
+        <!-- Permission denied panel -->
+        <section id="cameraGuidePermissionPanel" class="cg-panel hidden">
+            <div class="cg-hero">
+                <div class="cg-hero-badge">
+                    <svg class="icon"><use href="#i-videocam-off"></use></svg>
+                </div>
+                <h2 class="cg-hero-title">Camera access blocked</h2>
+                <p class="cg-hero-sub">
+                    Permission was denied by your browser. Follow these quick steps to allow the
+                    camera, then reload.
+                </p>
+                <div class="cg-status-chip">
+                    <span class="dot"></span>
+                    <span>Permission required</span>
+                </div>
+            </div>
+
+            <!-- Platform tabs -->
+            <div class="cg-tabs" role="tablist" aria-label="Choose your device">
+                <button type="button" id="cameraGuideTabAndroid" role="tab" onclick="switchGuideTab('android')"
+                    class="cg-tab">
+                    <svg class="icon"><use href="#i-android"></use></svg>
+                    Android
+                </button>
+                <button type="button" id="cameraGuideTabIOS" role="tab" onclick="switchGuideTab('ios')"
+                    class="cg-tab">
+                    <svg class="icon"><use href="#i-iphone"></use></svg>
+                    iPhone
+                </button>
+            </div>
+
+            <!-- Android guide -->
+            <div id="cameraGuideContentAndroid" class="cg-steps">
+                <div class="cg-step">
+                    <span class="cg-step-num">1</span>
+                    <div class="cg-step-body">
+                        <p>Tap the <b>Lock</b> or <b>tune</b> icon beside the address bar.</p>
+                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-lock"></use></svg>
+                </div>
+                <div class="cg-step">
+                    <span class="cg-step-num">2</span>
+                    <div class="cg-step-body">
+                        <p>Tap <b>Permissions</b> (or <b>Site settings</b>).</p>
+                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-settings"></use></svg>
+                </div>
+                <div class="cg-step">
+                    <span class="cg-step-num">3</span>
+                    <div class="cg-step-body">
+                        <p>Set <b>Camera</b> to <b>Allow</b>.</p>
+                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-videocam"></use></svg>
+                </div>
+                <div class="cg-step">
+                    <span class="cg-step-num">4</span>
+                    <div class="cg-step-body">
+                        <p>Tap <b>Reload</b> below and scan again.</p>
+                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-refresh"></use></svg>
+                </div>
+            </div>
+
+            <!-- iOS guide -->
+            <div id="cameraGuideContentIOS" class="cg-steps hidden">
+                <div class="cg-step">
+                    <span class="cg-step-num">1</span>
+                    <div class="cg-step-body">
+                        <p>Tap the <b>aA</b> button on the left of Safari's address bar.</p>
+                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-text-fields"></use></svg>
+                </div>
+                <div class="cg-step">
+                    <span class="cg-step-num">2</span>
+                    <div class="cg-step-body">
+                        <p>Open <b>Website Settings</b>.</p>
+                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-settings"></use></svg>
+                </div>
+                <div class="cg-step">
+                    <span class="cg-step-num">3</span>
+                    <div class="cg-step-body">
+                        <p>Set <b>Camera</b> to <b>Allow</b>.</p>
+                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-videocam"></use></svg>
+                </div>
+                <div class="cg-step">
+                    <span class="cg-step-num">4</span>
+                    <div class="cg-step-body">
+                        <p>Tap <b>Reload</b> below and scan again.</p>
+                    </div>
+                    <svg class="icon cg-step-icon"><use href="#i-refresh"></use></svg>
+                </div>
+            </div>
+
+            <div class="cg-actions">
+                <button type="button" onclick="reloadPage()" class="cg-btn cg-btn-primary">
+                    <svg class="icon"><use href="#i-refresh"></use></svg>
+                    Reload page
+                </button>
+                <button type="button" onclick="closeCameraGuide()" class="cg-btn cg-btn-ghost">
+                    <svg class="icon"><use href="#i-close"></use></svg>
+                    Close
+                </button>
+            </div>
+        </section>
+
+        <div class="cg-hint">
+            <svg class="icon"><use href="#i-shield"></use></svg>
+            Camera is only used to scan QR signals — never recorded.
+        </div>
     </div>
-
-    <script>
-        // ==============================
-        // IN-APP BROWSER & CAMERA PERMISSION GUIDANCE
-        // Standalone page the game opens when camera access is blocked.
-        // ==============================
-
-        function detectInAppBrowser() {
-            const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
-            const isIOS = /iphone|ipad|ipod/.test(ua);
-            const isAndroid = /android/.test(ua);
-
-            let appName = '';
-            if (ua.includes('whatsapp')) appName = 'WhatsApp';
-            else if (ua.includes('instagram')) appName = 'Instagram';
-            else if (ua.includes('fbav') || ua.includes('fban') || ua.includes('messenger')) appName = 'Facebook';
-            else if (ua.includes('telegram')) appName = 'Telegram';
-            else if (ua.includes('twitter') || ua.includes('x/')) appName = 'X (Twitter)';
-            else if (ua.includes('micromessenger')) appName = 'WeChat';
-            else if (ua.includes('line/')) appName = 'Line';
-            else if (ua.includes('snapchat')) appName = 'Snapchat';
-            else if (isAndroid && (ua.includes('; wv') || (ua.includes('version/') && ua.includes('chrome') && !ua.includes('mobile safari')))) {
-                appName = 'In-App Browser';
-            } else if (isIOS && !ua.includes('safari') && ua.includes('applewebkit')) {
-                appName = 'In-App Browser';
-            }
-
-            return {
-                isInApp: Boolean(appName),
-                appName: appName || 'In-App Browser',
-                isIOS,
-                isAndroid
-            };
-        }
-
-        const params = new URLSearchParams(window.location.search);
-        const info = detectInAppBrowser();
-
-        // Prefer an explicit ?reason from the game, otherwise infer it.
-        const reason = params.get('reason') || (info.isInApp ? 'inapp' : 'permission');
-        const returnUrl = params.get('return') || '../index.html';
-        const paramApp = params.get('app');
-
-        function gameUrl() {
-            // The link to hand to a real browser: the game URL without the hash.
-            return returnUrl.split('#')[0];
-        }
-
-        function copyGameUrl() {
-            const url = gameUrl();
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(url).then(showCopied).catch(() => fallbackCopyUrl(url));
-            } else {
-                fallbackCopyUrl(url);
-            }
-        }
-
-        function fallbackCopyUrl(text) {
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            ta.style.position = 'fixed';
-            ta.style.opacity = '0';
-            document.body.appendChild(ta);
-            ta.focus();
-            ta.select();
-            try {
-                document.execCommand('copy');
-                showCopied();
-            } catch (e) {
-                prompt('Copy this link and open it in Chrome or Safari:', text);
-            }
-            ta.remove();
-        }
-
-        function showCopied() {
-            const btn = document.getElementById('copyGameBtn');
-            if (!btn) return;
-            const original = btn.innerHTML;
-            btn.innerHTML = '<svg class="icon"><use href="#i-check"></use></svg> Link copied!';
-            setTimeout(() => { btn.innerHTML = original; }, 2000);
-        }
-
-        function reloadPage() {
-            window.location.reload();
-        }
-
-        function backToGame() {
-            window.location.href = returnUrl;
-        }
-
-        function switchGuideTab(platform) {
-            const tabAndroid = document.getElementById('guideTabAndroid');
-            const tabIOS = document.getElementById('guideTabIOS');
-            const contentAndroid = document.getElementById('guideContentAndroid');
-            const contentIOS = document.getElementById('guideContentIOS');
-            if (!tabAndroid || !tabIOS || !contentAndroid || !contentIOS) return;
-
-            if (platform === 'ios') {
-                tabIOS.classList.add('is-active');
-                tabAndroid.classList.remove('is-active');
-                contentIOS.classList.remove('hidden');
-                contentAndroid.classList.add('hidden');
-            } else {
-                tabAndroid.classList.add('is-active');
-                tabIOS.classList.remove('is-active');
-                contentAndroid.classList.remove('hidden');
-                contentIOS.classList.add('hidden');
-            }
-        }
-
-        function init() {
-            const inappPanel = document.getElementById('inappPanel');
-            const permissionPanel = document.getElementById('permissionPanel');
-            const card = document.getElementById('guideCard');
-
-            if (reason === 'inapp' || info.isInApp) {
-                const appName = paramApp || info.appName;
-                document.getElementById('inappName').textContent = appName.toLowerCase();
-                document.getElementById('inappNameText').textContent = appName;
-                document.getElementById('inappStatus').textContent = appName + ' detected';
-                document.getElementById('inappMenuHint').textContent = info.isIOS ? '⋯ or Share' : '⋮ (3 dots)';
-                document.getElementById('inappOpenHint').textContent = info.isIOS ? 'Open in Safari' : 'Open in Chrome';
-                inappPanel.classList.remove('hidden');
-            } else {
-                card.classList.add('is-permission');
-                permissionPanel.classList.remove('hidden');
-                switchGuideTab(info.isIOS ? 'ios' : 'android');
-            }
-        }
-
-        window.copyGameUrl = copyGameUrl;
-        window.backToGame = backToGame;
-        window.reloadPage = reloadPage;
-        window.switchGuideTab = switchGuideTab;
-
-        init();
-    </script>
-</body>
-
-</html>
+</div>

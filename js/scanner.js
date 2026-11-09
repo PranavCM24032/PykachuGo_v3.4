@@ -1,19 +1,6 @@
 // ==============================
 // STEP 2: QR SCANNER
 // ==============================
-// Camera blocked (in-app browser, denied permission, missing camera API):
-// send the trainer to the dedicated guidance page, carrying the game URL so
-// they can return once access is fixed.
-function openCameraGuide() {
-    try {
-        const url = new URL('html/camera-guide.html', window.location.href);
-        url.searchParams.set('reason', 'permission');
-        url.searchParams.set('return', window.location.href);
-        window.location.href = url.href;
-    } catch (e) {
-        window.location.href = 'html/camera-guide.html';
-    }
-}
 
 function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -217,9 +204,11 @@ async function startQRScanner() {
         stopQRScanner();
 
         // Camera blocked (in-app browser, denied permission, no camera API):
-        // hand off to the dedicated guidance page instead of a modal.
-        if (['NotAllowedError', 'PermissionDeniedError', 'SecurityError', 'NotSupportedError'].includes(error && error.name)) {
-            openCameraGuide();
+        // show the guidance popup inside the Pokédex.
+        const errorName = error && error.name;
+        if (['NotAllowedError', 'PermissionDeniedError', 'SecurityError', 'NotSupportedError'].includes(errorName)
+            && typeof openCameraGuide === 'function') {
+            openCameraGuide(errorName === 'NotSupportedError' ? 'inapp' : 'permission');
         } else {
             showToast(cameraErrorMessage(error), 'error');
             showManualEntry();
