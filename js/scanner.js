@@ -102,6 +102,13 @@ async function startQRScanner() {
     let stream = null;
 
     try {
+        const inApp = (typeof detectInAppBrowser === 'function') ? detectInAppBrowser() : { isInApp: false };
+        if (inApp.isInApp && (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function')) {
+            stopQRScanner();
+            if (typeof showInAppBrowserModal === 'function') showInAppBrowserModal();
+            return;
+        }
+
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
             const error = new Error('Camera API unavailable');
             error.name = window.isSecureContext ? 'NotSupportedError' : 'SecurityError';
@@ -201,8 +208,16 @@ async function startQRScanner() {
         console.error('Camera error:', error);
         // Never leave a live camera running on the failure path.
         stopQRScanner();
-        showToast(cameraErrorMessage(error), 'error');
-        showManualEntry();
+
+        const inApp = (typeof detectInAppBrowser === 'function') ? detectInAppBrowser() : { isInApp: false };
+        if (inApp.isInApp && typeof showInAppBrowserModal === 'function') {
+            showInAppBrowserModal();
+        } else if (['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(error && error.name) && typeof showCameraPermissionGuide === 'function') {
+            showCameraPermissionGuide(error);
+        } else {
+            showToast(cameraErrorMessage(error), 'error');
+            showManualEntry();
+        }
     } finally {
         scannerStarting = false;
     }

@@ -120,6 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateTeamStatus();
     prefillRegistrationForm();
     updatePowerLed();
+    if (typeof initInAppBrowserNotice === 'function') initInAppBrowserNotice();
 
     // Flow: Loader -> Step 0 (Oak's master rules) -> button click -> Step 1 (Login form)
     showStep(0);
