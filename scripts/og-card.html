@@ -74,7 +74,7 @@
 
             background:
                 radial-gradient(circle at 72% 46%,
-                    rgba(255, 214, 51, 0.10),
+                    rgba(70, 160, 255, 0.13),
                     transparent 58%),
 
                 radial-gradient(circle at 24% 105%,
@@ -329,14 +329,14 @@
 
             background:
                 radial-gradient(circle,
-                    rgba(255, 214, 51, 0.17),
-                    rgba(255, 214, 51, 0.06) 46%,
+                    rgba(70, 170, 255, 0.20),
+                    rgba(50, 140, 255, 0.07) 46%,
                     transparent 70%);
         }
 
         /*
           Pikachu becomes a dark silhouette.
-          The gold drop-shadows create the rim light.
+          The blue drop-shadows create the rim light.
         */
 
         .pika {
@@ -353,13 +353,13 @@
             height: auto;
 
             filter:
-                brightness(0) saturate(0) drop-shadow(0 0 2px rgba(255, 214, 51, 0.85)) drop-shadow(0 0 20px rgba(255, 214, 51, 0.45)) drop-shadow(0 0 58px rgba(255, 214, 51, 0.18));
+                brightness(0) saturate(0) drop-shadow(0 0 2px rgba(120, 205, 255, 0.90)) drop-shadow(0 0 20px rgba(60, 155, 255, 0.50)) drop-shadow(0 0 58px rgba(35, 110, 255, 0.22));
         }
 
         /* =========================================================
            QUESTION MARK
            
-           A normal (non-pixel) bold sans glyph with a blue glow,
+           A normal (non-pixel) bold sans glyph with a gold glow,
            positioned over the Pikachu body.
         ========================================================= */
 
@@ -389,19 +389,19 @@
 
             line-height: 1;
 
-            color: #5fd0ff;
+            color: #ffd633;
 
             text-shadow:
-                0 0 6px rgba(120, 214, 255, 0.95),
-                0 0 18px rgba(70, 170, 255, 0.85),
-                0 0 44px rgba(40, 130, 255, 0.60);
+                0 0 6px rgba(255, 228, 130, 0.95),
+                0 0 18px rgba(255, 214, 51, 0.85),
+                0 0 44px rgba(255, 190, 40, 0.60);
 
             pointer-events: none;
 
             user-select: none;
         }
 
-        /* Soft blue aura behind the glyph so the glow reads at thumbnail size,
+        /* Soft gold aura behind the glyph so the glow reads at thumbnail size,
            where a plain text-shadow is too tight to be seen. */
         .question-mark::before {
             content: '';
@@ -419,8 +419,8 @@
 
             background:
                 radial-gradient(circle,
-                    rgba(70, 175, 255, 0.38),
-                    rgba(40, 125, 255, 0.16) 44%,
+                    rgba(255, 214, 51, 0.34),
+                    rgba(255, 186, 36, 0.14) 44%,
                     transparent 68%);
 
             filter: blur(3px);
