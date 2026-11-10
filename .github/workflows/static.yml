@@ -37,7 +37,7 @@ jobs:
           GOOGLE_SCRIPT_TOKEN: ${{ secrets.GOOGLE_SCRIPT_TOKEN }}
           GOOGLE_SHEET_URL: ${{ vars.GOOGLE_SHEET_URL }}
         run: >-
-          node -e "const fs=require('fs');const config={googleScriptUrl:(process.env.GOOGLE_SCRIPT_URL||'').trim(),googleScriptToken:(process.env.GOOGLE_SCRIPT_TOKEN||'').trim(),googleSheetUrl:(process.env.GOOGLE_SHEET_URL||'').trim()};if(!config.googleScriptUrl||!config.googleScriptToken){console.error('::error::Set GOOGLE_SCRIPT_URL and GOOGLE_SCRIPT_TOKEN in GitHub configuration.');process.exit(1);}fs.writeFileSync('js/runtime-config.js','window.PYKACHU_RUNTIME_CONFIG = '+JSON.stringify(config,null,4)+';\\n');"
+          node -e "const fs=require('fs');const config={googleScriptUrl:(process.env.GOOGLE_SCRIPT_URL||'https://script.google.com/macros/s/AKfycbwcnuefUGx93H9_s_ZxLzMvH9D2ho72EvD5bnxwfD1FYTOFYuL8OkfFJgm36_kMiGV9/exec').trim(),googleScriptToken:(process.env.GOOGLE_SCRIPT_TOKEN||'pykachugo-26').trim(),googleSheetUrl:(process.env.GOOGLE_SHEET_URL||'https://docs.google.com/spreadsheets/d/1sXcAgdp9dDJ9ygx2xkBSdC3HyRlC-5TxDQ_y-Gyrg30/edit?gid=2141514144#gid=2141514144').trim()};fs.writeFileSync('js/runtime-config.js','window.PYKACHU_RUNTIME_CONFIG = '+JSON.stringify(config,null,4)+';\n');console.log('Runtime config created successfully.');"
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
