@@ -25,8 +25,20 @@ function getPlayerToken() {
 
 function getAdminToken() {
   var token = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
-  if (!token) Logger.log('⚠️ Missing ADMIN_TOKEN script property');
+  if (!token || token.length < 32 || token === getPlayerToken()) {
+    Logger.log('ADMIN_TOKEN must be a unique value of at least 32 characters');
+    return '';
+  }
   return token || '';
+}
+
+function getLoginSessionSecret_() {
+  var secret = PropertiesService.getScriptProperties().getProperty('LOGIN_SESSION_SECRET');
+  if (!secret || secret.length < 32 || secret === getPlayerToken()) {
+    Logger.log('LOGIN_SESSION_SECRET must be unique from PLAYER_TOKEN and at least 32 characters');
+    return '';
+  }
+  return secret;
 }
 
 function getSpreadsheet_() {
@@ -37,26 +49,24 @@ function getSpreadsheet_() {
 
 // ── Server-authoritative puzzle catalogue ────────────────────────────────
 // data/puzzle.json (the file the client also loads) is the single source of
-// truth. The server reads that same file so answers, start codes, points and
-// the puzzle graph are never duplicated here. Set PUZZLE_SECRETS_JSON in
-// Script Properties only to rotate secrets without republishing the JSON.
-var DEFAULT_DATA_BASE_URL = 'https://pranavcm24032.github.io/PykachuGo_v3.4/';
+// truth. Set DATA_BASE_URL in Script Properties to the public site root.
 
 var LOGIN_SESSION_TTL_SECS = 21600;
 var LOGIN_RATE_LIMIT = 10;
 var START_CODE_RATE_LIMIT = 10;
 var AUTH_RATE_WINDOW_SECS = 60;
+var ADMIN_AUTH_RATE_LIMIT = 5;
 
 function getDataBaseUrl_() {
   var configured = PropertiesService.getScriptProperties().getProperty('DATA_BASE_URL');
-  var base = String(configured || DEFAULT_DATA_BASE_URL).trim();
+  var base = String(configured || '').trim();
+  if (!base) throw new Error('Missing DATA_BASE_URL script property');
   if (base && base.charAt(base.length - 1) !== '/') base += '/';
   return base;
 }
 
 // Fetch one of the public data/*.json files (cached briefly) so the client and
-// server always agree on the puzzle graph, answers and team roster. Set
-// DATA_BASE_URL in Script Properties if the app is served from another origin.
+// server always agree on the puzzle graph, answers and team roster.
 function readDataJson_(file) {
   var cache = CacheService.getScriptCache();
   var cacheKey = 'datajson:' + file;
@@ -217,26 +227,43 @@ function invalidateTeamContext(tid, teamName) {
 function getLoginSession(data) {
   var token = data && data.loginToken;
   if (!token) return null;
+  var secret = getLoginSessionSecret_();
+  if (!secret) return null;
 
   // 1. Fast cache check
   try {
-    var raw = CacheService.getScriptCache().get('login_' + token);
-    if (raw) return JSON.parse(raw);
+    var raw = CacheService.getScriptCache().get('login_v2_' + token);
+    if (raw) {
+      var cachedSession = JSON.parse(raw);
+      if (cachedSession.exp > Date.now()) {
+        return { tid: cachedSession.tid || '', teamName: cachedSession.teamName || '' };
+      }
+      CacheService.getScriptCache().remove('login_v2_' + token);
+    }
   } catch (e) { }
 
-  // 2. Cryptographic signature fallback: preserves sessions even if cache is evicted
+  // 2. Cryptographic signature fallback: preserves sessions if cache is evicted.
   try {
     var parts = String(token).split('.');
     if (parts.length === 2) {
       var payloadBytes = Utilities.base64DecodeWebSafe(parts[0]);
       var payload = Utilities.newBlob(payloadBytes).getDataAsString();
-      var secret = getPlayerToken() || 'pykachu_secret';
       var expectedSig = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, secret));
       if (parts[1] === expectedSig) {
-        var subParts = payload.split('::');
-        var session = { tid: subParts[0] || '', teamName: subParts[1] || '' };
+        var parsedPayload = JSON.parse(payload);
+        if (!parsedPayload || typeof parsedPayload.exp !== 'number' || parsedPayload.exp <= Date.now()) {
+          return null;
+        }
+        var session = {
+          tid: parsedPayload.tid || '',
+          teamName: parsedPayload.teamName || ''
+        };
         try {
-          CacheService.getScriptCache().put('login_' + token, JSON.stringify(session), LOGIN_SESSION_TTL_SECS);
+          CacheService.getScriptCache().put(
+            'login_v2_' + token,
+            JSON.stringify({ tid: session.tid, teamName: session.teamName, exp: parsedPayload.exp }),
+            LOGIN_SESSION_TTL_SECS
+          );
         } catch (ce) { }
         return session;
       }
@@ -247,15 +274,21 @@ function getLoginSession(data) {
 }
 
 function createLoginSession(tid, teamName) {
-  var secret = getPlayerToken() || 'pykachu_secret';
-  var payload = (tid || '') + '::' + (teamName || '');
+  var secret = getLoginSessionSecret_();
+  if (!secret) return '';
+  var expiresAt = Date.now() + LOGIN_SESSION_TTL_SECS * 1000;
+  var payload = JSON.stringify({
+    tid: tid || '',
+    teamName: teamName || '',
+    exp: expiresAt
+  });
   var sig = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, secret));
   var signedToken = Utilities.base64EncodeWebSafe(Utilities.newBlob(payload).getBytes()) + '.' + sig;
 
   try {
     CacheService.getScriptCache().put(
-      'login_' + signedToken,
-      JSON.stringify({ tid: tid || '', teamName: teamName || '' }),
+      'login_v2_' + signedToken,
+      JSON.stringify({ tid: tid || '', teamName: teamName || '', exp: expiresAt }),
       LOGIN_SESSION_TTL_SECS
     );
   } catch (e) { }
@@ -479,22 +512,32 @@ function doPost(e) {
     }
 
     if (data.action === 'ADMIN_AUTH') {
+      if (!checkSlidingWindowRate_('admin', 'global', ADMIN_AUTH_RATE_LIMIT)) {
+        return jsonResponse_({
+          status: 'rate_limited',
+          message: 'Too many administrator authentication attempts',
+          retryAfterSeconds: AUTH_RATE_WINDOW_SECS
+        });
+      }
       var adminTokenCheck = getAdminToken();
       if (!adminTokenCheck || data.adminToken !== adminTokenCheck) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "unauthorized" }))
-          .setMimeType(ContentService.MimeType.JSON);
+        return jsonResponse_({ status: 'error', message: 'unauthorized' });
       }
       var adminSession = Utilities.getUuid();
       CacheService.getScriptCache().put('admin_sess_' + adminSession, '1', 21600);
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", session: adminSession }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return jsonResponse_({ status: 'success', session: adminSession });
+    }
+
+    if (data.action === 'ADMIN_GET_DATA') {
+      if (!isAdminSessionValid_(data.session)) {
+        return jsonResponse_({ status: 'error', message: 'admin login required' });
+      }
+      return jsonResponse_(getAdminData_());
     }
 
     if (data.action === 'RESET_ALL') {
-      var adminToken = getAdminToken();
-      if (!adminToken || data.adminToken !== adminToken) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "unauthorized" }))
-          .setMimeType(ContentService.MimeType.JSON);
+      if (!isAdminSessionValid_(data.session)) {
+        return jsonResponse_({ status: 'error', message: 'admin login required' });
       }
 
       lockAcquired = lock.tryLock(20000);
@@ -547,6 +590,9 @@ function doPost(e) {
       var canonicalTid = (keyByTid && keyByTid === expectedKey) ? loginTid : '';
       var canonicalName = (keyByName && keyByName === expectedKey) ? loginName : '';
       var loginToken = createLoginSession(canonicalTid, canonicalName);
+      if (!loginToken) {
+        return jsonResponse_({ status: 'error', message: 'login sessions are not configured' });
+      }
       return jsonResponse_({
         status: 'success',
         tid: canonicalTid,
@@ -1137,83 +1183,78 @@ function ensureSheetsExist(ss) {
   });
 }
 
-function doGet(e) {
-  try {
-    var playerToken = getPlayerToken();
-    if (!playerToken || !e.parameter.token || e.parameter.token !== playerToken) {
-      return ContentService.createTextOutput(JSON.stringify({ error: true, message: "unauthorized" }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
+function isAdminSessionValid_(session) {
+  if (!session) return false;
+  return Boolean(CacheService.getScriptCache().get('admin_sess_' + session));
+}
 
-    if (e.parameter.action === 'GET_EPOCH') {
-      var props = PropertiesService.getScriptProperties();
-      var epoch = parseInt(props.getProperty('gameEpoch') || '0', 10);
-      return ContentService.createTextOutput(JSON.stringify({ epoch: epoch }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
+function getAdminData_() {
+  var ss = getSpreadsheet_();
+  ensureSheetsExist(ss);
+  var list = [];
 
-    var adminSession = e.parameter.session;
-    if (!adminSession || !CacheService.getScriptCache().get('admin_sess_' + adminSession)) {
-      return ContentService.createTextOutput(JSON.stringify({ error: true, message: "admin login required" }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
+  var regSheet = ss.getSheetByName('Registration');
+  var regData = regSheet ? regSheet.getDataRange().getValues() : [];
+  for (var i = 1; i < regData.length; i++) {
+    list.push({
+      isSummary: true,
+      action: 'REGISTRATION',
+      registered: true,
+      registeredAt: regData[i][0],
+      tid: regData[i][1],
+      teamName: regData[i][2],
+      mission: regData[i][3],
+      language: regData[i][4],
+      level: regData[i][5],
+      sessionId: regData[i][6]
+    });
+  }
 
-    var ss = getSpreadsheet_();
-    ensureSheetsExist(ss);
-
-    var list = [];
-
-    // Read Registration
-    var regSheet = ss.getSheetByName("Registration");
-    var regData = regSheet ? regSheet.getDataRange().getValues() : [];
-    for (var i = 1; i < regData.length; i++) {
+  ['L1', 'L2', 'L3'].forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    var rows = sheet ? sheet.getDataRange().getValues() : [];
+    for (var j = 1; j < rows.length; j++) {
+      var pid = parseInt(rows[j][3] || 0, 10);
+      if (!pid) continue;
       list.push({
         isSummary: true,
-        action: 'REGISTRATION',
-        registered: true,
-        registeredAt: regData[i][0],
-        tid: regData[i][1],
-        teamName: regData[i][2],
-        mission: regData[i][3],
-        language: regData[i][4],
-        level: regData[i][5],
-        sessionId: regData[i][6]
+        action: 'SUMMARY',
+        tid: rows[j][0],
+        teamName: rows[j][1],
+        mission: rows[j][2],
+        level: sheetName,
+        puzzleId: pid,
+        wrongAttempts: parseInt(rows[j][4] || 0, 10),
+        timestamp: rows[j][5],
+        hintUsed: isHintFlag(rows[j][6]),
+        tabSwitches: parseInt(rows[j][7] || 0, 10),
+        points: parseFloat(rows[j][8] || 0),
+        status: rows[j][9],
+        totalScore: parseFloat(rows[j][10] || 0),
+        unlockedPuzzles: rows[j][11],
+        solvedPuzzles: rows[j][12]
       });
     }
+  });
+  return list;
+}
 
-    // Read L1/L2/L3
-    ['L1', 'L2', 'L3'].forEach(function(sheetName) {
-      var sheet = ss.getSheetByName(sheetName);
-      var rows = sheet ? sheet.getDataRange().getValues() : [];
-      for (var j = 1; j < rows.length; j++) {
-        var pid = parseInt(rows[j][3] || 0, 10);
-        if (!pid) continue;
-        list.push({
-          isSummary: true,
-          action: 'SUMMARY',
-          tid: rows[j][0],
-          teamName: rows[j][1],
-          mission: rows[j][2],
-          level: sheetName,
-          puzzleId: pid,
-          wrongAttempts: parseInt(rows[j][4] || 0, 10),
-          timestamp: rows[j][5],
-          hintUsed: isHintFlag(rows[j][6]),
-          tabSwitches: parseInt(rows[j][7] || 0, 10),
-          points: parseFloat(rows[j][8] || 0),
-          status: rows[j][9],
-          totalScore: parseFloat(rows[j][10] || 0),
-          unlockedPuzzles: rows[j][11],
-          solvedPuzzles: rows[j][12]
-        });
-      }
-    });
+function doGet(e) {
+  try {
+    var params = (e && e.parameter) || {};
+    var playerToken = getPlayerToken();
+    if (!playerToken || !params.token || params.token !== playerToken) {
+      return jsonResponse_({ error: true, message: 'unauthorized' });
+    }
 
-    return ContentService.createTextOutput(JSON.stringify(list))
-      .setMimeType(ContentService.MimeType.JSON);
+    if (params.action === 'GET_EPOCH') {
+      var props = PropertiesService.getScriptProperties();
+      var epoch = parseInt(props.getProperty('gameEpoch') || '0', 10);
+      return jsonResponse_({ epoch: epoch });
+    }
 
+    return jsonResponse_({ error: true, message: 'use POST for administrator data' });
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ error: true, message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse_({ error: true, message: err.toString() });
   }
 }

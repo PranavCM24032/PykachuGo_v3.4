@@ -690,7 +690,7 @@ The backend creates these tabs automatically on first use.
 - Events are routed by puzzle **level** to `L1`/`L2`/`L3` (fallback: team's
   registered mission level).
 - `Registration` events only touch the Registration tab; the security key column is
-  stored but **never** returned by the admin `doGet` endpoint.
+  stored but **never** returned by the admin data endpoint.
 - **`SOLVED`** ships the full per-puzzle notebook in one call, finalizes the
   puzzle's row and writes **`Unlocked Puzzle IDs`** + **`Solved Puzzle IDs`** +
   the running **`Total Score`**. Abandoned puzzles go through
@@ -711,9 +711,13 @@ The backend creates these tabs automatically on first use.
   are persisted per team until the server confirms them, including when a team
   solves before login finishes or while offline. Unload beacons retain their
   notebook locally until a later server confirmation.
-- Token auth: every request carries `{ token: GOOGLE_SCRIPT_TOKEN }`.
-- Script properties include `PLAYER_TOKEN`, `ADMIN_TOKEN`, and
-  `SPREADSHEET_ID`; the Apps Script opens the configured spreadsheet by ID.
+- Every request carries `{ token: GOOGLE_SCRIPT_TOKEN }`; this value is public
+  client configuration, not an authorization secret. Admin access additionally
+  requires the private `ADMIN_TOKEN`, and team sessions are signed with the
+  separate private `LOGIN_SESSION_SECRET`.
+- Script properties include `PLAYER_TOKEN`, `ADMIN_TOKEN`,
+  `LOGIN_SESSION_SECRET`, and `SPREADSHEET_ID`; the Apps Script opens the
+  configured spreadsheet by ID.
 
 ### API surface
 
@@ -723,9 +727,10 @@ The backend creates these tabs automatically on first use.
 | `POST` | game-step actions | `QR_SCANNED`, `QR_BLOCKED`, `PUZZLE_UNLOCKED`, `UNLOCK_FAILED`, `SOLVED`, `WRONG_ATTEMPT`, `HINT_REQUESTED`, `HINT_USED`, `PENALTY`, `MALPRACTICE_DETECTED`, `PUZZLE_ABANDONED`… |
 | `POST` | `SESSION_BATCH` | Flush multiple buffered events in one call |
 | `POST` | `GET_TEAM_STATE` | Aggregated current puzzle id + solved/unlocked queues + score for a team |
-| `POST` | `RESET_ALL` | Wipe all sheets + bump the game **epoch** |
-| `GET?token=…` | — | Aggregated JSON for the Admin dashboard (registrations + per-level summaries) |
-| `GET` | `GET_EPOCH` | Return current game epoch (clients wipe stale local progress on change) |
+| `POST` | `ADMIN_AUTH` | Validate the private admin token and issue an admin session |
+| `POST` | `ADMIN_GET_DATA` | Return registrations and per-level summaries for a valid admin session |
+| `POST` | `RESET_ALL` | Wipe all sheets + bump the game **epoch** for a valid admin session |
+| `GET?token=…&action=GET_EPOCH` | — | Return current game epoch (clients wipe stale local progress on change) |
 
 Game-step actions are whitelisted in `GAME_STEP_ACTIONS`; telemetry like
 `SESSION_START`, `CONNECTION_TEST`, `PROMISE_REJECTION` is intentionally ignored,
@@ -823,15 +828,15 @@ flowchart TD
         WROW --> TAILDONE["1 spreadsheet · 4 tabs"]
     end
 
-    subgraph RD["E · ADMIN DASHBOARD (GET /exec viewer)"]
-        ADM["admin.html dashboard"] --> GDO["doGet(e)  GET?token=…"]
-        GDO --> GTOK{"token valid?"}
-        GTOK -- "No" --> GTFAIL["{error, message: unauthorized}"]
-        GTOK -- "Yes" --> GEP{"action ===<br/>GET_EPOCH?"}
-        GEP -- "Yes" --> GEPOK["{epoch}"]
-        GEP -- "No" --> GAGG["Aggregate:<br/>Registration rows +<br/>L1 / L2 / L3 rows"]
+    subgraph RD["E · ADMIN DASHBOARD (POST viewer)"]
+        ADM["admin.html dashboard"] --> AP["doPost: ADMIN_AUTH / ADMIN_GET_DATA"]
+        AP --> ADMIN{"private admin token<br/>or server session valid?"}
+        ADMIN -- "No" --> AFAIL["{status: error}"]
+        ADMIN -- "Yes" --> GAGG["Aggregate:<br/>Registration rows +<br/>L1 / L2 / L3 rows"]
         GAGG --> GJ["JSON list (isSummary objects)<br/>with level, status, wrongAttempts,<br/>tabSwitches, hintUsed, pointsEarned/Lost"]
         GJ --> REN["Render tabs:<br/>REGISTRATION · L1 · L2 · L3<br/>· LEADERBOARD · ROSTER LOG"]
+        EPOCH["game client"] --> EGET["doGet: GET_EPOCH<br/>(no admin session in URL)"]
+        EGET --> GEPOK["{epoch}"]
     end
 ```
 
@@ -990,25 +995,26 @@ GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit
 ```
 
 In the Apps Script project's **Script properties**, set `PLAYER_TOKEN` to the
-same value as `GOOGLE_SCRIPT_TOKEN`, set a separate `ADMIN_TOKEN`, and set
-`SPREADSHEET_ID` to the target workbook ID. The admin token is prompted for only
-during a full reset and must not be placed in `.env`, GitHub Actions secrets, or
-`runtime-config.js`.
+same value as `GOOGLE_SCRIPT_TOKEN`, set `ADMIN_TOKEN` to a unique random value
+of at least 32 characters, set `LOGIN_SESSION_SECRET` to a different random
+value of at least 32 characters, set `SPREADSHEET_ID` to the target workbook
+ID, and set `DATA_BASE_URL` to the public site root that serves the `data/`
+directory. `GOOGLE_SCRIPT_TOKEN` is included in the public browser bundle and
+is not a secret; it must never be reused as either private property.
+`ADMIN_TOKEN` is entered on the admin page and must not be placed in `.env`,
+GitHub configuration, or `runtime-config.js`. `LOGIN_SESSION_SECRET` is used
+only by Apps Script to sign team sessions and must remain private.
 
 `npm run serve` generates the ignored `js/runtime-config.js` from `.env` (via
 `js/generate-runtime-config.cjs`) and loads it before both the player and
 admin app. The generated file is still delivered to browsers, so it is
 configuration hygiene — not a security boundary.
 
-For GitHub Pages, create these repository or `github-pages` environment
-secrets. The deployment workflow generates `js/runtime-config.js` before it
-uploads the site:
-
-```text
-GOOGLE_SCRIPT_URL
-GOOGLE_SCRIPT_TOKEN
-GOOGLE_SHEET_URL
-```
+For GitHub Pages, configure `GOOGLE_SCRIPT_URL` and `GOOGLE_SHEET_URL` as
+GitHub Actions variables, and `GOOGLE_SCRIPT_TOKEN` as a GitHub Actions secret
+(at repository or `github-pages` environment scope). The workflow generates
+`js/runtime-config.js` from these values before uploading the site. Deployment
+fails if the backend URL or token is missing.
 
 ---
 
@@ -1027,11 +1033,15 @@ Open the local URL printed by `serve`. Camera access generally requires either
 
 ## 🚀 Deployment
 
-Set the Apps Script Script Properties (`PLAYER_TOKEN`, `ADMIN_TOKEN`, and
-`SPREADSHEET_ID`) and deploy the latest Apps Script version before using either
-host. The Vercel build uses the same Apps Script and spreadsheet as the GitHub
-Pages workflow by default; local development reads the three `GOOGLE_*` values
-from `.env`.
+Set the Apps Script Script Properties (`PLAYER_TOKEN`, `ADMIN_TOKEN`,
+`LOGIN_SESSION_SECRET`, `SPREADSHEET_ID`, and `DATA_BASE_URL`) and deploy the
+latest Apps Script version before using either host. Admin tokens must be
+unique from the public player token and at least 32 characters; login-session
+signing secrets must also be private and at least 32 characters. Set
+`DATA_BASE_URL` to the public site root ending in `/`. Set the frontend's
+`GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and optionally `GOOGLE_SHEET_URL`
+in local `.env` or the hosting provider's environment configuration; no
+deployment URLs are embedded as runtime defaults.
 
 When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
 `service-worker.js` so cache-first clients receive the update. Bump
@@ -1039,7 +1049,8 @@ When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
 
 ### GitHub Pages
 
-1. Add the three `GOOGLE_*` values as GitHub Actions secrets (repository or
+1. Add `GOOGLE_SCRIPT_URL` and `GOOGLE_SHEET_URL` as GitHub Actions variables
+   and `GOOGLE_SCRIPT_TOKEN` as an Actions secret (repository or
    `github-pages` environment).
 2. Push to `main` or run the single Pages workflow manually
    (`.github/workflows/static.yml`).
@@ -1047,12 +1058,11 @@ When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
 ### Vercel
 
 1. Import the repository in Vercel and choose **Other** as the framework preset.
-2. Add `GOOGLE_SCRIPT_TOKEN` as a Production environment variable. It must
-   match the Apps Script `PLAYER_TOKEN` property. The backend URL and sheet URL
-   default to the same values used by the GitHub Pages workflow; set
-   `GOOGLE_SCRIPT_URL` or `GOOGLE_SHEET_URL` in Vercel only if using a different
-   backend or workbook.
-3. Redeploy after adding the variable. `vercel.json` runs
+2. Add `GOOGLE_SCRIPT_URL` and `GOOGLE_SCRIPT_TOKEN` as Production environment
+   variables. The token must match the Apps Script `PLAYER_TOKEN` property.
+   Optionally set `GOOGLE_SHEET_URL` to show the spreadsheet link in the admin
+   dashboard.
+3. Redeploy after adding the variables. `vercel.json` runs
    `npm run build && npm run config:runtime`, serves
    the repository root, adds the `/admin` redirect, and disables caching for
    `service-worker.js`, `runtime-config.js`, pages, and game data.
