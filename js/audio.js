@@ -413,9 +413,10 @@ const CELEBRATION_TOTAL_SECONDS = 15;
 // frame the reveal + confetti were doing their heaviest work.
 const CELEBRATION_LEAD = 0.08;
 // Gentle onset so the track swells in instead of slamming in on the reveal
-// frame. The track itself is still played in full afterwards — this only ramps
-// the very start up to level.
-const CELEBRATION_FADE_IN = 1.0;
+// frame — but short: the confetti choreography fires its first 150-particle
+// blast at t=0, so a longer ramp muted the track's opening beat under that
+// first burst and the start read as out of sync.
+const CELEBRATION_FADE_IN = 0.25;
 // Noise buffers are cached per AudioContext, not globally: the cue is also
 // rendered once through an OfflineAudioContext during idle, and an AudioBuffer
 // is only safe to reuse in the context that created it.
@@ -492,11 +493,14 @@ function prewarmCelebrationAudio() {
         getCelebrationNoiseBuffer(audioContext, 2, 'crowd');
         getCelebrationNoiseBuffer(audioContext, 3, 'cymbal');
         getCelebrationNoiseBuffer(audioContext, 2, 'cymbal');
-        // Avoid downloading the optional celebration track for data-saver or
-        // slow connections; the synthesized cue remains available offline.
-        if (typeof isLowBandwidthConnection !== 'function' || !isLowBandwidthConnection()) {
-            loadCelebrationAudio();
-        }
+        // The celebration track IS the cue: always fetch and decode
+        // assets/sound.mp3 during idle so the reveal plays the real track —
+        // never the synth stand-in. It is a single 933 KB file fetched once
+        // off the startup path and cached by the service worker, so even
+        // data-saver connections pay for it while idle and repeat visits get
+        // it offline. The synthesized cue remains only for when the fetch
+        // genuinely fails (first visit, fully offline).
+        loadCelebrationAudio();
         renderCelebrationBuffer();
     } catch (e) {
         // A failed prewarm must never break boot; the cold path still works.
@@ -789,7 +793,7 @@ let celebrationAudioPromise = null;
 
 function loadCelebrationAudio() {
     if (celebrationAudioPromise) return celebrationAudioPromise;
-    if (!audioContext) { celebrationAudioPromise = Promise.resolve(null); return celebrationAudioPromise; }
+    if (!audioContext) return Promise.resolve(null);
     celebrationAudioPromise = fetch(CELEBRATION_AUDIO_URL)
         .then((res) => {
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -799,9 +803,32 @@ function loadCelebrationAudio() {
         .then((buf) => { celebrationAudioBuffer = buf; return buf; })
         .catch((err) => {
             console.warn('Celebration track failed to load; using synth cue:', err);
+            // Let the next call retry (e.g. after a dropped connection while
+            // prewarming) instead of caching the failure forever.
+            celebrationAudioPromise = null;
             return null;
         });
     return celebrationAudioPromise;
+}
+
+// Resolve when the celebration track is decoded and ready, or null once it
+// has definitively failed (or `waitMs` elapsed). runCelebration awaits this so
+// the REAL assets/sound.mp3 plays whenever it can be had — including when the
+// reveal beat arrives while the idle fetch is still mid-download — instead of
+// silently dropping to the synthesized cue. Normally the idle prewarm has
+// already finished and this resolves on the next microtask (zero delay).
+function ensureCelebrationTrack(waitMs) {
+    if (celebrationAudioBuffer) return Promise.resolve(celebrationAudioBuffer);
+    if (!celebrationAudioPromise) loadCelebrationAudio();
+    const load = celebrationAudioPromise || Promise.resolve(null);
+    if (!waitMs) return load;
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(null), waitMs);
+        load.then(
+            (buf) => { clearTimeout(timer); resolve(buf); },
+            () => { clearTimeout(timer); resolve(null); }
+        );
+    });
 }
 
 // The synth cue, baked once through an OfflineAudioContext while the game is

@@ -61,6 +61,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Keep optional celebration downloads off the startup path.
     const warmCelebration = () => {
         if (typeof prewarmCelebrationAudio === 'function') prewarmCelebrationAudio();
+        // Warm the confetti library too. It is REQUIRED at reveal time (the
+        // celebration is nothing without it), and fetching it there meant the
+        // ball could open and sit silent for a beat while the CDN download
+        // finished — which read as the celebration starting late and out of
+        // sync with the reveal. Same bytes either way; this only moves the
+        // fetch off the reveal's critical path.
+        if (typeof preloadConfetti === 'function') preloadConfetti().catch(() => { });
     };
     if (typeof requestIdleCallback === 'function') {
         requestIdleCallback(warmCelebration, { timeout: 3000 });
@@ -567,9 +574,8 @@ function triggerFinalCelebration() {
     const screen = document.getElementById('screen');
     if (!canvas || !screen) return;
 
-    preloadConfetti().then(() => {
-        runCelebration(canvas, screen);
-    }).catch(err => console.warn('Confetti load failed:', err));
+    preloadConfetti().then(() => runCelebration(canvas, screen))
+        .catch(err => console.warn('Confetti load failed:', err));
 }
 
 // Single reusable gold wash layer, created once and kept in the DOM at
@@ -592,9 +598,22 @@ function getCelebrationWash(screen) {
 const CELEBRATION_BLASTS = [0, 3.45, 3.94, 4.44, 4.93, 5.43, 5.93, 6.42, 7.41, 7.91, 8.41, 9.40, 10.39, 10.89, 11.38, 11.88, 12.62, 13.37, 14.01, 14.85, 15.75];
 const CELEBRATION_SPARKS = [0.97, 1.97, 16.21, 17.42];
 const CELEBRATION_BLAST_X = [0.5, 0.2, 0.8];
+// Upper bound on how long the choreography will wait for assets/sound.mp3 to
+// finish if the reveal arrives mid-download. The track is prewarmed during
+// idle, so this is only paid on a cold/slow first visit — never on a normal
+// run. Waiting (instead of playing the synth cue) is what guarantees the mp3
+// is the celebration, not a stand-in.
+const CELEBRATION_TRACK_WAIT_MS = 2500;
 
-function runCelebration(canvas, screen) {
+async function runCelebration(canvas, screen) {
     if (typeof confetti === 'undefined') return;
+
+    // The celebration must be the real track. Give a mid-flight download a
+    // short, bounded chance to finish; audio and confetti still start on the
+    // same clock, so they stay one performance either way.
+    if (typeof ensureCelebrationTrack === 'function') {
+        try { await ensureCelebrationTrack(CELEBRATION_TRACK_WAIT_MS); } catch (e) { }
+    }
 
     // Fire the cue on the audio clock FIRST, before the confetti library spins
     // up its worker and we touch the canvas. The decoded track (or synth

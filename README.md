@@ -278,9 +278,9 @@ The final puzzle's celebration is driven by `playFinalCelebration()` in
 `js/audio.js`. Its primary cue is the track **`assets/sound.mp3`**, fetched and
 decoded during idle (`decodeAudioData`) and then played **in full** — no clip,
 no fade-out, no length cap — as a single `BufferSource` started on the audio
-hardware clock with a short look-ahead (a 1s fade-in eases the onset in). It is
-fired from `runCelebration()` and nothing speaks: no SpeechSynthesis, so it can
-never read as voiceover.
+hardware clock with a short look-ahead (a 0.25s fade-in eases the onset in). It
+is fired from `runCelebration()` and nothing speaks: no SpeechSynthesis, so it
+can never read as voiceover.
 
 The confetti is **choreographed to the track**, not the other way round. The
 beat grid in `runCelebration()` (`CELEBRATION_BLASTS` / `CELEBRATION_SPARKS` in
@@ -291,9 +291,18 @@ and the bursts read `getAudioContextTime()`, so sound and confetti share one
 clock and behave as a single performance. **If you swap `sound.mp3`, re-derive
 the two arrays** or the blasts will no longer land on the beat.
 
-The fully-synthesised cue below is kept only as an **offline fallback** for when
-the file is unavailable. It is a 15-second instrumental generated at runtime
-(zero audio files), fired on the same frame as the confetti:
+The mp3 is prewarmed during idle on **every** connection — the data-saver gate
+was removed, because the celebration must be the real track rather than a
+stand-in. `runCelebration()` awaits `ensureCelebrationTrack(2500)` before
+starting anything, so if the reveal arrives while the idle fetch is still
+mid-download the choreography waits up to 2.5 s for the file (no delay at all on
+a normal run, where the prewarm has already finished). `loadCelebrationAudio()`
+clears its cached promise on failure so a later call can retry.
+
+The fully-synthesised cue below is kept only as a genuine last-resort fallback
+for when the fetch actually fails (first visit on a fully offline device). It is
+a 15-second instrumental generated at runtime (zero audio files), fired on the
+same frame as the confetti:
 
 | Time | Layer |
 |------|-------|
@@ -939,7 +948,9 @@ and renders aggregated JSON.
   browser reports data saver, 2G, or a downlink below 1 Mbps. The Material
   Symbols icon font is self-hosted and precached, so in-game icons render
   immediately and still work offline. Text fonts are deferred until after
-  initial page load; YouTube and celebration audio load only when needed.
+  initial page load; YouTube media loads only when needed. The celebration
+  track (`assets/sound.mp3`) is always prewarmed during idle so the end-of-chain
+  cue is the real mp3, not the synthesized fallback.
 - Camera scanning loads the locally hosted QR decoder on demand and retains it
   across app updates without adding it to the initial download. After its first
   successful load, QR decoding is available offline; on a first-ever offline
