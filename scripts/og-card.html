@@ -97,51 +97,17 @@
             display: block;
         }
 
-        /* The two source photos frame their subjects differently (CSI has a
-           wide white margin, Auron nearly fills the frame). Normalise both so
-           the faces read at the same scale inside their rings. */
-        .mark--csi img {
-            transform: scale(1.08);
-        }
-
-        .mark--auron img {
-            transform: scale(0.92);
-        }
-
-        /* Drawn cross instead of a "×" glyph: the pixel font has no multiplication
-           sign, so the fallback glyph never sits dead-centre between the rings. */
         .cross {
-            position: relative;
-            width: 18px;
-            height: 18px;
+            font-family: var(--pixel);
+            font-size: 18px;
+            line-height: 1;
+            color: var(--gold);
+            text-shadow: 0 0 12px rgba(255, 214, 51, 0.45);
             flex: none;
         }
 
-        .cross::before,
-        .cross::after {
-            content: '';
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            background: var(--gold);
-            border-radius: 1px;
-            box-shadow: 0 0 10px rgba(255, 214, 51, 0.6);
-        }
-
-        .cross::before {
-            width: 14px;
-            height: 2px;
-            transform: translate(-50%, -50%);
-        }
-
-        .cross::after {
-            width: 2px;
-            height: 14px;
-            transform: translate(-50%, -50%);
-        }
-
         .presents {
-            margin: 16px 0 0 0;
+            margin: 16px 0 0 2px;
             font-family: var(--pixel);
             font-size: 12px;
             letter-spacing: 0.5px;
@@ -152,7 +118,7 @@
             display: block;
             width: 430px;
             height: auto;
-            margin: 18px 0 0 0;
+            margin: 18px 0 0 -4px;
             filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.55));
         }
 
@@ -327,7 +293,7 @@
         <div class="column">
             <div class="partner-row">
                 <span class="mark"><img src="../assets/img/csi.jpg" alt="CSI"></span>
-                <span class="cross" aria-hidden="true"></span>
+                <span class="cross" aria-hidden="true">&times;</span>
                 <span class="mark"><img src="../assets/img/auron.png" alt="Auron"></span>
             </div>
 
