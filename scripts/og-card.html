@@ -97,17 +97,51 @@
             display: block;
         }
 
+        /* The two source photos frame their subjects differently (CSI has a
+           wide white margin, Auron nearly fills the frame). Normalise both so
+           the faces read at the same scale inside their rings. */
+        .mark--csi img {
+            transform: scale(1.08);
+        }
+
+        .mark--auron img {
+            transform: scale(0.92);
+        }
+
+        /* Drawn cross instead of a "×" glyph: the pixel font has no multiplication
+           sign, so the fallback glyph never sits dead-centre between the rings. */
         .cross {
-            font-family: var(--pixel);
-            font-size: 18px;
-            line-height: 1;
-            color: var(--gold);
-            text-shadow: 0 0 12px rgba(255, 214, 51, 0.45);
+            position: relative;
+            width: 18px;
+            height: 18px;
             flex: none;
         }
 
+        .cross::before,
+        .cross::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            background: var(--gold);
+            border-radius: 1px;
+            box-shadow: 0 0 10px rgba(255, 214, 51, 0.6);
+        }
+
+        .cross::before {
+            width: 14px;
+            height: 2px;
+            transform: translate(-50%, -50%);
+        }
+
+        .cross::after {
+            width: 2px;
+            height: 14px;
+            transform: translate(-50%, -50%);
+        }
+
         .presents {
-            margin: 16px 0 0 2px;
+            margin: 16px 0 0 0;
             font-family: var(--pixel);
             font-size: 12px;
             letter-spacing: 0.5px;
@@ -118,7 +152,7 @@
             display: block;
             width: 430px;
             height: auto;
-            margin: 18px 0 0 -4px;
+            margin: 18px 0 0 0;
             filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.55));
         }
 
@@ -179,26 +213,67 @@
             place-items: center;
         }
 
-        .halo {
+        /* Wide bloom bleeding past the frame edges. */
+        .art::before {
+            content: '';
             position: absolute;
-            width: 440px;
-            height: 440px;
+            width: 580px;
+            height: 580px;
             border-radius: 50%;
             background: radial-gradient(circle,
-                    rgba(255, 214, 51, 0.17),
-                    rgba(255, 214, 51, 0.06) 46%,
-                    transparent 70%);
+                    rgba(255, 214, 51, 0.26),
+                    rgba(255, 214, 51, 0.09) 42%,
+                    transparent 68%);
+            filter: blur(12px);
+        }
+
+        .halo {
+            position: absolute;
+            width: 480px;
+            height: 480px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 45%,
+                    rgba(255, 238, 160, 0.46),
+                    rgba(255, 214, 51, 0.20) 34%,
+                    rgba(255, 214, 51, 0.07) 55%,
+                    transparent 72%);
+            filter: blur(4px);
+        }
+
+        /* Hot core right behind the silhouette. */
+        .halo::after {
+            content: '';
+            position: absolute;
+            inset: 21%;
+            border-radius: 50%;
+            background: radial-gradient(circle,
+                    rgba(255, 244, 190, 0.55),
+                    rgba(255, 214, 51, 0.14) 58%,
+                    transparent 76%);
+            filter: blur(24px);
+        }
+
+        /* Thin shine ring so the glow has an edge instead of a mush. */
+        .ring {
+            position: absolute;
+            width: 404px;
+            height: 404px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 214, 51, 0.30);
+            box-shadow:
+                0 0 28px rgba(255, 214, 51, 0.20),
+                inset 0 0 30px rgba(255, 214, 51, 0.10);
         }
 
         /* brightness(0) flattens the artwork into a single shadow tone;
            the drop-shadows trace only its outline, giving a gold rim light
-           (a tight 2px edge so the silhouette still reads in a thumbnail). */
+           (a tight 3px edge so the silhouette still reads in a thumbnail). */
         .art img {
             position: relative;
             width: 400px;
             height: auto;
             filter:
-                brightness(0) saturate(0) drop-shadow(0 0 2px rgba(255, 214, 51, 0.85)) drop-shadow(0 0 20px rgba(255, 214, 51, 0.45)) drop-shadow(0 0 58px rgba(255, 214, 51, 0.18));
+                brightness(0) saturate(0) drop-shadow(0 0 3px rgba(255, 214, 51, 0.95)) drop-shadow(0 0 26px rgba(255, 214, 51, 0.62)) drop-shadow(0 0 72px rgba(255, 214, 51, 0.30));
         }
 
         .signal {
@@ -214,6 +289,36 @@
         .signal span {
             color: var(--gold);
         }
+
+        /* A few glints to sell the shine without adding noise. */
+        .spark {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #fff3b8;
+            box-shadow: 0 0 12px 2px rgba(255, 214, 51, 0.85);
+        }
+
+        .spark--a {
+            top: 52px;
+            left: 92px;
+        }
+
+        .spark--b {
+            bottom: 88px;
+            right: 66px;
+            width: 3px;
+            height: 3px;
+        }
+
+        .spark--c {
+            top: 96px;
+            right: 148px;
+            width: 2px;
+            height: 2px;
+            opacity: 0.8;
+        }
     </style>
 </head>
 
@@ -222,7 +327,7 @@
         <div class="column">
             <div class="partner-row">
                 <span class="mark"><img src="../assets/img/csi.jpg" alt="CSI"></span>
-                <span class="cross" aria-hidden="true">&times;</span>
+                <span class="cross" aria-hidden="true"></span>
                 <span class="mark"><img src="../assets/img/auron.png" alt="Auron"></span>
             </div>
 
@@ -241,7 +346,11 @@
 
         <div class="art">
             <div class="halo"></div>
+            <div class="ring"></div>
             <img src="../assets/img/pikachu.png" alt="Pikachu silhouette">
+            <i class="spark spark--a" aria-hidden="true"></i>
+            <i class="spark spark--b" aria-hidden="true"></i>
+            <i class="spark spark--c" aria-hidden="true"></i>
             <div class="signal">SIGNAL <span>#025</span></div>
         </div>
     </div>
