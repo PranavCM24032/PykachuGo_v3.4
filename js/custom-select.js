@@ -201,7 +201,7 @@
         });
 
         Object.defineProperty(wrap, 'refresh', { value: refresh, writable: true });
-        enhanced.set(select, { wrap, refresh });
+        enhanced.set(select, { wrap, refresh, menu });
 
         refresh();
     }
@@ -254,11 +254,10 @@
         const container = sel.parentElement;
         const oldWrap = container.querySelector('.custom-select');
         if (oldWrap) oldWrap.remove();
-        // Remove the stale floating menu (appended to <body>)
-        document.querySelectorAll('.custom-select-menu').forEach(m => {
-            // Only remove orphaned menus (the wrap that owned them is gone)
-            if (!document.body.contains(m.previousElementSibling)) m.remove();
-        });
+        // Remove this select's stale floating menu (tracked in the enhanced
+        // map at build time; it lives in <body>, far from the wrapper).
+        const entry = enhanced.get(sel);
+        if (entry && entry.menu) entry.menu.remove();
         // Detach the built flag so build() runs fresh
         delete sel.dataset.customSelectBuilt;
         const oldIcon = container.querySelector('.material-symbols-rounded');
@@ -280,7 +279,9 @@ window.refreshSelectDisplay = function (el, attempts) {
     };
 
     function init() {
-        ['codeLanguage', 'missionLevel', 'typeFilter'].forEach(enhanceSelect);
+        // typeFilter + levelFilter only exist on admin.html; enhanceSelect
+        // safely skips ids that are missing on the current page.
+        ['codeLanguage', 'missionLevel', 'typeFilter', 'levelFilter'].forEach(enhanceSelect);
     }
 
     if (document.readyState === 'loading') {
