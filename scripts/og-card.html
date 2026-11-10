@@ -15,7 +15,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;500;600&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@600;700&display=swap">
 
     <style>
         :root {
@@ -32,6 +32,11 @@
             --pixel: 'Press Start 2P',
                 'Courier New',
                 monospace;
+
+            --sans: 'Outfit',
+                'Segoe UI',
+                Arial,
+                sans-serif;
         }
 
         * {
@@ -352,11 +357,10 @@
         }
 
         /* =========================================================
-           YELLOW QUESTION MARK
+           QUESTION MARK
            
-           Positioned directly over the Pikachu body.
-           Adjust top / left if the source PNG has different
-           transparent padding.
+           A normal (non-pixel) bold sans glyph with a blue glow,
+           positioned over the Pikachu body.
         ========================================================= */
 
         .question-mark {
@@ -367,32 +371,61 @@
               artwork has transparent padding, one ear sits top-right and the
               tail pulls mass to the bottom-right. Measured on pikachu.png, the
               thick lower-left body lobe sits around 33% / 67% of the image.
-              The +5.5px offsets cancel the Press Start 2P "?" ink bearing at
-              80px, so the glyph ink - not its em box - lands on that point.
+              The sub-pixel offsets correct the Outfit "?" ink bearing so the
+              glyph ink - not its box - lands on that point.
             */
             left: 33%;
             top: 67%;
 
-            transform: translate(calc(-50% + 5.5px), calc(-50% + 5.5px));
+            transform: translate(calc(-50% + 0.5px), calc(-50% + 1px));
 
             z-index: 5;
 
-            font-family: var(--pixel);
+            font-family: var(--sans);
 
-            font-size: 80px;
+            font-size: 104px;
+
+            font-weight: 700;
 
             line-height: 1;
 
-            color: var(--gold);
+            color: #5fd0ff;
 
             text-shadow:
-                0 0 4px rgba(255, 214, 51, 0.95),
-                0 0 14px rgba(255, 214, 51, 0.85),
-                0 0 30px rgba(255, 214, 51, 0.55);
+                0 0 6px rgba(120, 214, 255, 0.95),
+                0 0 18px rgba(70, 170, 255, 0.85),
+                0 0 44px rgba(40, 130, 255, 0.60);
 
             pointer-events: none;
 
             user-select: none;
+        }
+
+        /* Soft blue aura behind the glyph so the glow reads at thumbnail size,
+           where a plain text-shadow is too tight to be seen. */
+        .question-mark::before {
+            content: '';
+
+            position: absolute;
+            left: 50%;
+            top: 50%;
+
+            width: 200px;
+            height: 200px;
+
+            transform: translate(-50%, -50%);
+
+            border-radius: 50%;
+
+            background:
+                radial-gradient(circle,
+                    rgba(70, 175, 255, 0.38),
+                    rgba(40, 125, 255, 0.16) 44%,
+                    transparent 68%);
+
+            filter: blur(3px);
+
+            z-index: -1;
         }
 
         /* =========================================================
