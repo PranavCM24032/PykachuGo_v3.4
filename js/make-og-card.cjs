@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Renders scripts/og-card.html into assets/img/og-card.jpg (1200x630).
+ * Renders html/og-card.html into assets/img/og-card.jpg (1200x630).
  *
  * The card is what WhatsApp, iMessage, Telegram, Slack, Discord, LinkedIn,
  * Facebook and most email clients show when the site link is shared. A real
@@ -15,7 +15,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
-const SOURCE = path.join(ROOT, 'scripts', 'og-card.html');
+const SOURCE = path.join(ROOT, 'html', 'og-card.html');
 const OUTPUT = path.join(ROOT, 'assets', 'img', 'og-card.jpg');
 const WIDTH = 1200;
 const HEIGHT = 630;

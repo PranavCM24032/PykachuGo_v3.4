@@ -351,49 +351,6 @@
             width: 100%;
 
             height: auto;
-
-            filter:
-                brightness(0) saturate(0) drop-shadow(0 0 2px rgba(255, 214, 51, 0.90)) drop-shadow(0 0 20px rgba(255, 196, 40, 0.50)) drop-shadow(0 0 58px rgba(230, 160, 20, 0.22));
-        }
-
-        /* =========================================================
-           QUESTION MARK
-           
-           A normal (non-pixel) bold sans glyph, no glow, positioned
-           over the Pikachu body.
-        ========================================================= */
-
-        .question-mark {
-            position: absolute;
-
-            /*
-              The silhouette's visual body centre is not its box centre: the
-              artwork has transparent padding, one ear sits top-right and the
-              tail pulls mass to the bottom-right. Measured on pikachu.png, the
-              thick lower-left body lobe sits around 33% / 62% of the image.
-              The sub-pixel offsets correct the Outfit "?" ink bearing so the
-              glyph ink - not its box - lands on that point.
-            */
-            left: 33%;
-            top: 62%;
-
-            transform: translate(calc(-50% + 1.1px), calc(-50% + 0.1px));
-
-            z-index: 5;
-
-            font-family: var(--sans);
-
-            font-size: 132px;
-
-            font-weight: 700;
-
-            line-height: 1;
-
-            color: #ff4d4d;
-
-            pointer-events: none;
-
-            user-select: none;
         }
 
         /* =========================================================
@@ -502,11 +459,6 @@
             <div class="pika">
 
                 <img src="../assets/img/pikachu.png" alt="Pikachu silhouette">
-
-                <!-- QUESTION MARK -->
-                <div class="question-mark">
-                    ?
-                </div>
 
             </div>
 

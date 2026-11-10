@@ -976,7 +976,7 @@ during a full reset and must not be placed in `.env`, GitHub Actions secrets, or
 `runtime-config.js`.
 
 `npm run serve` generates the ignored `js/runtime-config.js` from `.env` (via
-`scripts/generate-runtime-config.cjs`) and loads it before both the player and
+`js/generate-runtime-config.cjs`) and loads it before both the player and
 admin app. The generated file is still delivered to browsers, so it is
 configuration hygiene — not a security boundary.
 
@@ -1053,10 +1053,10 @@ block near the top of `index.html` — canonical link, `og:url`, `og:image`,
 The card artwork is `assets/img/og-card.jpg` (1200×630, kept under 300 KB so
 WhatsApp does not shrink it to a thumbnail). It reuses the splash screen's
 visual language — dark CRT screen, gold accents and a shadow-only Pikachu —
-and is generated from `scripts/og-card.html`. Regenerate after branding changes:
+and is generated from `html/og-card.html`. Regenerate after branding changes:
 
 ```bash
-npm run og:card   # renders scripts/og-card.html via headless Chrome/Edge
+npm run og:card   # renders html/og-card.html via headless Chrome/Edge
 ```
 
 Crawlers cache previews for days/weeks: after deploying, re-scrape the URL with
