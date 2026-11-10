@@ -599,7 +599,7 @@ function getCelebrationWash(screen) {
 // music read as one performance instead of two. Times are seconds from the
 // start of the track; the sparks are the lighter beats between the big hits.
 const CELEBRATION_BLASTS = [0, 3.45, 3.94, 4.44, 4.93, 5.43, 5.93, 6.42, 7.41, 7.91, 8.41, 9.40, 10.39, 10.89, 11.38, 11.88, 12.62, 13.37, 14.01, 14.85, 15.75];
-const CELEBRATION_SPARKS = [0.97, 1.97, 16.21, 17.42];
+const CELEBRATION_SPARKS = [0.48, 0.97, 1.48, 1.97, 2.95, 4.68, 6.91, 8.90, 9.89, 11.63, 12.15, 13.86, 14.38, 16.21, 17.42];
 const CELEBRATION_BLAST_X = [0.5, 0.2, 0.8];
 
 async function runCelebration(canvas, screen) {
@@ -669,7 +669,7 @@ async function runCelebration(canvas, screen) {
     if (trackDur) displayEnd = Math.min(displayEnd, trackDur);
 
     const blastAt = (x) => myConfetti({
-        particleCount: 90,
+        particleCount: 140,
         startVelocity: 45,
         spread: 90,
         origin: { x: x, y: 0.7 },
@@ -677,7 +677,7 @@ async function runCelebration(canvas, screen) {
         gravity: 1.2
     });
     const starAt = (x, y) => myConfetti({
-        particleCount: 24,
+        particleCount: 40,
         spread: 100,
         origin: { x: x, y: y },
         shapes: ['star'],
@@ -705,8 +705,8 @@ async function runCelebration(canvas, screen) {
 
         if (elapsed < displayEnd) {
             if (elapsed >= nextFountainAt) {
-                myConfetti({ particleCount: 2, angle: 60, spread: 55, origin: { x: 0, y: 1 }, colors: colors });
-                myConfetti({ particleCount: 2, angle: 120, spread: 55, origin: { x: 1, y: 1 }, colors: colors });
+                myConfetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0, y: 1 }, colors: colors });
+                myConfetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1, y: 1 }, colors: colors });
                 nextFountainAt = elapsed + 0.1;
             }
             requestAnimationFrame(frame);

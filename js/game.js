@@ -58,6 +58,10 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     const nextTeamKey = resolvedTid || resolvedTeamName;
     const isDifferentTeam = !previousTeamKey || previousTeamKey !== nextTeamKey;
 
+    // Never let requests issued while the new team's login is pending inherit
+    // a token from the previously active team.
+    loginToken = '';
+
     // A browser can be shared by multiple teams. Do not carry the previous
     // team's active puzzle, screen, or session into a new team's login.
     if (isDifferentTeam) {
@@ -125,13 +129,20 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         });
 
         const versionAtLogin = progressVersion;
-        return fetchTeamState().then(serverState => {
+        return flushPendingAnswerEvents().catch(error => {
+            console.warn('[Sheets] Could not flush pending answers after login:', error);
+            return { pending: true };
+        }).then(pendingSync => fetchTeamState().then(serverState => {
             // A slow state response must not navigate a player who has already
             // scanned a puzzle, solved it, or started another login.
             if (thisLoginFlow !== loginFlowId || currentTeamTid !== canonicalTid || currentStep !== 2) {
                 return;
             }
-            if (serverState) applyServerTeamState(serverState, versionAtLogin);
+            // Do not replace local progress with a pre-solve snapshot if an
+            // answer is still queued for this team.
+            if (serverState && !pendingSync.pending) {
+                applyServerTeamState(serverState, versionAtLogin);
+            }
 
             document.getElementById('screen')?.classList.remove('premium-glow');
             // Universal link: skip QR scan and jump straight to that puzzle
@@ -149,7 +160,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
                 // Same team re-logging in: resume exactly where they left off
                 resumeToLastStep();
             }
-        });
+        }));
     }).catch(() => {
         document.getElementById('screen')?.classList.remove('premium-glow');
     });
@@ -499,16 +510,25 @@ async function submitPuzzleAnswer() {
 
     }, 0);
 
-    // Apply the local result now and drop the notebook; its summary is already
-    // in the telemetry payload.
+    // Queue the answer for durable server sync before dropping its notebook.
+    // This also persists it immediately when login is still in flight/offline.
+    const answerSync = submitAnswerToServer(puzzle.id, answer, summary);
+
+    // Apply the local result now; the answer payload is safely queued above.
     applyAuthoritativeSolve(optimisticResult);
-    if (typeof deletePuzzleNotebook === 'function') deletePuzzleNotebook(puzzle.id);
 
     // Reconcile against the server without blocking play. Ignore the reply if
-    // the player has already made newer local progress.
+    // the player has already made newer local progress or changed teams.
+    const solvedTeamKey = getTeamStorageKey();
     const versionAfterLocal = progressVersion;
-    submitAnswerToServer(puzzle.id, answer, summary).then(result => {
-        if (result && result.ok && result.correct && progressVersion === versionAfterLocal) {
+    answerSync.then(result => {
+        const stillSameTeam = getTeamStorageKey() === solvedTeamKey;
+        if (stillSameTeam && (result.ok || result.pending) &&
+            typeof deletePuzzleNotebook === 'function') {
+            deletePuzzleNotebook(puzzle.id);
+        }
+        if (result && result.ok && result.correct &&
+            stillSameTeam && progressVersion === versionAfterLocal) {
             applyAuthoritativeSolve(result);
         }
     }).catch(() => { });

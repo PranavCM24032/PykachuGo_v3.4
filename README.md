@@ -707,7 +707,9 @@ The backend creates these tabs automatically on first use.
 - A team is limited to 90 write requests per minute. Rate-limited events are
   explicitly rejected and retained in the client buffer; transient lock,
   network, and Apps Script quota failures are retried with backoff. Event IDs
-  make retries safe from duplicate score awards. Unload beacons retain their
+  make retries safe from duplicate score awards. Verified answer submissions
+  are persisted per team until the server confirms them, including when a team
+  solves before login finishes or while offline. Unload beacons retain their
   notebook locally until a later server confirmation.
 - Token auth: every request carries `{ token: GOOGLE_SCRIPT_TOKEN }`.
 - Script properties include `PLAYER_TOKEN`, `ADMIN_TOKEN`, and
