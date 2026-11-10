@@ -5,6 +5,7 @@
   "description": "Pykachu Go - a Pokedex-styled binary signal decryption hunt: teams solve Python and C++ riddles, scan QR signals and follow a branching puzzle graph.",
   "scripts": {
     "build": "tailwindcss -i css/tailwind-input.css -o css/tailwind.css --minify",
+    "og:card": "node scripts/make-og-card.cjs",
     "config:runtime": "node scripts/generate-runtime-config.cjs",
     "serve": "npm run config:runtime && npx serve -s ."
   },

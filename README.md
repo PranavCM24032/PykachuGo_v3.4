@@ -1039,6 +1039,29 @@ When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
 4. `.vercelignore` keeps design docs, GitHub metadata, and editor files out of
    the deployment without removing them from the repository.
 
+### Link previews (WhatsApp, email, social)
+
+`index.html` carries Open Graph + Twitter Card tags so a shared link renders a
+large preview card in WhatsApp, iMessage, Telegram, Slack, Discord, LinkedIn,
+Facebook, X and most email clients. Crawlers do **not** resolve relative image
+paths, so the `og:*` URLs are absolute and point at the canonical GitHub Pages
+host. If the canonical host moves (for example to the Vercel deployment), update
+the `SITE_URL` block near the top of `index.html` — canonical link, `og:url`,
+`og:image`, `twitter:image` and the JSON-LD `url`/`image`.
+
+The card artwork is `assets/img/og-card.jpg` (1200×630, kept under 300 KB so
+WhatsApp does not shrink it to a thumbnail). It reuses the splash screen's
+visual language — dark CRT screen, gold accents and a shadow-only Pikachu —
+and is generated from `scripts/og-card.html`. Regenerate after branding changes:
+
+```bash
+npm run og:card   # renders scripts/og-card.html via headless Chrome/Edge
+```
+
+Crawlers cache previews for days/weeks: after deploying, re-scrape the URL with
+the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) or
+append `?v=2` when sharing to force a refresh.
+
 All game content (`data/*.json`) is static JSON. After bumping `CACHE_NAME`,
 updated puzzles, teams, and memes are installed into the new offline cache.
 

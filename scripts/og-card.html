@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!--
+  Source for assets/img/og-card.jpg (1200x630 social preview card).
+  Same visual language as the in-app splash (css/loader.css): flat CRT screen,
+  faint scanlines, a soft gold pool, pixel type and a shadow-only Pikachu.
+  Regenerate with: npm run og:card
+-->
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Pykachu Go — social card</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;500;600&display=swap">
+    <style>
+        :root {
+            --screen: #0c111b;
+            --gold: #ffd633;
+            --gold-dim: #a3801f;
+            --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+            --pixel: 'Press Start 2P', 'Courier New', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            width: 1200px;
+            height: 630px;
+            overflow: hidden;
+        }
+
+        /* Exactly the splash surface: dark screen, faint scanlines, gold pool. */
+        body {
+            position: relative;
+            isolation: isolate;
+            background: var(--screen);
+            color: #e7edf5;
+            font-family: var(--mono);
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 72% 46%, rgba(255, 214, 51, 0.10), transparent 58%),
+                radial-gradient(circle at 24% 105%, rgba(67, 97, 238, 0.10), transparent 55%),
+                repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+        }
+
+        .stage {
+            position: relative;
+            height: 100%;
+            padding: 64px 72px 58px;
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+
+        /* ---- Left: the loader column, trimmed to one screen ----------------- */
+        .column {
+            flex: 1 1 auto;
+            min-width: 0;
+            max-width: 560px;
+        }
+
+        .partner-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .mark {
+            display: block;
+            width: 62px;
+            height: 62px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #0a0d14;
+            border: 2px solid var(--gold-dim);
+            box-shadow: 0 0 0 1px rgba(255, 214, 51, 0.12), 0 6px 18px rgba(0, 0, 0, 0.55);
+            flex: none;
+        }
+
+        .mark img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .cross {
+            font-family: var(--pixel);
+            font-size: 18px;
+            line-height: 1;
+            color: var(--gold);
+            text-shadow: 0 0 12px rgba(255, 214, 51, 0.45);
+            flex: none;
+        }
+
+        .presents {
+            margin: 16px 0 0 2px;
+            font-family: var(--pixel);
+            font-size: 12px;
+            letter-spacing: 0.5px;
+            color: #93a1b5;
+        }
+
+        .main-logo {
+            display: block;
+            width: 430px;
+            height: auto;
+            margin: 18px 0 0 -4px;
+            filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.55));
+        }
+
+        .tagline {
+            margin-top: 22px;
+            font-size: 21px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+            line-height: 1.45;
+            color: #c3cfdf;
+        }
+
+        .tagline b {
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        .rule {
+            width: 430px;
+            height: 1px;
+            margin-top: 26px;
+            background: linear-gradient(90deg, rgba(255, 214, 51, 0.55), rgba(255, 214, 51, 0.08), transparent);
+        }
+
+        .foot {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 430px;
+            margin-top: 14px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1.6px;
+            color: #74849a;
+        }
+
+        .foot .live {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #8fffc4;
+        }
+
+        .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.9);
+        }
+
+        /* ---- Right: Pikachu as a shadow only, lit by a gold rim ------------- */
+        .art {
+            position: relative;
+            flex: 0 0 458px;
+            height: 470px;
+            display: grid;
+            place-items: center;
+        }
+
+        .halo {
+            position: absolute;
+            width: 440px;
+            height: 440px;
+            border-radius: 50%;
+            background: radial-gradient(circle,
+                    rgba(255, 214, 51, 0.17),
+                    rgba(255, 214, 51, 0.06) 46%,
+                    transparent 70%);
+        }
+
+        /* brightness(0) flattens the artwork into a single shadow tone;
+           the drop-shadows trace only its outline, giving a gold rim light
+           (a tight 2px edge so the silhouette still reads in a thumbnail). */
+        .art img {
+            position: relative;
+            width: 400px;
+            height: auto;
+            filter:
+                brightness(0) saturate(0) drop-shadow(0 0 2px rgba(255, 214, 51, 0.85)) drop-shadow(0 0 20px rgba(255, 214, 51, 0.45)) drop-shadow(0 0 58px rgba(255, 214, 51, 0.18));
+        }
+
+        .signal {
+            position: absolute;
+            top: 12px;
+            right: 4px;
+            font-family: var(--pixel);
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: var(--gold-dim);
+        }
+
+        .signal span {
+            color: var(--gold);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="stage">
+        <div class="column">
+            <div class="partner-row">
+                <span class="mark"><img src="../assets/img/csi.jpg" alt="CSI"></span>
+                <span class="cross" aria-hidden="true">&times;</span>
+                <span class="mark"><img src="../assets/img/auron.png" alt="Auron"></span>
+            </div>
+
+            <p class="presents">presents</p>
+
+            <img class="main-logo" src="../assets/img/logo1.png" alt="Pykachu Go">
+
+            <p class="tagline">Decode the code. <b>Capture Pikachu.</b></p>
+
+            <div class="rule"></div>
+            <div class="foot">
+                <span>PYTHON · C++ · QR SIGNALS</span>
+                <span class="live"><span class="dot"></span>SIGNAL HUNT</span>
+            </div>
+        </div>
+
+        <div class="art">
+            <div class="halo"></div>
+            <img src="../assets/img/pikachu.png" alt="Pikachu silhouette">
+            <div class="signal">SIGNAL <span>#025</span></div>
+        </div>
+    </div>
+</body>
+
+</html>
