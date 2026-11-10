@@ -179,67 +179,26 @@
             place-items: center;
         }
 
-        /* Wide bloom bleeding past the frame edges. */
-        .art::before {
-            content: '';
-            position: absolute;
-            width: 580px;
-            height: 580px;
-            border-radius: 50%;
-            background: radial-gradient(circle,
-                    rgba(255, 214, 51, 0.26),
-                    rgba(255, 214, 51, 0.09) 42%,
-                    transparent 68%);
-            filter: blur(12px);
-        }
-
         .halo {
             position: absolute;
-            width: 480px;
-            height: 480px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 50% 45%,
-                    rgba(255, 238, 160, 0.46),
-                    rgba(255, 214, 51, 0.20) 34%,
-                    rgba(255, 214, 51, 0.07) 55%,
-                    transparent 72%);
-            filter: blur(4px);
-        }
-
-        /* Hot core right behind the silhouette. */
-        .halo::after {
-            content: '';
-            position: absolute;
-            inset: 21%;
+            width: 440px;
+            height: 440px;
             border-radius: 50%;
             background: radial-gradient(circle,
-                    rgba(255, 244, 190, 0.55),
-                    rgba(255, 214, 51, 0.14) 58%,
-                    transparent 76%);
-            filter: blur(24px);
-        }
-
-        /* Thin shine ring so the glow has an edge instead of a mush. */
-        .ring {
-            position: absolute;
-            width: 404px;
-            height: 404px;
-            border-radius: 50%;
-            border: 1px solid rgba(255, 214, 51, 0.30);
-            box-shadow:
-                0 0 28px rgba(255, 214, 51, 0.20),
-                inset 0 0 30px rgba(255, 214, 51, 0.10);
+                    rgba(255, 214, 51, 0.17),
+                    rgba(255, 214, 51, 0.06) 46%,
+                    transparent 70%);
         }
 
         /* brightness(0) flattens the artwork into a single shadow tone;
            the drop-shadows trace only its outline, giving a gold rim light
-           (a tight 3px edge so the silhouette still reads in a thumbnail). */
+           (a tight 2px edge so the silhouette still reads in a thumbnail). */
         .art img {
             position: relative;
             width: 400px;
             height: auto;
             filter:
-                brightness(0) saturate(0) drop-shadow(0 0 3px rgba(255, 214, 51, 0.95)) drop-shadow(0 0 26px rgba(255, 214, 51, 0.62)) drop-shadow(0 0 72px rgba(255, 214, 51, 0.30));
+                brightness(0) saturate(0) drop-shadow(0 0 2px rgba(255, 214, 51, 0.85)) drop-shadow(0 0 20px rgba(255, 214, 51, 0.45)) drop-shadow(0 0 58px rgba(255, 214, 51, 0.18));
         }
 
         .signal {
@@ -254,36 +213,6 @@
 
         .signal span {
             color: var(--gold);
-        }
-
-        /* A few glints to sell the shine without adding noise. */
-        .spark {
-            position: absolute;
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            background: #fff3b8;
-            box-shadow: 0 0 12px 2px rgba(255, 214, 51, 0.85);
-        }
-
-        .spark--a {
-            top: 52px;
-            left: 92px;
-        }
-
-        .spark--b {
-            bottom: 88px;
-            right: 66px;
-            width: 3px;
-            height: 3px;
-        }
-
-        .spark--c {
-            top: 96px;
-            right: 148px;
-            width: 2px;
-            height: 2px;
-            opacity: 0.8;
         }
     </style>
 </head>
@@ -312,11 +241,7 @@
 
         <div class="art">
             <div class="halo"></div>
-            <div class="ring"></div>
             <img src="../assets/img/pikachu.png" alt="Pikachu silhouette">
-            <i class="spark spark--a" aria-hidden="true"></i>
-            <i class="spark spark--b" aria-hidden="true"></i>
-            <i class="spark spark--c" aria-hidden="true"></i>
             <div class="signal">SIGNAL <span>#025</span></div>
         </div>
     </div>
