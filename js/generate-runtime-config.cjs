@@ -28,24 +28,21 @@ const env = { ...readEnv(envPath) };
 });
 
 const runtimeConfig = {
-    googleScriptUrl: env.GOOGLE_SCRIPT_URL || '',
-    googleScriptToken: env.GOOGLE_SCRIPT_TOKEN || '',
-    googleSheetUrl: env.GOOGLE_SHEET_URL || ''
+    googleScriptUrl: (env.GOOGLE_SCRIPT_URL || '').trim(),
+    googleScriptToken: (env.GOOGLE_SCRIPT_TOKEN || '').trim(),
+    googleSheetUrl: (env.GOOGLE_SHEET_URL || '').trim()
 };
 
 fs.writeFileSync(
     outputPath,
-    `// Generated from .env. Do not commit this file.\nwindow.PYKACHU_RUNTIME_CONFIG = ${JSON.stringify(runtimeConfig, null, 4)};\n`
+    `// Generated from environment. Do not commit this file.\nwindow.PYKACHU_RUNTIME_CONFIG = ${JSON.stringify(runtimeConfig, null, 4)};\n`
 );
 
 if (!runtimeConfig.googleScriptUrl || !runtimeConfig.googleScriptToken) {
     const message = process.env.VERCEL
-        ? 'Runtime config is missing GOOGLE_SCRIPT_URL or GOOGLE_SCRIPT_TOKEN. Add them to the Vercel project environment variables and redeploy.'
-        : 'Runtime config created without Google Sheets settings. Copy .env.example to .env and fill both values.';
-    if (process.env.VERCEL) {
-        console.error(message);
-        process.exitCode = 1;
-    } else {
-        console.warn(message);
-    }
+        ? '[Build] Warning: Runtime config generated without GOOGLE_SCRIPT_URL or GOOGLE_SCRIPT_TOKEN. Add them in Vercel Project Settings > Environment Variables for backend connectivity.'
+        : '[Build] Warning: Runtime config created without Google Sheets settings. Provide them via environment variables or .env for backend scoring.';
+    console.warn(message);
+} else {
+    console.log('[Build] Runtime config generated successfully.');
 }
