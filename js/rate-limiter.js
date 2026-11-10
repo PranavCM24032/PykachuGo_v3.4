@@ -58,6 +58,7 @@ class SlidingWindowRateLimiter {
     _prune(now = Date.now()) {
         const cutoff = now - this.windowMs;
         this.timestamps = this.timestamps.filter(t => t > cutoff && t <= now);
+        if (this._lastGrant > now) this._lastGrant = 0;
         return now;
     }
 
@@ -101,19 +102,39 @@ class SlidingWindowRateLimiter {
 
             if (this.timestamps.length >= this.limit) {
                 const releasedAt = this.timestamps[0] + this.windowMs + 1;
-                setTimeout(scheduleGrant, Math.max(0, releasedAt - Date.now()));
+                setTimeout(scheduleGrant, Math.min(
+                    Math.max(0, releasedAt - Date.now()),
+                    1000
+                ));
                 return;
             }
 
             const grantAt = Math.max(now, this._lastGrant + this.minIntervalMs);
             const wait = Math.max(0, grantAt - Date.now());
-            setTimeout(() => this._grantNext(grantAt), wait);
+            setTimeout(() => this._grantNext(), Math.min(wait, 1000));
         };
 
         scheduleGrant();
     }
 
-    _grantNext(grantAt) {
+    _grantNext() {
+        const now = this._prune();
+        if (this.timestamps.length >= this.limit) {
+            const releasedAt = this.timestamps[0] + this.windowMs + 1;
+            setTimeout(() => this._grantNext(), Math.min(
+                Math.max(0, releasedAt - Date.now()),
+                1000
+            ));
+            return;
+        }
+
+        const grantAt = Math.max(now, this._lastGrant + this.minIntervalMs);
+        const wait = grantAt - now;
+        if (wait > 0) {
+            setTimeout(() => this._grantNext(), Math.min(wait, 1000));
+            return;
+        }
+
         this.timestamps.push(grantAt);
         this._lastGrant = grantAt;
         this._saveTimestamps();
