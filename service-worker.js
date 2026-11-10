@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v2.0.30';
+const CACHE_NAME = 'pykachu-go-v2.0.31';
 const OPTIONAL_CACHE_NAME = 'pykachu-go-optional-v1';
 const ASSETS = [
     'index.html',
@@ -53,6 +53,7 @@ const ASSETS = [
     'assets/img/pokeball.svg',
     'assets/img/apple-touch-icon.png',
     'assets/img/pikachu.png',
+    'assets/sound.mp3',
     'assets/fonts/material-symbols-rounded.woff2'
 ];
 

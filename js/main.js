@@ -574,8 +574,11 @@ function triggerFinalCelebration() {
     const screen = document.getElementById('screen');
     if (!canvas || !screen) return;
 
-    preloadConfetti().then(() => runCelebration(canvas, screen))
-        .catch(err => console.warn('Confetti load failed:', err));
+    // The music IS the celebration; the confetti is decoration. Start the
+    // orchestration directly and let runCelebration() layer the confetti on
+    // once its library is available — a blocked or slow CDN must never be able
+    // to suppress assets/sound.mp3.
+    runCelebration(canvas, screen).catch(err => console.warn('Celebration failed:', err));
 }
 
 // Single reusable gold wash layer, created once and kept in the DOM at
@@ -606,8 +609,6 @@ const CELEBRATION_BLAST_X = [0.5, 0.2, 0.8];
 const CELEBRATION_TRACK_WAIT_MS = 2500;
 
 async function runCelebration(canvas, screen) {
-    if (typeof confetti === 'undefined') return;
-
     // The celebration must be the real track. Give a mid-flight download a
     // short, bounded chance to finish; audio and confetti still start on the
     // same clock, so they stay one performance either way.
@@ -615,12 +616,19 @@ async function runCelebration(canvas, screen) {
         try { await ensureCelebrationTrack(CELEBRATION_TRACK_WAIT_MS); } catch (e) { }
     }
 
-    // Fire the cue on the audio clock FIRST, before the confetti library spins
-    // up its worker and we touch the canvas. The decoded track (or synth
-    // fallback) is scheduled ahead of the heavy visual work, so it never starts
-    // late or past-due. Every burst below is locked to this same start time, so
-    // the confetti and the music are one performance.
+    // Fire the cue FIRST and unconditionally, before touching the canvas or
+    // waiting on the confetti library. The decoded track (or its streaming /
+    // synth fallback) is scheduled ahead of the heavy visual work, so it never
+    // starts late, and nothing below can prevent it from playing.
     const audioStart = (typeof playFinalCelebration === 'function') ? playFinalCelebration(1) : null;
+
+    // Confetti is best-effort decoration. Its library is prewarmed during idle;
+    // if the CDN is blocked the cue above has already started and we simply
+    // skip the visuals rather than muting the celebration.
+    if (typeof confetti === 'undefined' && typeof preloadConfetti === 'function') {
+        try { await preloadConfetti(); } catch (e) { console.warn('Confetti load failed:', e); }
+    }
+    if (typeof confetti === 'undefined') return;
 
     // Reset and size canvas
     canvas.width = screen.clientWidth;

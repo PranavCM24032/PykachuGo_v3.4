@@ -790,6 +790,13 @@ function scheduleFinalCelebrationSting(ctx, startTime, volume) {
 const CELEBRATION_AUDIO_URL = 'assets/sound.mp3';
 let celebrationAudioBuffer = null;
 let celebrationAudioPromise = null;
+// True only once the track fetch/decode has definitively failed. A celebration
+// uses this to decide whether to try streaming the mp3 through an <audio>
+// element (not known to have failed) or go straight to the synth fallback.
+let celebrationAudioFailed = false;
+// Reused <audio> element for the streaming fallback, so a second attempt does
+// not build a new one.
+let celebrationAudioEl = null;
 
 function loadCelebrationAudio() {
     if (celebrationAudioPromise) return celebrationAudioPromise;
@@ -800,9 +807,14 @@ function loadCelebrationAudio() {
             return res.arrayBuffer();
         })
         .then((data) => audioContext.decodeAudioData(data))
-        .then((buf) => { celebrationAudioBuffer = buf; return buf; })
+        .then((buf) => {
+            celebrationAudioBuffer = buf;
+            celebrationAudioFailed = false;
+            return buf;
+        })
         .catch((err) => {
             console.warn('Celebration track failed to load; using synth cue:', err);
+            celebrationAudioFailed = true;
             // Let the next call retry (e.g. after a dropped connection while
             // prewarming) instead of caching the failure forever.
             celebrationAudioPromise = null;
@@ -878,28 +890,85 @@ function getCelebrationDuration() {
     return null;
 }
 
+// Start an AudioBuffer on the hardware clock with the short fade-in. Used for
+// the decoded mp3 and for the pre-rendered synth alike.
+function playCelebrationBuffer(buf, startTime, volume) {
+    const src = audioContext.createBufferSource();
+    src.buffer = buf;
+    const g = audioContext.createGain();
+    const vol = Math.max(0, Math.min(1, volume));
+    // Short fade-in so the track eases in instead of starting abruptly.
+    // After that it holds full level for the whole track — no clip,
+    // no fade-out, no stop timer.
+    g.gain.setValueAtTime(0, startTime);
+    g.gain.linearRampToValueAtTime(vol, startTime + CELEBRATION_FADE_IN);
+    src.connect(g); g.connect(audioContext.destination);
+    src.start(startTime);
+    return src;
+}
+
+// Stream assets/sound.mp3 through an <audio> element. This is the safety net
+// for a celebration that arrives before the buffer is decoded: we still play
+// the REAL track (served from the service-worker cache the idle prewarm just
+// filled) instead of dropping to the synthesized stand-in. If the element
+// itself fails, the synth is scheduled as a genuine last resort.
+function startCelebrationAudioElement(volume) {
+    try {
+        if (!celebrationAudioEl) {
+            celebrationAudioEl = new Audio(CELEBRATION_AUDIO_URL);
+            celebrationAudioEl.preload = 'auto';
+        }
+        const el = celebrationAudioEl;
+        el.volume = Math.max(0, Math.min(1, volume));
+        try { el.currentTime = 0; } catch (e) { /* not seekable yet */ }
+        const played = el.play();
+        if (played && typeof played.catch === 'function') {
+            played.catch((err) => {
+                console.warn('Celebration track element failed; using synth cue:', err);
+                if (!audioContext) return;
+                try {
+                    const t = audioContext.currentTime + CELEBRATION_LEAD;
+                    if (celebrationRenderedBuffer) {
+                        playCelebrationBuffer(celebrationRenderedBuffer, t, volume);
+                    } else {
+                        scheduleFinalCelebrationSting(audioContext, t, volume);
+                    }
+                } catch (e) { /* nothing else to do */ }
+            });
+        }
+        return true;
+    } catch (e) {
+        console.warn('Celebration track element unavailable:', e);
+        return false;
+    }
+}
+
 // Play the end-of-chain cue on the hardware audio clock. Returns the scheduled
 // start time (or null if audio is off) so callers can align visuals to it.
-// Prefers the decoded celebration track, then the idle pre-rendered synth, and
-// finally falls back to live scheduling — always with a look-ahead.
+// The REAL assets/sound.mp3 is always preferred: the decoded buffer first,
+// then a direct stream of the same file, and only then the synthesized cue.
 function playFinalCelebration(volume = 1) {
     if (!soundEnabled || isMuted || !audioContext) return null;
     try {
         if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
         const startTime = audioContext.currentTime + CELEBRATION_LEAD;
-        const cue = celebrationAudioBuffer || celebrationRenderedBuffer;
-        if (cue) {
-            const src = audioContext.createBufferSource();
-            src.buffer = cue;
-            const g = audioContext.createGain();
-            const vol = Math.max(0, Math.min(1, volume));
-            // Short fade-in so the track eases in instead of starting abruptly.
-            // After that it holds full level for the whole track — no clip,
-            // no fade-out, no stop timer.
-            g.gain.setValueAtTime(0, startTime);
-            g.gain.linearRampToValueAtTime(vol, startTime + CELEBRATION_FADE_IN);
-            src.connect(g); g.connect(audioContext.destination);
-            src.start(startTime);
+
+        // 1) Normal path: the idle prewarm decoded the track; play it with
+        //    perfect clock alignment to the confetti.
+        if (celebrationAudioBuffer) {
+            playCelebrationBuffer(celebrationAudioBuffer, startTime, volume);
+            return startTime;
+        }
+
+        // 2) Track not decoded yet but not known to have failed: stream the
+        //    mp3 directly so the celebration is still the real track.
+        if (!celebrationAudioFailed && startCelebrationAudioElement(volume)) {
+            return startTime;
+        }
+
+        // 3) The mp3 is unavailable: idle pre-rendered synth, then live synth.
+        if (celebrationRenderedBuffer) {
+            playCelebrationBuffer(celebrationRenderedBuffer, startTime, volume);
         } else {
             scheduleFinalCelebrationSting(audioContext, startTime, volume);
         }
