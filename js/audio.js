@@ -274,13 +274,14 @@ function formatPokemonSpeechName(raw) {
         .join(' ');
 }
 
-function speakCatch(pokemonName) {
+function speakCatch(pokemonName, announce = true) {
     if (!soundEnabled || isMuted) return;
     clearPendingCatchSpeech();
 
     // Retro chime lands on the reveal tick immediately
     playCatchChime();
 
+    if (!announce) return;
     if (typeof window === 'undefined' || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
 
     const name = String(pokemonName || '').trim();

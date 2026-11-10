@@ -495,7 +495,6 @@
             TOKEN: RUNTIME_CONFIG.googleScriptToken || '',
             SHEET_URL: RUNTIME_CONFIG.googleSheetUrl || '',
             REFRESH_RATE: 12000,
-            MAX_LOGS: 10000,
             VERSION: '3.4.0'
         };
 
@@ -835,9 +834,7 @@
                 let serverError = '';
 
                 if (Array.isArray(rawData)) {
-                    state.logs = rawData.length > CONFIG.MAX_LOGS
-                        ? rawData.slice(rawData.length - CONFIG.MAX_LOGS)
-                        : rawData;
+                    state.logs = rawData;
                     try {
                         localStorage.setItem('pykachuLogs', JSON.stringify(state.logs));
                     } catch (e) {
@@ -1378,12 +1375,16 @@
                     '<span class="text-yellow-400 font-bold">1</span>' :
                     '<span class="text-slate-600">0</span>';
 
-                const adminStatus = (lvlData.status || '').toString().trim().toUpperCase() === 'SOLVED' ? 'SOLVED' : 'UNSOLVED';
-                const statusBadge = adminStatus === 'SOLVED'
-                    ? '<span class="text-emerald-400 font-bold">SOLVED</span>'
-                    : '<span class="text-red-400 font-bold">UNSOLVED</span>';
+                const recordStatus = (lvlData.status || '').toString().trim().toUpperCase();
+                const isRepeatSolve = recordStatus === 'REPEAT_SOLVE';
+                const isSolved = recordStatus === 'SOLVED' || isRepeatSolve;
+                const statusBadge = isRepeatSolve
+                    ? '<span class="text-amber-300 font-bold" title="Solved again; points deducted">REPEAT SOLVE</span>'
+                    : isSolved
+                        ? '<span class="text-emerald-400 font-bold">SOLVED</span>'
+                        : '<span class="text-red-400 font-bold">UNSOLVED</span>';
 
-                const netPts = adminStatus === 'SOLVED' ? toNumber(lvlData.points, 0) : '';
+                const netPts = isSolved ? toNumber(lvlData.points, 0) : '';
 
                 return `
                 <div class="grid gap-1 px-3 py-2 border-b border-slate-800/50 transition-all items-center hover:bg-white/5 text-[9px] text-center fade-in" style="grid-template-columns: ${L_COLS}">
@@ -1402,7 +1403,7 @@
                     <div class="font-bold">${hintBadge}</div>
                     <div class="font-mono text-emerald-400 text-[8px]">${escapeHTML(timestampStr)}</div>
                     <div class="font-bold">${statusBadge}</div>
-                    <div class="font-mono text-[8px] font-bold ${adminStatus === 'SOLVED' ? (netPts > 0 ? 'text-emerald-300' : netPts < 0 ? 'text-red-300' : 'text-slate-500') : 'text-slate-600'}" title="${adminStatus === 'SOLVED' ? 'Points ' + (lvlData.points || 0) : 'No points - unsolved'}">${adminStatus === 'SOLVED' ? netPts : '-'}</div>
+                    <div class="font-mono text-[8px] font-bold ${isSolved ? (netPts > 0 ? 'text-emerald-300' : netPts < 0 ? 'text-red-300' : 'text-slate-500') : 'text-slate-600'}" title="${isSolved ? (isRepeatSolve ? 'Repeat solve deduction: ' : 'Points ') + (lvlData.points || 0) : 'No points - unsolved'}">${isSolved ? netPts : '-'}</div>
                     <div class="font-mono text-amber-300 font-bold text-[8px]">${lvlData.totalScore || 0}</div>
                     <div class="font-mono text-purple-400 truncate text-[8px]" title="Unlock queue after this puzzle">${escapeHTML(lvlData.unlockedPuzzles || '-')}</div>
                 </div>`;

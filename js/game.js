@@ -403,6 +403,11 @@ async function submitPuzzleAnswer() {
     }
 
     const repeat = hasSolvedPuzzle(puzzle.id);
+    const isEnd = !Array.isArray(puzzle.nextPuzzleId) || puzzle.nextPuzzleId.length === 0;
+    if (isEnd && typeof preloadConfetti === 'function') {
+        preloadConfetti().catch(error => console.warn('[Celebration] Confetti preload failed:', error));
+    }
+
     const pointsEarned = repeat ? -(puzzle.points || 0) : (puzzle.points || 0);
     const solvedIds = Array.from(currentTeamSolvedPuzzles);
     if (!repeat) solvedIds.push(Number(puzzle.id));
@@ -420,8 +425,10 @@ async function submitPuzzleAnswer() {
     showToast(repeat ? `REPEATED SOLVE: ${pointsEarned} pts` : `SIGNAL DECRYPTED! +${pointsEarned} pts`, repeat ? 'info' : 'success');
 
     // Visual flair
-    document.getElementById('screen')?.classList.add('premium-glow');
-    setTimeout(() => document.getElementById('screen')?.classList.remove('premium-glow'), 2000);
+    if (!isEnd) {
+        document.getElementById('screen')?.classList.add('premium-glow');
+        setTimeout(() => document.getElementById('screen')?.classList.remove('premium-glow'), 2000);
+    }
 
     // Prepare Success Step Data
     const caughtImg = document.getElementById('capturePokemonImg') || document.getElementById('caughtPokemonImg');
@@ -438,8 +445,6 @@ async function submitPuzzleAnswer() {
 
     // Move immediately: the server already confirmed this solve, so making the
     // player wait on a cosmetic timer just reads as lag.
-    const isEnd = !Array.isArray(puzzle.nextPuzzleId) || puzzle.nextPuzzleId.length === 0;
-
     // Capture the puzzle this reveal belongs to. Without this the callback
     // read the mutable global `currentPuzzle`, which logout nulls — and the
     // timer still fired, showing a signed-out user the catch screen.

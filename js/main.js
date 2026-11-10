@@ -552,9 +552,9 @@ window.onerror = function (msg, url, lineNo, columnNo, error) {
     return false; // Let default handler run
 };
 
-// The confetti library is fetched once and remembered. Warming it at boot
-// (and, failing that, the first time a puzzle is solved) means the reveal frame
-// never stalls on a network fetch + script parse while the ball is opening.
+// The confetti library is fetched once and remembered. Warming it at boot and
+// again when the final answer is submitted gives it the reveal animation to
+// load, instead of holding the celebration on a network fetch.
 const CONFETTI_CDN_URL = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js';
 let confettiLoadPromise = null;
 
@@ -601,26 +601,15 @@ function getCelebrationWash(screen) {
 const CELEBRATION_BLASTS = [0, 3.45, 3.94, 4.44, 4.93, 5.43, 5.93, 6.42, 7.41, 7.91, 8.41, 9.40, 10.39, 10.89, 11.38, 11.88, 12.62, 13.37, 14.01, 14.85, 15.75];
 const CELEBRATION_SPARKS = [0.97, 1.97, 16.21, 17.42];
 const CELEBRATION_BLAST_X = [0.5, 0.2, 0.8];
-// Upper bound on how long the choreography will wait for assets/sound.mp3 to
-// finish if the reveal arrives mid-download. The track is prewarmed during
-// idle, so this is only paid on a cold/slow first visit — never on a normal
-// run. Waiting (instead of playing the synth cue) is what guarantees the mp3
-// is the celebration, not a stand-in.
-const CELEBRATION_TRACK_WAIT_MS = 2500;
 
 async function runCelebration(canvas, screen) {
-    // The celebration must be the real track. Give a mid-flight download a
-    // short, bounded chance to finish; audio and confetti still start on the
-    // same clock, so they stay one performance either way.
-    if (typeof ensureCelebrationTrack === 'function') {
-        try { await ensureCelebrationTrack(CELEBRATION_TRACK_WAIT_MS); } catch (e) { }
-    }
-
-    // Fire the cue FIRST and unconditionally, before touching the canvas or
-    // waiting on the confetti library. The decoded track (or its streaming /
-    // synth fallback) is scheduled ahead of the heavy visual work, so it never
-    // starts late, and nothing below can prevent it from playing.
+    // Start the cue on the reveal beat; use the streaming/synth fallback if
+    // the decoded track is not ready rather than delaying the celebration.
     const audioStart = (typeof playFinalCelebration === 'function') ? playFinalCelebration(1) : null;
+
+    const prefersReducedMotion = typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
 
     // Confetti is best-effort decoration. Its library is prewarmed during idle;
     // if the CDN is blocked the cue above has already started and we simply
@@ -680,7 +669,7 @@ async function runCelebration(canvas, screen) {
     if (trackDur) displayEnd = Math.min(displayEnd, trackDur);
 
     const blastAt = (x) => myConfetti({
-        particleCount: 150,
+        particleCount: 90,
         startVelocity: 45,
         spread: 90,
         origin: { x: x, y: 0.7 },
@@ -688,7 +677,7 @@ async function runCelebration(canvas, screen) {
         gravity: 1.2
     });
     const starAt = (x, y) => myConfetti({
-        particleCount: 40,
+        particleCount: 24,
         spread: 100,
         origin: { x: x, y: y },
         shapes: ['star'],
@@ -697,22 +686,29 @@ async function runCelebration(canvas, screen) {
 
     let si = 0;
     let blastCount = 0;
+    let nextFountainAt = 0;
     (function frame() {
         const elapsed = clock() - base;
 
-        // Fire every hit whose beat has arrived, on the same clock as the sound.
+        // Skip stale beats after a slow frame instead of dumping several
+        // particle bursts at once.
         while (si < schedule.length && elapsed >= schedule[si][0]) {
-            if (schedule[si][1] === 'blast') {
-                blastAt(CELEBRATION_BLAST_X[blastCount++ % CELEBRATION_BLAST_X.length]);
-            } else {
-                starAt(Math.random(), Math.random() - 0.2);
+            if (elapsed - schedule[si][0] <= 0.12) {
+                if (schedule[si][1] === 'blast') {
+                    blastAt(CELEBRATION_BLAST_X[blastCount++ % CELEBRATION_BLAST_X.length]);
+                } else {
+                    starAt(Math.random(), Math.random() - 0.2);
+                }
             }
             si++;
         }
 
         if (elapsed < displayEnd) {
-            myConfetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 1 }, colors: colors });
-            myConfetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 1 }, colors: colors });
+            if (elapsed >= nextFountainAt) {
+                myConfetti({ particleCount: 2, angle: 60, spread: 55, origin: { x: 0, y: 1 }, colors: colors });
+                myConfetti({ particleCount: 2, angle: 120, spread: 55, origin: { x: 1, y: 1 }, colors: colors });
+                nextFountainAt = elapsed + 0.1;
+            }
             requestAnimationFrame(frame);
         }
     }());

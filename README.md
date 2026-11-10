@@ -557,7 +557,7 @@ The score shown in the player app and leaderboard is **Total Score**.
 
 - A first-time solve awards the puzzle's configured `points` value.
 - A repeated solve awards no additional points and deducts that puzzle's full
-  value from the current total (capped so the total never goes below zero).
+  value from the current total; the total may become negative.
 - Wrong answers, hints, and tab-switch penalties are logged but do not directly
   deduct score.
 
@@ -568,8 +568,10 @@ Google Sheets persists two separate queues across `L1`, `L2`, and `L3`:
 | `Solved Puzzle IDs` | Decides whether a puzzle is a first solve or repeat for scoring. |
 | `Unlocked Puzzle IDs` | Decides whether a QR/location is reachable; blocks jumps ahead. |
 
-The client fetches and combines both queues across all level sheets when a team
-returns. The latest Total Score snapshot is used by the leaderboard.
+The backend rebuilds the solved and unlocked state from the rows when a team
+returns. Scores are reconstructed by summing each solve row's signed `Points`
+delta; the admin leaderboard uses those deltas, with the latest `Total Score`
+snapshot as a fallback for older records that lack point data.
 
 ### Leaderboard totals
 
@@ -666,20 +668,23 @@ A single Google Apps Script web app that owns one Google Sheets workbook.
 | Tab | Schema |
 |-----|--------|
 | `Registration` | Registration Time, TID, Team Name, Mission, Language, Level, Session ID |
-| `L1` / `L2` / `L3` | Last Active, TID, Team Name, Mission, Puzzle ID, Wrong Attempts, Timestamp, Hint Used, Tab Switches, Points Earned, Points Lost, Status, Total Score, Unlocked Puzzle IDs, Solved Puzzle IDs |
+| `L1` / `L2` / `L3` | TID, Team Name, Mission, Puzzle ID, Wrong Attempts, Timestamp, Hint Used, Tab Switches, Points, Status, Total Score, Unlocked Puzzle IDs, Solved Puzzle IDs |
 
-Status column values are `SOLVED` or empty (mid-way rows). Hint usage and tab switches are
-stored in their own columns. A row that reached `SOLVED` is sealed — late or
-retried events cannot downgrade the status.
+Status column values are `SOLVED`, `REPEAT_SOLVE`, or empty (mid-way rows).
+Repeat solves are separate rows with a points deduction; the admin detail view
+labels them `REPEAT SOLVE`, while solved-puzzle totals count only the original
+solve. Hint usage and tab switches are stored in their own columns. A row that
+reached `SOLVED` is sealed — late or retried events cannot downgrade the status.
 
 The backend creates these tabs automatically on first use.
 
 ### Design decisions
 
-- **1 row per (TID × puzzle)** — every puzzle gets its own permanent row in the
-  level tab. In-progress events (`WRONG_ATTEMPT`, `HINT_*`,
+- **1 canonical row per (TID × puzzle)** — every puzzle gets its own permanent
+  row in the level tab. In-progress events (`WRONG_ATTEMPT`, `HINT_*`,
   `PENALTY`/`MALPRACTICE`, `UNLOCK_*`) update only that puzzle's row; a
-  `SOLVED` finalizes it.
+  `SOLVED` finalizes it. Each later solve appends a separate `REPEAT_SOLVE` row
+  so the deduction remains auditable and cannot overwrite the original solve.
 - The row is matched by **TID + Puzzle ID**, with team name retained for
   display and compatibility.
 - Events are routed by puzzle **level** to `L1`/`L2`/`L3` (fallback: team's
@@ -691,9 +696,11 @@ The backend creates these tabs automatically on first use.
   the running **`Total Score`**. Abandoned puzzles go through
   **`PUZZLE_ABANDONED`** (1 call) with the half-done notebook intact.
 - There is **no separate TeamState tab**. `GET_TEAM_STATE` re-aggregates the
-  `L1`/`L2`/`L3` rows: `solved` = union of solved puzzle IDs, `currentPuzzle` =
-  most recent puzzle row, `unlocked` = union of queue snapshots, `score` = latest
-  Total Score; the client derives the frontier as `unlocked − solved`.
+  `L1`/`L2`/`L3` rows: `solved` = unique puzzle IDs with `SOLVED` or
+  `REPEAT_SOLVE` status, `currentPuzzle` = puzzle from the most recent row,
+  `unlocked` = starting puzzles plus solved puzzles and their outgoing edges,
+  `score` = sum of the `Points` deltas; the client derives the frontier as
+  `unlocked − solved`.
 - Uses `LockService` (`tryLock 20s`) to serialize writes and resets; initialized
   read-only team-state requests do not take the write lock. Rows are added to a
   sheet automatically if a write needs more than its current row capacity.

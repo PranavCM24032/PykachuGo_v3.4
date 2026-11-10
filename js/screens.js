@@ -86,7 +86,7 @@ function startRevealFx(stage) {
 //   1.00s  white silhouette materializes -> flash dissolve -> full-color Pokémon
 // Pacing is deliberately unhurried: the old version slammed the ball in and
 // flashed a white shockwave, which read as a shock rather than a reveal.
-function playPokemonReveal() {
+function playPokemonReveal(announceCatch = true) {
     const stage = document.getElementById('pokemonReveal');
     const ball = document.getElementById('step4RevealBall');
     if (!stage || !ball) return;
@@ -97,9 +97,8 @@ function playPokemonReveal() {
 
     const pokemonName = (typeof currentPuzzle !== 'undefined' && currentPuzzle && currentPuzzle.pokemonName) || '';
 
-    // The name is deliberately NOT rendered — the catch line is voice-only
-    // (pokemonName is spoken by speakCatch), so the player identifies the
-    // Pokémon from the sprite alone.
+    // The name is deliberately NOT rendered; on the final puzzle the catch
+    // voice is skipped so it does not talk over the celebration track.
 
     // Reset to the "waiting" state so re-entering step 4 replays cleanly.
     stage.classList.remove('reveal-ready');
@@ -155,7 +154,7 @@ function playPokemonReveal() {
     // t=2.05s — catch fanfare chime & announcer speak in exact sync as the Pokémon emerges
     scheduleReveal(() => {
         if (!stillCurrent()) return;
-        speakCatch(pokemonName);
+        speakCatch(pokemonName, announceCatch);
     }, 2050);
 }
 
@@ -323,7 +322,9 @@ function showStep(stepNumber) {
         if (nextBtn) nextBtn.classList.remove('hidden');
 
         // Animate the caught Pokémon bursting out of a Pokéball.
-        if (typeof playPokemonReveal === 'function') playPokemonReveal();
+        const isFinalPuzzle = currentPuzzle &&
+            (!Array.isArray(currentPuzzle.nextPuzzleId) || currentPuzzle.nextPuzzleId.length === 0);
+        if (typeof playPokemonReveal === 'function') playPokemonReveal(!isFinalPuzzle);
     }
 
     if (stepNumber === 3) {
