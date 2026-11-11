@@ -19,11 +19,18 @@
     height: 100%;
     min-height: 0;
     /* The location cards added after a solve can make the stack taller than the
-       CRT, so let step 4 scroll instead of clipping the reveal's top. */
+       CRT, so let step 4 scroll instead of clipping the reveal's top. The bar
+       itself stays hidden so the reveal reads as a clean stage. */
     overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     /* Nudges the Pokéball platform up off the exact screen middle. Tune here:
        larger = higher. transform keeps the location card below it in place. */
     --step4-stage-lift: clamp(10px, 2.4vh, 24px);
+}
+
+#step4::-webkit-scrollbar {
+    display: none;
 }
 
 #step4 .step4-success-layout {

@@ -947,7 +947,7 @@ and renders aggregated JSON.
 - `assets/img/apple-touch-icon.png` — 180×180 opaque PNG for iOS home screens
   and older Safari tabs, which ignore the SVG icon format.
 - `service-worker.js` — caches the app shell and required JSON data for offline
-  reloads using cache version `pykachu-go-v2.0.40`. Large optional audio and
+  reloads using cache version `pykachu-go-v2.0.41`. Large optional audio and
   decorative artwork are not downloaded during installation; the small Pikachu
   image is cached as an offline fallback for remote Pokémon artwork.
 - Cached local assets use cache-first delivery, so repeat visits and offline
