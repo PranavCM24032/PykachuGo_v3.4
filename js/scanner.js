@@ -467,6 +467,7 @@ async function handleQRScanResult(qrData) {
 
     let linkId = qrData;
     let memeId = null;
+    let pathId = null;
     try {
         if (qrData.includes('linkid=') || qrData.includes('memeid=')) {
             try {
@@ -486,23 +487,40 @@ async function handleQRScanResult(qrData) {
         }
 
         // Fallback: full URL with the ID in the path (e.g. https://host/XG01 or https://host/Pikachu_v3/M01)
-        if (!memeId && (linkId === qrData) && /^https?:\/\//i.test(qrData)) {
+        if ((linkId === qrData || !linkId) && /^https?:\/\//i.test(qrData)) {
             const url = new URL(qrData);
             const pathSegs = url.pathname.split('/').filter(Boolean);
-            const lastSeg = pathSegs[pathSegs.length - 1];
-            if (lastSeg) linkId = lastSeg;
+            pathId = pathSegs[pathSegs.length - 1] || null;
+            if (pathId) linkId = pathId;
         }
     } catch (e) {
         console.warn('QR parse error:', e);
     }
 
-    if (!memeId) {
-        memeId = linkId;
-    }
+    const normalizedLink = standardizeString(linkId || '');
+    const normalizedMeme = standardizeString(memeId || '');
 
-    const matchedMeme = MEMES.find(m => standardizeString(m.memeid) === standardizeString(memeId));
+    const matchedPuzzle = (() => {
+        if (!normalizedLink) return null;
+        const direct = PUZZLES.find(p => standardizeString(p.linkid) === normalizedLink);
+        if (direct) return direct;
+        // Allow direct start-code entry. Codes live in data/puzzle.json.
+        return PUZZLES.find(p => isStartingPuzzle(p) && standardizeString(p.startCode) === normalizedLink) || null;
+    })();
 
-    if (matchedMeme) {
+    const matchedMeme = (() => {
+        if (normalizedMeme) {
+            return MEMES.find(m => standardizeString(m.memeid) === normalizedMeme) || null;
+        }
+        if (pathId) {
+            return MEMES.find(m => standardizeString(m.memeid) === standardizeString(pathId)) || null;
+        }
+        return null;
+    })();
+
+    if (matchedPuzzle) {
+        urlLockedPuzzle = matchedPuzzle;
+    } else if (matchedMeme && !matchedPuzzle) {
         showToast('🎬 Meme Unlocked!', 'success');
         setTimeout(() => {
             stopQRScanner();
@@ -510,17 +528,21 @@ async function handleQRScanResult(qrData) {
             processingQR = false;
         }, 1000);
         return;
+    } else {
+        urlLockedPuzzle = null;
     }
 
-    const normalizedInput = standardizeString(linkId);
-    urlLockedPuzzle = PUZZLES.find(p => standardizeString(p.linkid) === normalizedInput);
+    if (!matchedPuzzle && !matchedMeme) {
+        console.warn('QR code not recognized:', qrData);
+        showToast('❌ Invalid Signal - Access Denied', 'error');
 
-    // Allow direct start-code entry. Codes live in data/puzzle.json.
-    if (!urlLockedPuzzle) {
-        urlLockedPuzzle = PUZZLES.find(p => isStartingPuzzle(p) && standardizeString(p.startCode) === normalizedInput) || null;
+        setTimeout(() => {
+            processingQR = false;
+        }, 2500);
+        return;
     }
 
-    if (urlLockedPuzzle) {
+    if (matchedPuzzle && urlLockedPuzzle) {
         // Chain gate: only the NEXT puzzle in the sequence can be scanned.
         // Trying to jump ahead (e.g. puzzle 1 -> puzzle 4) is rejected here.
         if (!isPuzzleAllowed(urlLockedPuzzle)) {
