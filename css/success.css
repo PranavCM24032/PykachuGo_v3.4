@@ -604,7 +604,7 @@
 .pk-pop {
     position: absolute;
     left: 50%;
-    bottom: var(--plat-h);
+    bottom: calc(var(--plat-h) * 0.5);
     transform: translateX(-50%) scale(0);
     transform-origin: center bottom;
     opacity: 0;
@@ -619,7 +619,9 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
-    object-position: bottom;
+    object-position: bottom center;
+    /* nudge sprite feet to the actual container bottom edge */
+    transform: translateY(8%);
     pointer-events: none;
     will-change: transform, opacity;
     backface-visibility: hidden;
