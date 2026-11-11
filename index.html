@@ -367,7 +367,7 @@
         <div class="crt-container flex-1 min-h-0">
             <div id="screen" class="crt-screen overflow-y-auto scrollable relative">
                 <!-- Celebration Canvas -->
-                <canvas id="celebrationCanvas" class="absolute inset-0 pointer-events-none z-[100]"></canvas>
+                <canvas id="celebrationCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-[100]"></canvas>
 
                 <!-- Splitter loader: CSI x Auron presents Pykachu Go.
                      Markup lives in html/loader.html (like the other partials)
@@ -861,15 +861,14 @@ Loading puzzle data...</pre>
                         <div
                             class="step4-pokemon-stage relative z-10 flex w-full shrink-0 flex-col items-center justify-center">
                             <div id="pokemonReveal" class="pokemon-reveal relative z-10 shrink-0">
-                                <!-- Platform: blue + yellow rings with a glowing core -->
-                                <div class="pokemon-platform">
-                                    <div class="platform-ring ring-blue"></div>
-                                    <div class="platform-ring ring-yellow"></div>
-                                    <div class="platform-ring ring-core"></div>
+                                <!-- Platform rings -->
+                                <div class="pk-platform">
+                                    <div class="pk-ring pk-ring-outer"></div>
+                                    <div class="pk-ring pk-ring-mid"></div>
+                                    <div class="pk-ring pk-ring-core"></div>
                                 </div>
 
                                 <!-- Shared FX -->
-                                <div class="pk-seam"></div>
                                 <div class="pk-bloom"></div>
                                 <div class="pk-shockwave"></div>
 

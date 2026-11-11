@@ -441,9 +441,8 @@ async function submitPuzzleAnswer() {
         setTimeout(() => document.getElementById('screen')?.classList.remove('premium-glow'), 2000);
     }
 
-    // Prepare Success Step Data. The home render is the primary reveal art;
-    // the official artwork (the previous source) is the fallback, and the
-    // bundled Pikachu is the last resort.
+    // Prepare Success Step Data. Official artwork is the primary reveal art;
+    // the bundled Pikachu is the fallback.
     const caughtImg = document.getElementById('capturePokemonImg') || document.getElementById('caughtPokemonImg');
     const caughtSilhouette = document.getElementById('caughtPokemonSilhouette');
     if (puzzle.pokemonId && typeof applyPokemonSprite === 'function') {
@@ -578,7 +577,7 @@ function continueToQRScan() {
 // (missing #pokemonReveal / #step4RevealBall markup, or the reveal being
 // cancelled by a second showStep(4)). Every armed listener self-cleans, so a
 // stale listener can never hijack a later reveal.
-const REVEAL_OPEN_FALLBACK_MS = 2200;
+const REVEAL_OPEN_FALLBACK_MS = 2100;
 
 function armFinalCelebration() {
     if (typeof triggerFinalCelebration !== 'function') return;

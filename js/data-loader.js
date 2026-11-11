@@ -12,12 +12,10 @@ function isLowBandwidthConnection() {
 
 const POKEMON_SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
 
-// Primary reveal art: the newer "home" renders. The official artwork is kept
-// as the fallback (it was the only source before the drop & bounce reveal),
-// and the bundled Pikachu is the final resort if both CDN paths fail.
+// Reveal art: the official artwork from the PokeAPI sprite repo. The bundled
+// Pikachu is the final resort if the CDN path fails.
 function pokemonSpriteUrls(pokemonId) {
     return [
-        `${POKEMON_SPRITE_BASE}/other/home/${pokemonId}.png`,
         `${POKEMON_SPRITE_BASE}/other/official-artwork/${pokemonId}.png`,
         'assets/img/pikachu.png'
     ];

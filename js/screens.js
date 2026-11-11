@@ -38,15 +38,14 @@ function scheduleReveal(fn, ms) {
 }
 
 // Step 4 flourish: the caught Pokémon is revealed with the "drop & bounce"
-// sequence (Concept 6). The ball falls in, bounces once on the platform, its
-// seam leaks warm light, then the shells crack and the sprite pops out.
+// sequence (Concept 6). The ball falls in, bounces once on the platform, then
+// the shells crack and the sprite pops out.
 // Timeline (mirrored by the CSS in css/success.css):
 //   0.00s  ball drops from above
 //   0.72s  first impact thud (55% of the 1.3s drop)
 //   1.07s  second, softer contact (82% of the drop)
-//   1.10s  seam light starts to build
-//   1.50s  shells crack open + shockwave/bloom + sprite pops out
-//   1.54s  catch line spoken
+//   1.40s  shells crack open + shockwave/bloom + sprite pops out
+//   1.44s  catch line spoken
 function playPokemonReveal(announceCatch = true) {
     const stage = document.getElementById('pokemonReveal');
     if (!stage) return;
@@ -88,7 +87,7 @@ function playPokemonReveal(announceCatch = true) {
         playSound('pokeballDrop', 0.12);
     }, 1066);
 
-    // t=1.50s — seam light has built; the ball cracks and the shells split
+    // t=1.40s — the ball cracks and the shells split
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         stage.classList.add('is-open');
@@ -97,13 +96,13 @@ function playPokemonReveal(announceCatch = true) {
         // listens for this instead of running on a timer of its own, so it
         // always lands with the reveal no matter how the fall is retimed.
         document.dispatchEvent(new CustomEvent('pykachu:reveal-open'));
-    }, 1500);
+    }, 1400);
 
-    // t=1.54s — catch fanfare voice lands with the emerging sprite
+    // t=1.44s — catch fanfare voice lands with the emerging sprite
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         speakCatch(pokemonName, announceCatch);
-    }, 1540);
+    }, 1440);
 }
 
 function showStep(stepNumber) {
