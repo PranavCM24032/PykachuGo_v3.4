@@ -861,37 +861,37 @@ Loading puzzle data...</pre>
                         <div
                             class="step4-pokemon-stage relative z-10 flex w-full shrink-0 flex-col items-center justify-center">
                             <div id="pokemonReveal" class="pokemon-reveal relative z-10 shrink-0">
-                                <!-- Platform Base -->
+                                <!-- Platform: blue + yellow rings with a glowing core -->
                                 <div class="pokemon-platform">
                                     <div class="platform-ring ring-blue"></div>
                                     <div class="platform-ring ring-yellow"></div>
                                     <div class="platform-ring ring-core"></div>
                                 </div>
-                                <!-- Warm seam of light along the ball's equator as it splits open -->
-                                <div class="reveal-seam"></div>
-                                <!-- Soft warm bloom unfurls out of the ball as it opens -->
-                                <div class="reveal-bloom"></div>
-                                <div class="reveal-ring reveal-ring-one" aria-hidden="true"></div>
-                                <div class="reveal-ring reveal-ring-two" aria-hidden="true"></div>
-                                <!-- Elemental aura + soft shockwave, coloured from the caught Pokémon's type -->
-                                <div class="reveal-aura" aria-hidden="true"></div>
-                                <div class="reveal-shockwave" aria-hidden="true"></div>
-                                <!-- Ground shadow under the ball resting on platform -->
-                                <div class="ball-shadow"></div>
-                                <!-- 3D Pokéball: drops, lands on platform once, then opens -->
-                                <div id="step4RevealBall" class="pokemon-reveal-ball">
-                                    <div class="ball-half ball-top"></div>
-                                    <div class="ball-half ball-bottom"></div>
-                                    <div class="ball-shade"></div>
-                                    <div class="ball-band"></div>
-                                    <div class="ball-btn"></div>
-                                    <div class="ball-gloss"></div>
+
+                                <!-- Shared FX -->
+                                <div class="pk-seam"></div>
+                                <div class="pk-bloom"></div>
+                                <div class="pk-shockwave"></div>
+
+                                <!-- Ground shadow under the ball -->
+                                <div class="pk-shadow"></div>
+
+                                <!-- 3D Pokéball: drops, bounces once, then cracks open -->
+                                <div id="step4RevealBall" class="pk-ball">
+                                    <div class="pk-half pk-top"></div>
+                                    <div class="pk-half pk-bottom"></div>
+                                    <div class="pk-band"></div>
+                                    <div class="pk-btn"></div>
+                                    <div class="pk-gloss"></div>
+                                    <div class="pk-shade"></div>
                                 </div>
-                                <!-- Pokémon pops out of the ball -->
-                                <div class="reveal-pop">
-                                    <img id="caughtPokemonImg" src="" alt="Caught Pokémon"
-                                        loading="lazy" decoding="async"
-                                        class="pokemon-success-glow relative z-10 size-[clamp(130px,26vh,195px)] object-contain drop-shadow-[0_0_20px_rgba(234,179,8,0.3)] transition-transform duration-300 hover:scale-105" />
+
+                                <!-- Pokémon: white silhouette dissolves into full colour -->
+                                <div class="pk-pop">
+                                    <img id="caughtPokemonSilhouette" class="pk-silhouette" alt=""
+                                        aria-hidden="true" decoding="async" />
+                                    <img id="caughtPokemonImg" class="pk-sprite" alt="Caught Pokémon"
+                                        decoding="async" />
                                 </div>
                             </div>
                         </div>

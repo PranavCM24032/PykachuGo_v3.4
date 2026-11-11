@@ -273,7 +273,8 @@
 /* ── Performance guards ──────────────────────────────────────────────────── */
 /* Promote frequently-animated layers to the GPU compositor so transforms
    run on the compositor thread instead of the main thread */
-.pokemon-success-glow,
+.pk-sprite,
+.pk-ball,
 .gym-badge-image,
 .pixel-pokeball,
 .cyber-pokeball,

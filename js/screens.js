@@ -9,11 +9,10 @@ let stepTransitionId = 0;
 // whatever screen the user had actually moved to.
 let pendingFocusTimer = null;
 
-// Every pending timer inside the step-4 reveal (latch, shells, voice line) plus
-// the sparkle-removal timeouts. Two overlapping reveals used to add/remove the
-// same classes on different clocks, spawn 160 sparkles and speak twice.
+// Every pending timer inside the step-4 reveal (impact thuds, shell crack,
+// voice line). Two overlapping reveals used to add/remove the same classes on
+// different clocks and speak twice.
 let revealTimers = [];
-let sparkleTimers = [];
 
 // Monotonic generation counter: a timer from an abandoned reveal can never
 // touch the ball even if it fires after the user re-enters step 4.
@@ -23,16 +22,10 @@ function cancelPokemonReveal() {
     revealGeneration++;
     revealTimers.forEach(clearTimeout);
     revealTimers = [];
-    sparkleTimers.forEach(clearTimeout);
-    sparkleTimers = [];
     const stage = document.getElementById('pokemonReveal');
-    const ball = document.getElementById('step4RevealBall');
     // Leaving these on would strand a half-open ball on the next entry to
     // step 4 (shells split but no sprite, or vice versa).
-    if (stage) stage.classList.remove('reveal-ready');
-    if (ball) ball.classList.remove('release-latch', 'pokemon-reveal-open');
-    document.querySelectorAll('#pokemonReveal .reveal-sparkle, #pokemonReveal .reveal-wisp, #pokemonReveal .reveal-type-particle')
-        .forEach((n) => n.remove());
+    if (stage) stage.classList.remove('is-playing', 'is-open');
     // Chorus members that haven't entered yet would keep talking over the
     // next screen, so drop any pending entrances with the rest of the reveal.
     if (typeof stopCatchVoice === 'function') stopCatchVoice();
@@ -44,52 +37,19 @@ function scheduleReveal(fn, ms) {
     return id;
 }
 
-// ── Reveal flourish: particle burst ────────────────────────────────────────
-// Every Pokémon gets the same white / blue / pink energy burst out of the ball,
-// so the reveal always reads the same regardless of which one was caught.
-
-const REVEAL_PARTICLE_COLORS = ['#ffffff', '#93c5fd', '#f472b6'];
-
-// Fans particles out from the ball. Each one gets its own angle, distance,
-// size, colour and duration so no two bursts read the same.
-function spawnRevealBurst(stage) {
-    const reduced = typeof window.matchMedia === 'function' &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const count = reduced ? 0 : 18;
-    for (let i = 0; i < count; i++) {
-        const p = document.createElement('span');
-        p.className = 'reveal-type-particle';
-        const ang = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-        const dist = 42 + Math.random() * 72;
-        p.style.setProperty('--pp-dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
-        p.style.setProperty('--pp-dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
-        p.style.setProperty('--pp-size', (5 + Math.random() * 5).toFixed(1) + 'px');
-        p.style.setProperty('--pp-col', REVEAL_PARTICLE_COLORS[i % REVEAL_PARTICLE_COLORS.length]);
-        p.style.setProperty('--pp-dur', (0.7 + Math.random() * 0.5).toFixed(2) + 's');
-        p.style.setProperty('--pp-delay', (Math.random() * 0.12).toFixed(2) + 's');
-        stage.appendChild(p);
-        sparkleTimers.push(setTimeout(() => p.remove(), 1800));
-    }
-}
-
-// Runs when the shells split: fans the white / blue / pink burst out of the ball.
-function startRevealFx(stage) {
-    spawnRevealBurst(stage);
-}
-
-// Step 4 flourish: the caught Pokémon drifts out of its Pokéball.
-// The ball drifts in from above, rests on the platform, then plays the
-// audio-synced OPEN SEQUENCE (t = 0 when the ball settles):
-//   0.00s  latch click + button press            (release-latch)
-//   0.21s  shells swing open + seam flare + bloom (pokemon-reveal-open / reveal-ready)
-//   0.35s  rising wisps + sparkle/ring particles
-//   1.00s  white silhouette materializes -> flash dissolve -> full-color Pokémon
-// Pacing is deliberately unhurried: the old version slammed the ball in and
-// flashed a white shockwave, which read as a shock rather than a reveal.
+// Step 4 flourish: the caught Pokémon is revealed with the "drop & bounce"
+// sequence (Concept 6). The ball falls in, bounces once on the platform, its
+// seam leaks warm light, then the shells crack and the sprite pops out.
+// Timeline (mirrored by the CSS in css/success.css):
+//   0.00s  ball drops from above
+//   0.72s  first impact thud (55% of the 1.3s drop)
+//   1.07s  second, softer contact (82% of the drop)
+//   1.10s  seam light starts to build
+//   1.50s  shells crack open + shockwave/bloom + sprite pops out
+//   1.54s  catch line spoken
 function playPokemonReveal(announceCatch = true) {
     const stage = document.getElementById('pokemonReveal');
-    const ball = document.getElementById('step4RevealBall');
-    if (!stage || !ball) return;
+    if (!stage) return;
 
     // Abandon any reveal still in flight so two timelines can never overlap.
     cancelPokemonReveal();
@@ -101,12 +61,12 @@ function playPokemonReveal(announceCatch = true) {
     // voice is skipped so it does not talk over the celebration track.
 
     // Reset to the "waiting" state so re-entering step 4 replays cleanly.
-    stage.classList.remove('reveal-ready');
-    ball.classList.remove('release-latch');
-    ball.classList.remove('pokemon-reveal-open');
+    stage.classList.remove('is-playing', 'is-open');
 
-    // Force a reflow so the bounce animation always restarts from scratch.
+    // Force a reflow so the drop animation always restarts from scratch.
     void stage.offsetWidth;
+
+    stage.classList.add('is-playing');
 
     // Old guard was `if (step4 && !active) return` — when #step4 was missing
     // this short-circuited to FALSE and the callback mutated the ball anyway.
@@ -116,96 +76,34 @@ function playPokemonReveal(announceCatch = true) {
         return !!step4 && step4.classList.contains('active');
     };
 
-    // t=1.044s — ball first rests on the platform (58% of the 1.8s fall)
+    // t=0.72s — first landing squash (55% of the 1.3s drop)
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         playSound('pokeballDrop', 0.22);
-    }, 1044);
+    }, 715);
 
-    // t=1.53s — second, barely-there contact (85% of 1.8s), quieter
+    // t=1.07s — second, softer contact (82% of the drop), quieter
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         playSound('pokeballDrop', 0.12);
-    }, 1530);
+    }, 1066);
 
-    // t=1.8s — ball has settled; latch release begins
+    // t=1.50s — seam light has built; the ball cracks and the shells split
     scheduleReveal(() => {
         if (!stillCurrent()) return;
-        ball.classList.add('release-latch');
+        stage.classList.add('is-open');
         playSound('pokeballOpen');
-    }, 1800);
-
-    // t=2.01s — shells swing open, seam flare and bloom rise, Pokémon emerges
-    scheduleReveal(() => {
-        if (!stillCurrent()) return;
-        ball.classList.remove('release-latch');
-        ball.classList.add('pokemon-reveal-open');
-        stage.classList.add('reveal-ready');
-        spawnReleaseWisps();
-        spawnReleaseSparkles();
-        // White / blue / pink particle burst fired from inside the ball.
-        startRevealFx(stage);
         // Exact frame the ball opens. The end-of-chain confetti celebration
         // listens for this instead of running on a timer of its own, so it
         // always lands with the reveal no matter how the fall is retimed.
         document.dispatchEvent(new CustomEvent('pykachu:reveal-open'));
-    }, 2010);
+    }, 1500);
 
-    // t=2.05s — catch fanfare chime & announcer speak in exact sync as the Pokémon emerges
+    // t=1.54s — catch fanfare voice lands with the emerging sprite
     scheduleReveal(() => {
         if (!stillCurrent()) return;
         speakCatch(pokemonName, announceCatch);
-    }, 2050);
-}
-
-// Rising wisps: a handful of soft puffs of light drift up out of the opened
-// ball. This replaced the tall light column — wisps read as energy escaping
-// the ball while passing BEHIND the sprite (z-index 9 vs 10), so the Pokémon
-// is never washed out. Each puff gets its own drift, rise, size and delay so
-// no two reveals look identical.
-function spawnReleaseWisps() {
-    const stage = document.getElementById('pokemonReveal');
-    if (!stage) return;
-
-    for (let i = 0; i < 5; i++) {
-        const wisp = document.createElement('span');
-        wisp.className = 'reveal-wisp';
-        wisp.style.setProperty('--wisp-size', (14 + Math.random() * 14).toFixed(1) + 'px');
-        wisp.style.setProperty('--wisp-drift', (Math.random() * 34 - 17).toFixed(1) + 'px');
-        wisp.style.setProperty('--wisp-rise', (70 + Math.random() * 60).toFixed(1) + 'px');
-        wisp.style.setProperty('--wisp-delay', (i * 0.13 + Math.random() * 0.08).toFixed(2) + 's');
-        wisp.style.setProperty('--wisp-dur', (1.1 + Math.random() * 0.5).toFixed(2) + 's');
-
-        stage.appendChild(wisp);
-        // Cleared past the longest delay + duration so nothing lingers
-        sparkleTimers.push(setTimeout(() => wisp.remove(), 2200));
-    }
-}
-
-// Falling-star sparkle shower. Many tinytiny stars appear along the top
-// edge and drift down the full screen in slow motion — sky to ground.
-function spawnReleaseSparkles() {
-    const stage = document.getElementById('pokemonReveal');
-    if (!stage) return;
-
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-
-    for (let i = 0; i < 80; i++) {
-        const s = document.createElement('span');
-        s.className = 'reveal-sparkle' + (i % 4 === 0 ? ' sparkle-star' : '');
-
-        s.style.left = (Math.random() * w).toFixed(1) + 'px';
-        s.style.top = '0px';
-        const sway = (Math.random() * 100 - 50);
-        const fall = h + 60 + Math.random() * 60;
-        s.style.setProperty('--dx', sway.toFixed(1) + 'px');
-        s.style.setProperty('--dy', fall.toFixed(1) + 'px');
-        s.style.animationDelay = (Math.random() * 1200).toFixed(0) + 'ms';
-
-        stage.appendChild(s);
-        sparkleTimers.push(setTimeout(() => s.remove(), 7600));
-    }
+    }, 1540);
 }
 
 function showStep(stepNumber) {

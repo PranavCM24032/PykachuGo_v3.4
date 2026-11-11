@@ -10,6 +10,38 @@ function isLowBandwidthConnection() {
     ));
 }
 
+const POKEMON_SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
+
+// Primary reveal art: the newer "home" renders. The official artwork is kept
+// as the fallback (it was the only source before the drop & bounce reveal),
+// and the bundled Pikachu is the final resort if both CDN paths fail.
+function pokemonSpriteUrls(pokemonId) {
+    return [
+        `${POKEMON_SPRITE_BASE}/other/home/${pokemonId}.png`,
+        `${POKEMON_SPRITE_BASE}/other/official-artwork/${pokemonId}.png`,
+        'assets/img/pikachu.png'
+    ];
+}
+
+function applyPokemonSprite(img, pokemonId) {
+    if (!img || !pokemonId) return;
+    const urls = pokemonSpriteUrls(pokemonId);
+    const token = String(pokemonId);
+    let next = 1;
+    // Guard against a late error from a previous puzzle overwriting the new
+    // primary source after the next solve has already started.
+    img.dataset.pokemonSprite = token;
+    img.onerror = () => {
+        if (img.dataset.pokemonSprite !== token) return;
+        if (next < urls.length) {
+            img.src = urls[next++];
+        } else {
+            img.onerror = null;
+        }
+    };
+    img.src = urls[0];
+}
+
 const AssetPreloader = {
     cached: new Set(),
     preloadImage(url, priority) {
@@ -29,7 +61,7 @@ const AssetPreloader = {
     // the caught sprite only when it is needed.
     prioritizePokemon(pokemonId) {
         if (!pokemonId || isLowBandwidthConnection()) return;
-        this.preloadImage(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonId}.png`, true);
+        this.preloadImage(pokemonSpriteUrls(pokemonId)[0], true);
     },
     preload() {
         if (isLowBandwidthConnection()) return;

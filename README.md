@@ -214,24 +214,19 @@ would look cleaner.
 
 ### The step 4 catch reveal
 
-On solve, a 3D Pokéball drifts in from off-screen, rests softly on the
-platform with a shallow squash, and the latch eases open so the sprite
-materialises out of a warm bloom. The pacing is deliberately unhurried — an
-earlier version dropped the ball hard, punched the platform ring with a white
-flash and fired a full-opacity shockwave, which read as a shock instead of a
-peaceful reveal. The catch line is **voice-only** — `pokemonName` is never
-rendered on screen, so the player identifies the Pokémon from the sprite alone.
+On solve, a 3D Pokéball drops in from above, bounces once on the platform and
+settles. Warm light leaks from its equator, the shells crack open, and the
+caught Pokémon pops out as a white silhouette that dissolves into full colour.
+The ball's squash, the platform ring pulse and the ground shadow all share the
+same 1.3s drop, so the impact reads as one beat. The catch line is
+**voice-only** — `pokemonName` is never rendered on screen, so the player
+identifies the Pokémon from the sprite alone.
 
-The energy escaping the ball is expressed as a **seam flare plus rising
-wisps**, not a light column. `.reveal-seam` is a soft warm ellipse along the
-ball's equator — exactly where the shells split — and `spawnReleaseWisps()`
-adds five soft puffs (each with its own drift, rise, size and delay) that
-float up out of the open ball. Both sit *below* the sprite in z-order
-(9 vs 10) and neither grows tall, so the Pokémon is never washed out and the
-completion card on the last puzzle is never covered. This replaced the
-blurred golden beam, which fought the app's CRT/pixel theme, doubled up with
-the bloom and the sprite's own materialize glow, and grew straight through the
-reveal it was meant to sell.
+Timings live in two places and must stay in sync: the CSS in `css/success.css`
+(`pk-ball-drop`, `pk-seam-glow`, `pk-ball-crack`, `pk-emerge`) and
+`playPokemonReveal()` in `js/screens.js` (impact thuds at 0.72s / 1.07s, crack
+at 1.50s, catch line at 1.54s). The reveal dispatches `pykachu:reveal-open` on
+the crack frame so the end-of-chain confetti lands with it.
 
 `js/audio.js` speaks it as a male anime-announcer line — one male voice,
 `Gotcha! You caught <NAME>!` — with the name shouted in caps at pitch 0.92 /
@@ -622,7 +617,9 @@ Speech API.
 
 | Asset | Where used | URL template |
 |-------|-----------|--------------|
-| Official artwork (caught Pokémon) | `js/data-loader.js`, `js/game.js` | `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{pokemonId}.png` |
+| Home render (primary reveal art) | `js/data-loader.js`, `js/game.js` | `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/{pokemonId}.png` |
+| Official artwork (fallback) | `js/data-loader.js`, `js/game.js` | `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{pokemonId}.png` |
+| Bundled Pikachu (final fallback) | `js/data-loader.js`, `js/game.js` | `assets/img/pikachu.png` |
 | Gym badge (by `badgeId`) | `js/data-loader.js`, `js/screens.js` | `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/{badgeId}.png` |
 
 Useful roots:
@@ -952,7 +949,7 @@ and renders aggregated JSON.
 - `assets/img/apple-touch-icon.png` — 180×180 opaque PNG for iOS home screens
   and older Safari tabs, which ignore the SVG icon format.
 - `service-worker.js` — caches the app shell and required JSON data for offline
-  reloads using cache version `pykachu-go-v2.0.10`. Large optional audio and
+  reloads using cache version `pykachu-go-v2.0.37`. Large optional audio and
   decorative artwork are not downloaded during installation; the small Pikachu
   image is cached as an offline fallback for remote Pokémon artwork.
 - Cached local assets use cache-first delivery, so repeat visits and offline
