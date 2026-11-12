@@ -83,17 +83,7 @@
     animation: spin-slow 10s linear infinite;
 }
 
-.cyber-orbit::before {
-    content: '';
-    position: absolute;
-    top: -4px;
-    left: 50%;
-    width: 8px;
-    height: 8px;
-    background: #60A5FA;
-    border-radius: 50%;
-    box-shadow: 0 0 10px #60A5FA;
-}
+
 
 @keyframes spin-slow {
     to {

@@ -80,12 +80,8 @@
         top: 0%;
         opacity: 0.3;
     }
-    50% {
-        top: 98%;
-        opacity: 1;
-    }
     100% {
-        top: 0%;
+        top: 100%;
         opacity: 0.3;
     }
 }
