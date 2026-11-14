@@ -51,20 +51,29 @@ function isRetryableSheetsFailure(response, json) {
     return /lock unavailable|simultaneous|too many scripts|service invoked too many times|quota exceeded/.test(message);
 }
 
-async function postToGoogleSheets(body, action) {
+async function postToGoogleSheets(body, action, options = {}) {
     // Capture credentials before waiting for a rate-limit slot: logout may
     // clear the active team's globals while this request is queued.
     const requestLoginToken = body.loginToken || getLoginToken();
-    for (let attempt = 0; attempt <= SHEETS_RETRY_DELAYS_MS.length; attempt++) {
-        await waitForSheetsSlot();
+    const useRateLimit = options.rateLimit !== false && body.action !== 'LOGIN';
+    const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 15000;
+    const maxRetries = Number.isInteger(options.maxRetries) && options.maxRetries >= 0
+        ? options.maxRetries
+        : SHEETS_RETRY_DELAYS_MS.length;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (useRateLimit) await waitForSheetsSlot();
         let response;
         let json = null;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         try {
             response = await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'cors',
                 cache: 'no-cache',
                 keepalive: true,
+                signal: controller.signal,
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({
                     ...body,
@@ -74,23 +83,29 @@ async function postToGoogleSheets(body, action) {
             });
             json = await response.json();
         } catch (error) {
-            if (attempt === SHEETS_RETRY_DELAYS_MS.length) {
-                console.warn(`[Sheets] Request failed for ${action}:`, error);
-                return { ok: false, json: null };
+            const timedOut = Boolean(error && error.name === 'AbortError');
+            if (timedOut) {
+                json = { status: 'timeout', message: 'The server did not respond in time.' };
             }
+            if (attempt === maxRetries) {
+                console.warn(`[Sheets] Request failed for ${action}:`, error);
+                return { ok: false, json: timedOut ? json : null };
+            }
+        } finally {
+            clearTimeout(timeoutId);
         }
 
         if (response && response.ok && isSheetsSuccess({ ok: true, json })) {
             return { ok: true, json };
         }
 
-        if (!isRetryableSheetsFailure(response, json) || attempt === SHEETS_RETRY_DELAYS_MS.length) {
+        if (!isRetryableSheetsFailure(response, json) || attempt === maxRetries) {
             return { ok: false, json };
         }
 
         await new Promise(resolve => setTimeout(
             resolve,
-            SHEETS_RETRY_DELAYS_MS[attempt] + Math.floor(Math.random() * 500)
+            SHEETS_RETRY_DELAYS_MS[Math.min(attempt, SHEETS_RETRY_DELAYS_MS.length - 1)] + Math.floor(Math.random() * 500)
         ));
     }
     return { ok: false, json: null };
@@ -335,7 +350,7 @@ async function loginTeam(teamName, tid, securityKey) {
             teamName: teamName || '',
             tid: tid || '',
             securityKey: securityKey || ''
-        }, 'LOGIN');
+        }, 'LOGIN', { rateLimit: false, timeoutMs: 15000, maxRetries: 0 });
         if (isSheetsSuccess(result) && result.json && result.json.loginToken) {
             return { ok: true, ...result.json };
         }

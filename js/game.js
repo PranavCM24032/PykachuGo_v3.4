@@ -46,7 +46,13 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         submitButton.textContent = 'AUTHENTICATING...';
     }
     showFeedback('registrationFeedback', 'Verifying team credentials...', 'info');
+    const slowLoginNotice = setTimeout(() => {
+        if (thisLoginFlow === loginFlowId) {
+            showFeedback('registrationFeedback', 'Still connecting to the game server. This can take a few seconds...', 'info');
+        }
+    }, 4000);
     const login = await loginTeam(foundTeam.team, lookupTid, securityKeyInput);
+    clearTimeout(slowLoginNotice);
     if (submitButton && thisLoginFlow === loginFlowId) {
         submitButton.disabled = false;
         submitButton.innerHTML = '<span class="material-symbols-rounded text-sm sm:text-base">play_arrow</span> START GO';
@@ -64,6 +70,8 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
                         ? 'Server login is not configured. Contact the administrator.'
                         : response.status === 'configuration_error'
                             ? 'Game login is not configured. Contact the administrator.'
+                        : response.status === 'timeout'
+                            ? 'The login server is taking too long. Please retry in a moment.'
                         : 'Could not reach the login server. Check your connection and try again.';
         showFeedback('registrationFeedback', message, 'error');
         triggerShake(response.message === 'invalid credentials' ? 'teamSecurityKey' : 'teamName');
