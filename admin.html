@@ -490,17 +490,17 @@
     <script src="js/custom-select.js"></script>
     <script>
         const RUNTIME_CONFIG = window.PYKACHU_RUNTIME_CONFIG || {};
-        const FALLBACK_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxkayXUQtv1eQoTTxVj_U-3ONsnCIz_2VKY2yFUM51hnBI2k9rcWQlIO8Z0SN8VIQ74cA/exec';
-        const FALLBACK_SCRIPT_TOKEN = 'pykachugo-27';
-        const FALLBACK_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Owj4i-89RnXO-UipEVBvOcqYs2r5vdyG7vYRB8_F_X0/edit?gid=0#gid=0';
-
         const CONFIG = {
-            SCRIPT_URL: (RUNTIME_CONFIG.googleScriptUrl || FALLBACK_SCRIPT_URL).trim(),
-            TOKEN: (RUNTIME_CONFIG.googleScriptToken || FALLBACK_SCRIPT_TOKEN).trim(),
-            SHEET_URL: (RUNTIME_CONFIG.googleSheetUrl || FALLBACK_SHEET_URL).trim(),
+            SCRIPT_URL: (RUNTIME_CONFIG.googleScriptUrl || '').trim(),
+            TOKEN: (RUNTIME_CONFIG.googleScriptToken || '').trim(),
+            SHEET_URL: (RUNTIME_CONFIG.googleSheetUrl || '').trim(),
             REFRESH_RATE: 12000,
             VERSION: '3.4.0'
         };
+
+        if (!CONFIG.SCRIPT_URL || !CONFIG.TOKEN) {
+            console.error('[Admin] Google Apps Script backend is NOT configured. Set GOOGLE_SCRIPT_URL/GOOGLE_SCRIPT_TOKEN in runtime config or environment variables.');
+        }
 
         const masterSheetLink = document.getElementById('masterSheetLink');
         if (masterSheetLink && CONFIG.SHEET_URL) {
