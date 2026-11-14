@@ -178,6 +178,7 @@ function safeCell(value) {
 }
 
 function teamRowMatches(row, tidIndex, teamIndex, tid, teamName) {
+  if (!row || row.length <= Math.max(tidIndex, teamIndex)) return false;
   var tId = cellText_(tid).toUpperCase();
   var tName = cellText_(teamName).toUpperCase();
   var rowTid = cellText_(row[tidIndex]).toUpperCase();
