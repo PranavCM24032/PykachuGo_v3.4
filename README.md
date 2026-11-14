@@ -685,10 +685,14 @@ The backend creates these tabs automatically on first use.
   registered mission level).
 - `Registration` events only touch the Registration tab; the security key column is
   stored but **never** returned by the admin data endpoint.
-- **`SOLVED`** ships the full per-puzzle notebook in one call, finalizes the
-  puzzle's row and writes **`Unlocked Puzzle IDs`** + **`Solved Puzzle IDs`** +
-  the running **`Total Score`**. Abandoned puzzles go through
-  **`PUZZLE_ABANDONED`** (1 call) with the half-done notebook intact.
+- **`REGISTRATION`** writes immediately so the registration row is available
+  to the admin panel as soon as the player signs in.
+- Gameplay telemetry is saved in a per-browser localStorage queue and sent in
+  batches of up to ten events. The queue flushes on a timer, after a solve, or
+  when the player leaves; failed batches remain queued for retry.
+- A verified **`SUBMIT_ANSWER`** writes the full per-puzzle notebook and score
+  in one server-locked operation. Abandoned puzzles are queued as
+  **`PUZZLE_ABANDONED`** with the half-done notebook.
 - There is **no separate TeamState tab**. `GET_TEAM_STATE` re-aggregates the
   `L1`/`L2`/`L3` rows: `solved` = unique puzzle IDs with `SOLVED` or
   `REPEAT_SOLVE` status, `currentPuzzle` = puzzle from the most recent row,
@@ -738,17 +742,21 @@ App-Script-side logic; each diamond = a server-side condition.
 ```mermaid
 flowchart TD
     subgraph WR["A · CLIENT → APPS SCRIPT (POST /exec)"]
-        CLIENT["Client app<br/>(js/google-sheets.js)"] --> RATE["sheetsRateLimiter<br/>30 calls / 60s sliding window"]
-        RATE --> MODE{"Send mode?"}
-        MODE -- "Single event" --> PS["sendToGoogleSheets()<br/>POST {action, token, team, …}"]
+        CLIENT["Client app<br/>(js/google-sheets.js)"] --> MODE{"Send mode?"}
+        MODE -- "Registration" --> PS["sendToGoogleSheets()<br/>POST registration now"]
+        MODE -- "Gameplay telemetry" --> BUF["localStorage session queue"]
+        BUF --> RATE["sheetsRateLimiter<br/>30 calls / 60s sliding window"]
         MODE -- "Batch flush" --> PB["flushSessionBuffer()<br/>POST {action: SESSION_BATCH,<br/>events: [...]}"]
+        MODE -- "Login / answer verification" --> AUTH["Direct interactive request"]
         MODE -- "Page unload" --> PU["beforeunload keepalive POST<br/>(tryAcquire() — non-blocking)"]
-        PS -. "send fails" .-> BUF["localStorage session buffer<br/>(retried by 10s flush / next load)"]
+        BUF --> PB
+        PS -. "send fails" .-> BUF
         PB -. "HTTP error" .-> BUF
     end
 
     PS --> DO_POST
     PB --> DO_POST
+    AUTH --> DO_POST
     PU --> DO_POST
 
     subgraph DSP["B · doPost(e) — entry + dispatch"]
@@ -836,8 +844,9 @@ flowchart TD
 
 Reading notes:
 
-- **A → B**: everything the client sends travels through the rate limiter, then
-  a single POST lands in `doPost` (CORS + batch-safe).
+- **A → B**: registration and event batches land in `doPost` (CORS + batch-safe).
+  Login and answer verification bypass the client event queue so cached telemetry
+  cannot delay interactive actions.
 - **B**: one script lock per request; `RESET_ALL` (epoch bump) is the only thing
   that touches *all* tabs at once.
 - **C**: routing is by puzzle level first (`puzzleLevel`), then mission prefix —
@@ -852,14 +861,14 @@ Reading notes:
 ## 🛡 Rate limiting
 
 `js/rate-limiter.js` implements a client-side **sliding-window rate limiter**
-for all Google Sheets API calls:
+for background event-batch flushes:
 
 - Config (in `js/google-sheets.js`): `limit: 30` calls per `windowMs: 60000`
   (60 s rolling window).
 - Requests are spaced `windowMs / limit` (2 s) apart automatically.
 - Holds call timestamps in `localStorage` (`pykachuSheetsRateLimit`) so reduced
   quota survives page reloads.
-- `acquire()` — awaited by `sendToGoogleSheets` and batch `flushSessionBuffer`.
+- `acquire()` — awaited by batch `flushSessionBuffer`.
 - `tryAcquire()` — non-blocking slot used by the `beforeunload` flush; if the
   window is full the buffer is kept for the next session's 10 s flush instead of
   dropping events.

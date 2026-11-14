@@ -55,7 +55,9 @@ async function postToGoogleSheets(body, action, options = {}) {
     // Capture credentials before waiting for a rate-limit slot: logout may
     // clear the active team's globals while this request is queued.
     const requestLoginToken = body.loginToken || getLoginToken();
-    const useRateLimit = options.rateLimit !== false && body.action !== 'LOGIN';
+    // Only background batch flushes use the browser queue. Interactive calls
+    // must not wait behind cached telemetry; Apps Script serializes writes.
+    const useRateLimit = options.rateLimit === true;
     const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 15000;
     const maxRetries = Number.isInteger(options.maxRetries) && options.maxRetries >= 0
         ? options.maxRetries
@@ -125,8 +127,10 @@ function addToSessionBuffer(payload) {
     try {
         localStorage.setItem(SESSION_BUFFER_KEY, JSON.stringify(buffer));
         _bufferDirty = true;
+        return true;
     } catch (e) {
         console.warn('[Buffer] Could not save to localStorage:', e);
+        return false;
     }
 }
 
@@ -277,14 +281,30 @@ async function submitToGoogleSheets(action, data = {}) {
             return false;
         }
 
-        // Send immediately in real-time; buffer ONLY if the send fails so the
-        // 10s flush / unload retry never duplicates events that already reached the sheet.
-        const sent = await sendToGoogleSheets(payload);
-        if (!sent) {
-            addToSessionBuffer(payload);
-            console.log(`[Sheets] Buffered ${action} for retry`);
+        // Registration is the one immediate write. Gameplay telemetry is
+        // cached first and then sent in a small batch to reduce simultaneous
+        // spreadsheet writes from many players.
+        if (action === 'REGISTRATION') {
+            const sent = await sendToGoogleSheets(payload);
+            if (!sent) {
+                addToSessionBuffer(payload);
+                console.log('[Sheets] Buffered REGISTRATION for retry');
+            }
+            return sent;
         }
-        return sent;
+
+        if (!addToSessionBuffer(payload)) {
+            // Keep the event moving if browser storage is unavailable or full.
+            return await sendToGoogleSheets(payload);
+        }
+        console.log(`[Sheets] Queued ${action} for batch sync`);
+
+        // Submit a full batch promptly. Smaller batches are flushed by the
+        // randomized background timer, after a solve, or when the page closes.
+        if (getSessionBuffer().length >= 10) {
+            flushSessionBuffer().catch(error => console.warn('[Sheets] Full-batch flush failed:', error));
+        }
+        return true;
 
     } catch (error) {
         console.error('CRITICAL: Error submitting telemetry:', error);
@@ -326,7 +346,7 @@ async function flushSessionBuffer() {
     if (!request) return;
 
     try {
-        const result = await postToGoogleSheets(request, 'SESSION_BATCH');
+        const result = await postToGoogleSheets(request, 'SESSION_BATCH', { rateLimit: true });
         if (isSheetsSuccess(result)) {
             console.log(`[Sheets] Flushed ${request.events.length} buffered events`);
             removeFlushedEvents(request.events);
