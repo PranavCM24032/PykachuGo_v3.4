@@ -187,6 +187,9 @@ function teamRowMatches(row, tidIndex, teamIndex, tid, teamName) {
 }
 
 function getTeamContext(ss, tid, teamName) {
+  if (!ss) {
+    return { solved: [], points: 0, hintsUsed: [], currentPuzzle: null };
+  }
   var cache = CacheService.getScriptCache();
   var cKey = 'ctx_' + String(tid || teamName || '').replace(/[^A-Za-z0-9_]/g, '_');
   var cached = cKey !== 'ctx_' ? cache.get(cKey) : null;
