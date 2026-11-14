@@ -1,9 +1,9 @@
 @media (max-width: 640px) {
     .pokedex-shell {
-        width: calc(100vw - 8px);
-        height: calc(100vh - 8px);
-        height: calc(100svh - 8px);
-        height: calc(100dvh - 8px);
+        width: calc(100% - 8px);
+        height: calc(100vh - 16px);
+        height: calc(100svh - 16px);
+        height: calc(100dvh - 16px);
         margin: 4px auto;
         border-radius: 22px;
         border-width: 3px;
@@ -16,9 +16,9 @@
 
 @media (max-height: 740px) {
     .pokedex-shell {
-        height: calc(100vh - 10px);
-        height: calc(100svh - 10px);
-        height: calc(100dvh - 10px);
+        height: calc(100vh - 18px);
+        height: calc(100svh - 18px);
+        height: calc(100dvh - 18px);
         margin: 5px auto;
         max-height: 720px;
     }
@@ -159,17 +159,15 @@
 
 @supports (padding-top: env(safe-area-inset-top)) {
     .pokedex-shell {
-        padding-top: max(10px, env(safe-area-inset-top));
-        padding-bottom: max(16px, env(safe-area-inset-bottom));
+        height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px);
+        height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px);
+        height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px);
+        margin: 4px auto;
     }
 
     @media (max-width: 640px) {
         .pokedex-shell {
-            /* Ensure bottom edge always shows even on notched phones */
-            height: calc(100vh  - max(8px, env(safe-area-inset-bottom)) - 8px);
-            height: calc(100svh - max(8px, env(safe-area-inset-bottom)) - 8px);
-            height: calc(100dvh - max(8px, env(safe-area-inset-bottom)) - 8px);
-            margin-bottom: max(4px, env(safe-area-inset-bottom));
+            width: calc(100% - 8px);
         }
     }
 }
