@@ -95,6 +95,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (serverEpoch > localEpoch) {
                 Object.values(CONFIG.STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
                 if (typeof SESSION_BUFFER_KEY !== 'undefined') localStorage.removeItem(SESSION_BUFFER_KEY);
+                if (typeof PENDING_ANSWER_KEY !== 'undefined') localStorage.removeItem(PENDING_ANSWER_KEY);
+                localStorage.removeItem('pykachuPendingAnswers');
                 localStorage.removeItem('pykachuSheetsRateLimit');
                 localStorage.setItem(CONFIG.STORAGE_KEYS.gameEpoch, String(serverEpoch));
                 console.log(`[Epoch] Reset detected (${localEpoch} -> ${serverEpoch}); local progress wiped.`);
@@ -450,12 +452,10 @@ function logoutCurrentUser() {
     resetHintForNewTeam();
     if (typeof resetNotebookMirror === 'function') resetNotebookMirror();
 
-    // Never leave a stale session token in remembered trainer data.
-    const remembered = (typeof getTeamInfo === 'function') ? getTeamInfo() : null;
-    if (remembered && remembered.loginToken) {
-        delete remembered.loginToken;
-        saveTeamInfo(remembered);
-    }
+    // Clear ALL remembered team data so the next user on this device starts
+    // completely fresh — no pre-filled team name, no stale puzzle, no old token.
+    if (typeof saveTeamInfo === 'function') saveTeamInfo(null);
+    try { localStorage.removeItem(CONFIG.STORAGE_KEYS.gameState); } catch (e) {}
 
     updateTeamStatus();
     updatePowerLed();

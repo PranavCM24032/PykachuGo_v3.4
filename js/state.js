@@ -109,7 +109,11 @@ function getTeamInfo() {
 
 function saveTeamInfo(info) {
     try {
-        localStorage.setItem(CONFIG.STORAGE_KEYS.teamInfo, JSON.stringify(info || {}));
+        if (info === null || info === undefined) {
+            localStorage.removeItem(CONFIG.STORAGE_KEYS.teamInfo);
+        } else {
+            localStorage.setItem(CONFIG.STORAGE_KEYS.teamInfo, JSON.stringify(info));
+        }
     } catch (e) {
         console.warn('Could not save remembered trainer:', e);
     }

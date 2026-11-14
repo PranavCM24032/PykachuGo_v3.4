@@ -27,10 +27,14 @@ const env = { ...readEnv(envPath) };
     if (process.env[key]) env[key] = process.env[key];
 });
 
+const FALLBACK_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPyHAN7lB2XfNGrYSI6NvTYPuoXP8Ncwul2mFomn_DSgQGc_jNsvf6O4ev1OPNmrjX6w/exec';
+const FALLBACK_SCRIPT_TOKEN = 'pykachugo-27';
+const FALLBACK_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Owj4i-89RnXO-UipEVBvOcqYs2r5vdyG7vYRB8_F_X0/edit?gid=0#gid=0';
+
 const runtimeConfig = {
-    googleScriptUrl: (env.GOOGLE_SCRIPT_URL || '').trim(),
-    googleScriptToken: (env.GOOGLE_SCRIPT_TOKEN || '').trim(),
-    googleSheetUrl: (env.GOOGLE_SHEET_URL || '').trim()
+    googleScriptUrl: (env.GOOGLE_SCRIPT_URL || FALLBACK_SCRIPT_URL).trim(),
+    googleScriptToken: (env.GOOGLE_SCRIPT_TOKEN || FALLBACK_SCRIPT_TOKEN).trim(),
+    googleSheetUrl: (env.GOOGLE_SHEET_URL || FALLBACK_SHEET_URL).trim()
 };
 
 fs.writeFileSync(

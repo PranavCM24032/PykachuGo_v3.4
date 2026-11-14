@@ -2,10 +2,14 @@
 // GAME CONFIGURATION
 // ==============================
 const RUNTIME_CONFIG = window.PYKACHU_RUNTIME_CONFIG || {};
-const GOOGLE_SCRIPT_URL = RUNTIME_CONFIG.googleScriptUrl || '';
-const GOOGLE_SCRIPT_TOKEN = RUNTIME_CONFIG.googleScriptToken || '';
 
-const GOOGLE_SHEET_URL = RUNTIME_CONFIG.googleSheetUrl || '';
+const FALLBACK_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPyHAN7lB2XfNGrYSI6NvTYPuoXP8Ncwul2mFomn_DSgQGc_jNsvf6O4ev1OPNmrjX6w/exec';
+const FALLBACK_SCRIPT_TOKEN = 'pykachugo-27';
+const FALLBACK_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Owj4i-89RnXO-UipEVBvOcqYs2r5vdyG7vYRB8_F_X0/edit?gid=0#gid=0';
+
+const GOOGLE_SCRIPT_URL = (RUNTIME_CONFIG.googleScriptUrl || FALLBACK_SCRIPT_URL).trim();
+const GOOGLE_SCRIPT_TOKEN = (RUNTIME_CONFIG.googleScriptToken || FALLBACK_SCRIPT_TOKEN).trim();
+const GOOGLE_SHEET_URL = (RUNTIME_CONFIG.googleSheetUrl || FALLBACK_SHEET_URL).trim();
 
 if (!GOOGLE_SCRIPT_URL || !GOOGLE_SCRIPT_TOKEN) {
     console.warn('[Config] Google Sheets backend is NOT configured. Scoring and telemetry will be disabled.');
