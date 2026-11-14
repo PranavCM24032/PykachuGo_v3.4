@@ -1009,13 +1009,15 @@ private property.
 admin app. The generated file is still delivered to browsers, so it is
 configuration hygiene — not a security boundary.
 
-For GitHub Pages, copy the values from ignored
-`.local-secrets/github-actions-settings.json` into Actions settings:
-`GOOGLE_SCRIPT_URL` and `GOOGLE_SHEET_URL` are variables, and
-`GOOGLE_SCRIPT_TOKEN` is a secret (repository or `github-pages` environment
-scope). The workflow generates `js/runtime-config.js` from these values before
-uploading the site and fails with the missing variable names if configuration
-is incomplete.
+For GitHub Pages, the runtime generator has the public player endpoint and
+player token as defaults, so a fresh Actions run can deploy without manually
+adding settings. These values are delivered to every browser and are not
+secrets. You can override them with `GOOGLE_SCRIPT_URL` and
+`GOOGLE_SCRIPT_TOKEN`; set `GOOGLE_SHEET_URL` as a variable if the admin page
+should show the spreadsheet link. `.local-secrets/github-actions-settings.json`
+contains the current values for those optional overrides. Never put admin
+credentials, team keys, or puzzle answers in Actions variables or browser
+runtime configuration.
 
 ---
 
@@ -1042,7 +1044,9 @@ unique from the public player token and at least 32 characters; login-session
 signing secrets must also be private and at least 32 characters. Set
 the frontend's `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and optionally
 `GOOGLE_SHEET_URL` in local `.env` or the hosting provider's environment
-configuration; no deployment URLs are embedded as runtime defaults.
+configuration. The public player endpoint and token also have browser-visible
+defaults in `js/generate-runtime-config.cjs`; admin credentials and game
+secrets are never included there.
 
 When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
 `service-worker.js` so cache-first clients receive the update. Bump
@@ -1050,17 +1054,19 @@ When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
 
 ### GitHub Pages
 
-1. Add `GOOGLE_SCRIPT_URL` and `GOOGLE_SHEET_URL` as GitHub Actions variables
-   and `GOOGLE_SCRIPT_TOKEN` as an Actions secret (repository or
-   `github-pages` environment).
+1. Public player endpoint and token defaults let the workflow run without
+   repository settings. Optionally override them with `GOOGLE_SCRIPT_URL` and
+   `GOOGLE_SCRIPT_TOKEN`, and set `GOOGLE_SHEET_URL` as an Actions variable.
+   These values are sent to browsers, so they are not secrets.
 2. Push to `main` or run the single Pages workflow manually
    (`.github/workflows/static.yml`).
 
 ### Vercel
 
 1. Import the repository in Vercel and choose **Other** as the framework preset.
-2. Add `GOOGLE_SCRIPT_URL` and `GOOGLE_SCRIPT_TOKEN` as Production environment
-   variables. The token must match the Apps Script `PLAYER_TOKEN` property.
+2. Optionally override `GOOGLE_SCRIPT_URL` and `GOOGLE_SCRIPT_TOKEN` as
+   Production environment variables. The token must match the Apps Script
+   `PLAYER_TOKEN` property.
    Optionally set `GOOGLE_SHEET_URL` to show the spreadsheet link in the admin
    dashboard.
 3. Redeploy after adding the variables. `vercel.json` runs

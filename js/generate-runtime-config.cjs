@@ -27,8 +27,9 @@ const env = { ...readEnv(envPath) };
     if (process.env[key]) env[key] = process.env[key];
 });
 
-const FALLBACK_SCRIPT_URL = '';
-const FALLBACK_SCRIPT_TOKEN = '';
+// These are public client settings: local .env and Actions values override them.
+const FALLBACK_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxkayXUQtv1eQoTTxVj_U-3ONsnCIz_2VKY2yFUM51hnBI2k9rcWQlIO8Z0SN8VIQ74cA/exec";
+const FALLBACK_SCRIPT_TOKEN = "pykachugo-27";
 const FALLBACK_SHEET_URL = '';
 
 const runtimeConfig = {
