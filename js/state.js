@@ -287,10 +287,9 @@ function standardizeString(str) {
 // appear in currentPuzzle.nextPuzzleId. Entry/starting puzzles are legitimate
 // chain entry points, NOT jumps, and bypass the queue gate.
 //
-// A non-empty startCode marks a puzzle as a start puzzle. This is the single
-// source of truth; puzzle.json does not need a separate isStart flag.
+// The public catalogue exposes the start-gate shape without shipping its key.
 function isStartingPuzzle(puzzle) {
-    return !!(puzzle && typeof puzzle.startCode === 'string' && puzzle.startCode.trim());
+    return Boolean(puzzle && puzzle.requiresStartCode === true);
 }
 
 function getNextPuzzle(puzzle) {

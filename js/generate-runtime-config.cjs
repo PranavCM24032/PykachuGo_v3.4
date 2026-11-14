@@ -43,7 +43,11 @@ fs.writeFileSync(
 );
 
 if (!runtimeConfig.googleScriptUrl || !runtimeConfig.googleScriptToken) {
-    const message = '[Build] Runtime config is missing GOOGLE_SCRIPT_URL or GOOGLE_SCRIPT_TOKEN. Configure both for the deployment.';
+    const missing = [
+        !runtimeConfig.googleScriptUrl && 'GOOGLE_SCRIPT_URL',
+        !runtimeConfig.googleScriptToken && 'GOOGLE_SCRIPT_TOKEN'
+    ].filter(Boolean);
+    const message = `[Build] Runtime config is missing: ${missing.join(', ')}. Configure these deployment settings.`;
     if (process.env.VERCEL || process.env.CI) {
         console.error(message);
         process.exitCode = 1;

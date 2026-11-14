@@ -502,10 +502,7 @@ async function handleQRScanResult(qrData) {
 
     const matchedPuzzle = (() => {
         if (!normalizedLink) return null;
-        const direct = PUZZLES.find(p => standardizeString(p.linkid) === normalizedLink);
-        if (direct) return direct;
-        // Allow direct start-code entry. Codes live in data/puzzle.json.
-        return PUZZLES.find(p => isStartingPuzzle(p) && standardizeString(p.startCode) === normalizedLink) || null;
+        return PUZZLES.find(p => standardizeString(p.linkid) === normalizedLink) || null;
     })();
 
     const matchedMeme = (() => {

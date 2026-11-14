@@ -654,7 +654,9 @@
                                 ? 'admin_token_rejected'
                                 : (json.message === 'admin authentication is not configured'
                                     ? 'admin_token_not_configured'
-                                    : 'admin_auth_failed')));
+                                    : (json.message === 'session signing is not configured'
+                                        ? 'admin_session_not_configured'
+                                        : 'admin_auth_failed'))));
                     }
                     state.adminSession = json.session;
                     saveAdminSession(json.session);
@@ -672,6 +674,7 @@
                         rate_limited: 'TOO MANY ATTEMPTS - WAIT ONE MINUTE AND TRY AGAIN.',
                         admin_token_rejected: 'ACCESS DENIED - VERIFY ADMIN_TOKEN IN APPS SCRIPT SCRIPT PROPERTIES.',
                         admin_token_not_configured: 'ADMIN LOGIN IS DISABLED - SET A UNIQUE ADMIN_TOKEN IN APPS SCRIPT SCRIPT PROPERTIES.',
+                        admin_session_not_configured: 'ADMIN LOGIN IS DISABLED - SET A PRIVATE LOGIN_SESSION_SECRET OF AT LEAST 32 CHARACTERS.',
                         admin_auth_failed: 'ADMIN AUTHENTICATION FAILED - CHECK APPS SCRIPT DEPLOYMENT AND CONFIGURATION.'
                     };
                     authError.textContent = messages[e.message] ||
@@ -979,7 +982,7 @@
             const L_COLS = "30px 88px 1.4fr 90px 76px 34px 36px 36px 36px 70px 60px 46px 46px";
             const REG_COLS = "35px 140px 90px 180px 110px 130px";
             const LB_COLS = "40px 88px 1fr 120px 58px 58px 58px 90px";
-            const ROSTER_COLS = "35px 1.4fr 100px 110px 2fr";
+            const ROSTER_COLS = "35px 1.4fr 100px 2fr";
 
             if (state.activeTab === 'REG') {
                 header.style.gridTemplateColumns = REG_COLS;
@@ -1011,7 +1014,6 @@
                     <div class="text-center font-mono">#</div>
                     <div class="text-left font-bold pl-1">Team Name</div>
                     <div class="text-center font-mono text-blue-400">TID</div>
-                    <div class="text-center font-mono text-slate-400">Security Key</div>
                     <div class="text-left font-mono text-emerald-300">Team Members</div>
                 `;
                 header.className = "grid gap-1 px-3 py-2.5 bg-slate-950/90 border-b border-slate-800 text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono text-center";
@@ -1339,7 +1341,6 @@
                         <div class="text-slate-500 font-mono">${i + 1}</div>
                         <div class="text-left font-bold text-slate-200 truncate pl-1" title="${escapeHTML(t.team)}">${escapeHTML(t.team)}</div>
                         <div class="font-mono text-blue-400 truncate" title="${escapeHTML(t.tid || '')}">${escapeHTML(t.tid || '-')}</div>
-                        <div class="font-mono text-slate-400 truncate" title="${escapeHTML(t.securityKey || '')}">${escapeHTML(t.securityKey || '-')}</div>
                         <div class="text-left font-mono text-emerald-300 truncate pl-1" title="${escapeHTML(members)}">${escapeHTML(members)}</div>
                     </div>`;
                 }).join('');

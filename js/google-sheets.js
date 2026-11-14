@@ -2,11 +2,6 @@
 // GOOGLE SHEETS INTEGRATION
 // ==============================
 const SESSION_BUFFER_KEY = 'pykachuSessionBuffer';
-const PENDING_ANSWER_KEY = 'pykachuPendingAnswers';
-let pendingAnswerFlushPromise = null;
-let pendingAnswerFlushTeamKey = '';
-let pendingAnswerRetryTimer = null;
-let pendingAnswerRetryDelay = 5000;
 
 // In-memory dirty flag: avoids a localStorage read every 10s when buffer is empty.
 let _bufferDirty = (() => {
@@ -351,7 +346,7 @@ async function loginTeam(teamName, tid, securityKey) {
     }
 }
 
-// Reconcile a locally-validated answer with the server's stored score.
+// Validate the answer and persist the score before revealing a solve.
 async function submitAnswerToServer(puzzleId, answer, extra = {}) {
     if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
         return { ok: false, json: null };
@@ -367,18 +362,14 @@ async function submitAnswerToServer(puzzleId, answer, extra = {}) {
         sessionId: typeof sessionId !== 'undefined' ? sessionId : ''
     };
     if (!payload.eventId) payload.eventId = generateEventId();
-
-    if (!queuePendingAnswer(payload)) {
-        return { ok: false, pending: false, json: null };
-    }
-
-    if (!getLoginToken()) return { ok: false, pending: true, json: null };
+    if (!getLoginToken()) return { ok: false, pending: false, json: { message: 'login required' } };
     try {
-        return await flushPendingAnswerEvents(payload.eventId);
+        const result = await postToGoogleSheets(payload, 'SUBMIT_ANSWER');
+        if (result && result.ok && result.json) return { ok: true, ...result.json };
+        return { ok: false, pending: false, json: (result && result.json) || null };
     } catch (error) {
-        console.warn('[Sheets] Answer sync failed; preserving it for retry:', error);
-        schedulePendingAnswerRetry();
-        return { ok: false, pending: true, json: null };
+        console.warn('[Sheets] Answer verification failed:', error);
+        return { ok: false, pending: false, json: null };
     }
 }
 
@@ -388,143 +379,6 @@ function getPendingAnswerTeamKey(event) {
     const teamName = String(event && event.teamName || '').trim().toUpperCase();
     return teamName ? `team:${teamName}` : '';
 }
-
-function getPendingAnswerQueue() {
-    try {
-        const queue = JSON.parse(localStorage.getItem(PENDING_ANSWER_KEY) || '[]');
-        return Array.isArray(queue) ? queue.filter(event =>
-            event && event.action === 'SUBMIT_ANSWER' && event.eventId &&
-            getPendingAnswerTeamKey(event) && Number(event.puzzleId) > 0
-        ) : [];
-    } catch (error) {
-        console.error('[Sheets] Could not read pending answer queue:', error);
-        return [];
-    }
-}
-
-function queuePendingAnswer(payload) {
-    const queue = getPendingAnswerQueue();
-    if (!queue.some(event => event.eventId === payload.eventId)) queue.push(payload);
-    try {
-        localStorage.setItem(PENDING_ANSWER_KEY, JSON.stringify(queue));
-        return true;
-    } catch (error) {
-        console.error('[Sheets] Could not persist pending answer:', error);
-        return false;
-    }
-}
-
-function removePendingAnswer(eventId) {
-    const queue = getPendingAnswerQueue().filter(event => event.eventId !== eventId);
-    try {
-        localStorage.setItem(PENDING_ANSWER_KEY, JSON.stringify(queue));
-        return true;
-    } catch (error) {
-        console.error('[Sheets] Could not remove confirmed pending answer:', error);
-        return false;
-    }
-}
-
-function schedulePendingAnswerRetry() {
-    if (pendingAnswerRetryTimer || !getLoginToken()) return;
-    const delay = pendingAnswerRetryDelay;
-    pendingAnswerRetryDelay = Math.min(pendingAnswerRetryDelay * 2, 60000);
-    pendingAnswerRetryTimer = setTimeout(() => {
-        pendingAnswerRetryTimer = null;
-        flushPendingAnswerEvents().catch(error =>
-            console.warn('[Sheets] Pending answer retry failed:', error)
-        );
-    }, delay);
-}
-
-function flushPendingAnswerEvents(targetEventId) {
-    if (pendingAnswerFlushPromise) {
-        const activeTeamKey = pendingAnswerFlushTeamKey;
-        return pendingAnswerFlushPromise.then(() => {
-            const queue = getPendingAnswerQueue();
-            const currentTeamKey = getPendingAnswerTeamKey({
-                tid: typeof currentTeamTid !== 'undefined' ? currentTeamTid : '',
-                teamName: typeof currentTeam !== 'undefined' ? currentTeam : ''
-            });
-            if (targetEventId && queue.some(event => event.eventId === targetEventId) &&
-                getPendingAnswerTeamKey(queue.find(event => event.eventId === targetEventId)) !== activeTeamKey) {
-                return flushPendingAnswerEvents(targetEventId);
-            }
-            if (!targetEventId && currentTeamKey !== activeTeamKey &&
-                queue.some(event => getPendingAnswerTeamKey(event) === currentTeamKey)) {
-                return flushPendingAnswerEvents();
-            }
-            return {
-                ok: false,
-                pending: queue.some(event => getPendingAnswerTeamKey(event) === currentTeamKey),
-                json: null
-            };
-        });
-    }
-
-    const loginTokenSnapshot = getLoginToken();
-    const teamKey = getPendingAnswerTeamKey({
-        tid: typeof currentTeamTid !== 'undefined' ? currentTeamTid : '',
-        teamName: typeof currentTeam !== 'undefined' ? currentTeam : ''
-    });
-    if (!loginTokenSnapshot || !teamKey) return Promise.resolve({ ok: false, pending: true, json: null });
-
-    let shouldRetry = false;
-    pendingAnswerFlushTeamKey = teamKey;
-    pendingAnswerFlushPromise = (async () => {
-        let targetResult = null;
-        const queue = getPendingAnswerQueue();
-        for (const event of queue) {
-            if (getPendingAnswerTeamKey(event) !== teamKey) continue;
-
-            const result = await postToGoogleSheets({
-                ...event,
-                loginToken: loginTokenSnapshot
-            }, 'SUBMIT_ANSWER');
-            if (isSheetsSuccess(result) && result.json && result.json.correct === true) {
-                if (!removePendingAnswer(event.eventId)) {
-                    shouldRetry = true;
-                    break;
-                }
-                pendingAnswerRetryDelay = 5000;
-                if (event.eventId === targetEventId) targetResult = { ok: true, ...result.json };
-                continue;
-            }
-
-            if (result && result.json && result.json.status === 'success' &&
-                result.json.correct === false) {
-                console.error('[Sheets] Server rejected a locally correct answer; preserving it for review:', event.puzzleId);
-            } else {
-                console.warn('[Sheets] Pending answer sync failed; preserving it for retry:', result && result.json);
-                shouldRetry = true;
-            }
-            if (event.eventId === targetEventId) {
-                targetResult = { ok: false, pending: true, json: (result && result.json) || null };
-            }
-            break;
-        }
-        const remaining = getPendingAnswerQueue();
-        const hasPendingForTeam = remaining.some(event => getPendingAnswerTeamKey(event) === teamKey);
-        return targetResult || {
-            ok: false,
-            pending: targetEventId
-                ? remaining.some(event => event.eventId === targetEventId)
-                : hasPendingForTeam,
-            json: null
-        };
-    })().finally(() => {
-        pendingAnswerFlushPromise = null;
-        pendingAnswerFlushTeamKey = '';
-        if (shouldRetry && getLoginToken() && !pendingAnswerRetryTimer) schedulePendingAnswerRetry();
-    });
-    return pendingAnswerFlushPromise;
-}
-
-window.addEventListener('online', () => {
-    flushPendingAnswerEvents().catch(error =>
-        console.warn('[Sheets] Could not flush pending answers after reconnect:', error)
-    );
-});
 
 // Validate a start code without shipping the code list to the browser.
 async function verifyStartCode(startCode, puzzleId = 0) {
@@ -541,6 +395,25 @@ async function verifyStartCode(startCode, puzzleId = 0) {
         return { ok: false, json: (result && result.json) || null };
     } catch (error) {
         console.warn('[Sheets] Start code check failed:', error);
+        return { ok: false, json: null };
+    }
+}
+
+async function fetchPuzzleHint(puzzleId) {
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes('SCRIPT_URL_HERE')) {
+        return { ok: false, json: null };
+    }
+    try {
+        const result = await postToGoogleSheets({
+            action: 'GET_HINT',
+            puzzleId: Number(puzzleId) || 0
+        }, 'GET_HINT');
+        if (isSheetsSuccess(result) && result.json && typeof result.json.hint === 'string') {
+            return { ok: true, hint: result.json.hint };
+        }
+        return { ok: false, json: (result && result.json) || null };
+    } catch (error) {
+        console.warn('[Sheets] Hint request failed:', error);
         return { ok: false, json: null };
     }
 }

@@ -91,8 +91,8 @@ vercel.json                    Vercel build, headers and redirects
 tailwind.config.js             Tailwind config
 .env.example                   Template for local runtime config
 .html, .vscode/                Meta / editor files
-data/puzzle.json               Puzzle graph, answers, scores, hints and locations
-data/teams.json                Team roster used by the player login
+data/puzzle.json               Public puzzle questions, graph, scores and locations
+data/teams.json                Public team names and IDs (no login keys)
 data/meme.json                 Meme QR IDs and YouTube clip settings
 html/                          Offline mirrors of the 4 overlay screens
   startcode.html               Start-key entry
@@ -500,9 +500,10 @@ Every loop-back at a glance:
 
 ## 🧩 Puzzle configuration (`data/puzzle.json`)
 
-Each object in `data/puzzle.json` contains the puzzle ID, QR/deep-link ID,
-language-specific question, answer, score, optional hint, location clue and
-outgoing links.
+Each object in `data/puzzle.json` contains public puzzle presentation data:
+IDs, language-specific questions, score display, hint availability, location
+clues and outgoing links. Answers, start keys and hint text live only in the
+Apps Script `PUZZLE_SECRETS_JSON` property.
 
 ```jsonc
 {
@@ -511,13 +512,12 @@ outgoing links.
   "badgeId": 1,            // gym badge index (reused from puzzle id)
   "questionPython": "…",   // riddle in Python
   "questionCpp": "…",      // riddle in C++
-  "answer": "-5",          // single correct answer (string compare)
   "nextPuzzleId": [2, 6],  // puzzle ids this one UNLOCKS (branching edge list)
-  "startCode": "START",    // presence marks a start puzzle; key typed on startcode screen
+  "requiresStartCode": true, // starting gate; the actual key is private
+  "hasHint": true,         // shows the hint request UI; hint text is private
   "locationClue": "CSE entrance - openspace",
   "level": 1,              // 1 | 2 | 3 (routes telemetry to L1/L2/L3 tab)
   "points": 10,
-  "hint": "BODMAS",        // optional; null hides the hint button
   "hintPenalty": 60,       // seconds the hint costs before it is shown
   "pokemonName": "Jigglypuff"  // spoken (never rendered) on solve
 }
@@ -525,9 +525,9 @@ outgoing links.
 
 Rules:
 
-- **Starting puzzles** are the only puzzles a fresh team can unlock. A
-  non-empty `startCode` marks a puzzle as a starting puzzle and is the key the
-  player types on the startcode screen.
+- **Starting puzzles** are the only puzzles a fresh team can unlock. Public
+  `requiresStartCode` marks the gate; Apps Script checks the entered key against
+  `PUZZLE_SECRETS_JSON`.
 - **Chains** are forward-linked: `nextPuzzleId` lists every puzzle this solve
   unlocks (branching allowed, e.g. `[2, 6]`, and even a loop back like
   puzzle 6 → `[7, 3]`).
@@ -588,20 +588,19 @@ The Admin dashboard's **LEADERBOARD** tab aggregates records by TID:
 [
   {
     "team": "PRANAV",
-    "securityKey": "123",
     "tid": "T001",
     "team_members": ["A", "B", "C", "D"]
   }
 ]
 ```
 
-- The inline JSON roster supplies team names and stable IDs; the backend
-  validates the submitted security key and issues the login session.
+- The public JSON roster contains names and stable IDs only. The player waits
+  for Apps Script to validate the key and issue a login session before entering
+  the game.
 - `tid` is the stable team id used inside the backend spreadsheet.
-- Backend team keys can be set with the Apps Script `TEAM_KEYS_JSON` script
-  property (keyed by team ID or team name). Until configured, the backend uses
-  `DEFAULT_TEAM_KEY` or its legacy fallback. Do not rely on the client roster
-  for authentication.
+- Team keys are stored in the private Apps Script `TEAM_KEYS_JSON` property,
+  keyed by team ID. This property is required; there is no public roster
+  fallback.
 
 ---
 
@@ -702,17 +701,17 @@ The backend creates these tabs automatically on first use.
 - A team is limited to 90 write requests per minute. Rate-limited events are
   explicitly rejected and retained in the client buffer; transient lock,
   network, and Apps Script quota failures are retried with backoff. Event IDs
-  make retries safe from duplicate score awards. Verified answer submissions
-  are persisted per team until the server confirms them, including when a team
-  solves before login finishes or while offline. Unload beacons retain their
-  notebook locally until a later server confirmation.
+  make retries safe from duplicate score awards. Login, start-key checks, hints,
+  and answers require the server; offline players can keep their local notebook
+  but cannot unlock or score puzzles until the backend is reachable.
 - Every request carries `{ token: GOOGLE_SCRIPT_TOKEN }`; this value is public
   client configuration, not an authorization secret. Admin access additionally
   requires the private `ADMIN_TOKEN`, and team sessions are signed with the
   separate private `LOGIN_SESSION_SECRET`.
 - Script properties include `PLAYER_TOKEN`, `ADMIN_TOKEN`,
-  `LOGIN_SESSION_SECRET`, and `SPREADSHEET_ID`; the Apps Script opens the
-  configured spreadsheet by ID.
+  `LOGIN_SESSION_SECRET`, `TEAM_KEYS_JSON`, `PUZZLE_SECRETS_JSON`, and
+  `SPREADSHEET_ID`; no login keys, answers, start keys, or hint text are read
+  from public JSON.
 
 ### API surface
 
@@ -989,27 +988,34 @@ GOOGLE_SCRIPT_TOKEN=YOUR_GOOGLE_SCRIPT_TOKEN
 GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit
 ```
 
-In the Apps Script project's **Script properties**, set `PLAYER_TOKEN` to the
-same value as `GOOGLE_SCRIPT_TOKEN`, set `ADMIN_TOKEN` to a unique random value
-of at least 32 characters, set `LOGIN_SESSION_SECRET` to a different random
-value of at least 32 characters, set `SPREADSHEET_ID` to the target workbook
-ID, and set `DATA_BASE_URL` to the public site root that serves the `data/`
-directory. `GOOGLE_SCRIPT_TOKEN` is included in the public browser bundle and
-is not a secret; it must never be reused as either private property.
-`ADMIN_TOKEN` is entered on the admin page and must not be placed in `.env`,
-GitHub configuration, or `runtime-config.js`. `LOGIN_SESSION_SECRET` is used
-only by Apps Script to sign team sessions and must remain private.
+The repo-wide security cleanup created ignored local setup files under
+`.local-secrets/`. Copy the values from `apps-script-properties.json` into the
+Apps Script project's **Script properties**. It includes a new unique team key
+for every TID, rotated start keys, a new `ADMIN_TOKEN`, a private
+`LOGIN_SESSION_SECRET`, and the player token from `.env`. Do not commit or
+share that file publicly. Distribute the new team keys to their teams and
+replace any printed start keys with the rotated values in `PUZZLE_SECRETS_JSON`.
+
+Required properties are `PLAYER_TOKEN`, `ADMIN_TOKEN`, `LOGIN_SESSION_SECRET`,
+`TEAM_KEYS_JSON`, `PUZZLE_SECRETS_JSON`, and `SPREADSHEET_ID`. `ADMIN_TOKEN` and
+`LOGIN_SESSION_SECRET` must each be unique, private, and at least 32 characters;
+the signing secret cannot match the player token. Apps Script fails closed if
+these properties are missing or invalid. `GOOGLE_SCRIPT_TOKEN` is included in
+the public browser bundle and is not a secret; it must never be reused as either
+private property.
 
 `npm run serve` generates the ignored `js/runtime-config.js` from `.env` (via
 `js/generate-runtime-config.cjs`) and loads it before both the player and
 admin app. The generated file is still delivered to browsers, so it is
 configuration hygiene — not a security boundary.
 
-For GitHub Pages, configure `GOOGLE_SCRIPT_URL` and `GOOGLE_SHEET_URL` as
-GitHub Actions variables, and `GOOGLE_SCRIPT_TOKEN` as a GitHub Actions secret
-(at repository or `github-pages` environment scope). The workflow generates
-`js/runtime-config.js` from these values before uploading the site. Deployment
-fails if the backend URL or token is missing.
+For GitHub Pages, copy the values from ignored
+`.local-secrets/github-actions-settings.json` into Actions settings:
+`GOOGLE_SCRIPT_URL` and `GOOGLE_SHEET_URL` are variables, and
+`GOOGLE_SCRIPT_TOKEN` is a secret (repository or `github-pages` environment
+scope). The workflow generates `js/runtime-config.js` from these values before
+uploading the site and fails with the missing variable names if configuration
+is incomplete.
 
 ---
 
@@ -1029,14 +1035,14 @@ Open the local URL printed by `serve`. Camera access generally requires either
 ## 🚀 Deployment
 
 Set the Apps Script Script Properties (`PLAYER_TOKEN`, `ADMIN_TOKEN`,
-`LOGIN_SESSION_SECRET`, `SPREADSHEET_ID`, and `DATA_BASE_URL`) and deploy the
-latest Apps Script version before using either host. Admin tokens must be
+`LOGIN_SESSION_SECRET`, `TEAM_KEYS_JSON`, `PUZZLE_SECRETS_JSON`, and
+`SPREADSHEET_ID`) and deploy the latest Apps Script version before using either
+host. Admin tokens must be
 unique from the public player token and at least 32 characters; login-session
 signing secrets must also be private and at least 32 characters. Set
-`DATA_BASE_URL` to the public site root ending in `/`. Set the frontend's
-`GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and optionally `GOOGLE_SHEET_URL`
-in local `.env` or the hosting provider's environment configuration; no
-deployment URLs are embedded as runtime defaults.
+the frontend's `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_TOKEN`, and optionally
+`GOOGLE_SHEET_URL` in local `.env` or the hosting provider's environment
+configuration; no deployment URLs are embedded as runtime defaults.
 
 When changing frontend or `data/*.json` files, bump `CACHE_NAME` in
 `service-worker.js` so cache-first clients receive the update. Bump
@@ -1097,8 +1103,8 @@ updated puzzles, teams, and memes are installed into the new offline cache.
 
 | Task | How |
 |------|-----|
-| **Add a puzzle** | Add an object to `data/puzzle.json`; link it via `nextPuzzleId`; set points/hints, `pokemonId` (sprite) and `pokemonName` (spoken). |
-| **Add / edit teams** | Edit `data/teams.json` (team, securityKey, tid, team_members). |
+| **Add a puzzle** | Add public presentation data to `data/puzzle.json`, then add its answer, start key and hint to `PUZZLE_SECRETS_JSON` in Apps Script Script Properties. |
+| **Add / edit teams** | Edit `data/teams.json` metadata and add a unique team key to `TEAM_KEYS_JSON` in Apps Script Script Properties. |
 | **Add a meme reward** | Push a `{ memeid, ytlink, starttime, endtime }` object to `data/meme.json`. |
 | **Reset the whole event** | Call the backend `RESET_ALL` (wipes all 4 tabs + bumps epoch; clients auto-wipe stale progress). |
 | **Tune sheet quota** | Adjust `limit`/`windowMs` on `sheetsRateLimiter` in `js/google-sheets.js`. |

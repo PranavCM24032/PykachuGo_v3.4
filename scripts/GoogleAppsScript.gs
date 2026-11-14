@@ -19,8 +19,7 @@ var GAME_STEP_ACTIONS = [
 
 function getPlayerToken() {
   var token = PropertiesService.getScriptProperties().getProperty('PLAYER_TOKEN');
-  if (token) return String(token).trim();
-  return 'pykachugo-27';
+  return String(token || '').trim();
 }
 
 function getAdminToken() {
@@ -28,23 +27,28 @@ function getAdminToken() {
   token = String(token || '').trim();
   // Never fall back to a credential embedded in this public source file.
   // Admin access must be configured explicitly in Apps Script properties.
-  if (!token || token === getPlayerToken()) return '';
+  if (!token || token.length < 32 || token === getPlayerToken()) return '';
   return token;
 }
 
 function getLoginSessionSecret_() {
   var secret = PropertiesService.getScriptProperties().getProperty('LOGIN_SESSION_SECRET');
-  if (secret && secret.length >= 32 && secret !== getPlayerToken()) {
-    return secret;
-  }
-  var token = getPlayerToken();
-  if (!token) {
-    Logger.log('LOGIN_SESSION_SECRET and PLAYER_TOKEN are both missing');
-    return '';
-  }
-  // Dynamic 64-char fallback derived from player token without hardcoding secrets
-  var rawBytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token + ':pykachu-session-salt-2026');
-  return rawBytes.map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+  secret = String(secret || '').trim();
+  if (secret.length < 32 || !getPlayerToken() || secret === getPlayerToken() || secret === getAdminToken()) return '';
+  return secret;
+}
+
+function sessionSecretVersion_(secret) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, secret);
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, '');
+}
+
+function loginSessionCacheKey_(token, secret) {
+  return 'login_v3_' + sessionSecretVersion_(secret) + '_' + token;
+}
+
+function adminSessionCacheKey_(token, secret) {
+  return 'admin_sess_v2_' + sessionSecretVersion_(secret) + '_' + token;
 }
 
 function getSpreadsheet_() {
@@ -67,81 +71,35 @@ function getSpreadsheet_() {
 }
 
 // ── Server-authoritative puzzle catalogue ────────────────────────────────
-// data/puzzle.json (the file the client also loads) is the single source of
-// truth. Set DATA_BASE_URL in Script Properties to the public site root.
-var DEFAULT_DATA_BASE_URL = 'https://pranavcm24032.github.io/PykachuGo_v3.4/';
-
+// Puzzle answers, start keys, and hints stay private in Script Properties.
+// data/puzzle.json contains only the presentation data sent to browsers.
 var LOGIN_SESSION_TTL_SECS = 21600;
 var LOGIN_RATE_LIMIT = 10;
 var START_CODE_RATE_LIMIT = 10;
 var AUTH_RATE_WINDOW_SECS = 60;
 var ADMIN_AUTH_RATE_LIMIT = 5;
 
-function getDataBaseUrl_() {
-  var configured = PropertiesService.getScriptProperties().getProperty('DATA_BASE_URL');
-  var base = String(configured || DEFAULT_DATA_BASE_URL).trim();
-  if (base && base.charAt(base.length - 1) !== '/') base += '/';
-  return base;
-}
-
-// Fetch one of the public data/*.json files (cached briefly) so the client and
-// server always agree on the puzzle graph, answers and team roster.
-function readDataJson_(file) {
-  var base = getDataBaseUrl_();
-  if (!base) {
-    Logger.log('DATA_BASE_URL script property is not configured. Cannot fetch ' + file);
-    return null;
-  }
-  var cache = CacheService.getScriptCache();
-  var cacheKey = 'datajson:' + file;
-  var cached = cache.get(cacheKey);
-  if (cached) {
-    try { return JSON.parse(cached); } catch (e) { }
-  }
-  var url = base + 'data/' + file;
-  try {
-    var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
-    if (res.getResponseCode() !== 200) {
-      Logger.log('Could not load ' + url + ' (HTTP ' + res.getResponseCode() + ')');
-      return null;
-    }
-    var text = res.getContentText();
-    cache.put(cacheKey, text, 21600); // 6 hours (entire event duration)
-    return JSON.parse(text);
-  } catch (e) {
-    Logger.log('Error fetching ' + url + ': ' + e);
-    return null;
-  }
-}
-
 function getPuzzleCatalogue_() {
   var raw = PropertiesService.getScriptProperties().getProperty('PUZZLE_SECRETS_JSON');
-  if (raw) {
-    try {
-      var parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') return parsed;
-    } catch (e) {
-      Logger.log('Invalid PUZZLE_SECRETS_JSON: ' + e);
-    }
+  if (!raw) {
+    Logger.log('PUZZLE_SECRETS_JSON is not configured in Script Properties');
+    return {};
   }
   try {
-    var list = readDataJson_('puzzle.json');
-    var catalogue = {};
-    (Array.isArray(list) ? list : []).forEach(function(p) {
-      var id = Number(p && p.id);
-      if (!id) return;
-      catalogue[id] = {
-        level: p.level,
-        points: p.points,
-        answer: p.answer,
-        startCode: p.startCode,
-        next: p.nextPuzzleId || [],
-        hint: p.hint
-      };
+    var parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !Object.keys(parsed).length) return {};
+    var valid = Object.keys(parsed).every(function(id) {
+      var puzzle = parsed[id];
+      return puzzle && Number(id) > 0 && Number(puzzle.level) >= 1 && Number(puzzle.level) <= 3 &&
+        isFinite(Number(puzzle.points)) && typeof puzzle.answer === 'string' && Array.isArray(puzzle.next);
     });
-    return catalogue;
+    if (!valid) {
+      Logger.log('PUZZLE_SECRETS_JSON contains an invalid puzzle entry');
+      return {};
+    }
+    return parsed;
   } catch (e) {
-    Logger.log('Could not build puzzle catalogue from data/puzzle.json: ' + e);
+    Logger.log('Invalid PUZZLE_SECRETS_JSON: ' + e);
     return {};
   }
 }
@@ -342,14 +300,15 @@ function getLoginSession(data) {
   if (!secret) return null;
 
   // 1. Fast cache check
+  var cacheKey = loginSessionCacheKey_(token, secret);
   try {
-    var raw = CacheService.getScriptCache().get('login_v2_' + token);
+    var raw = CacheService.getScriptCache().get(cacheKey);
     if (raw) {
       var cachedSession = JSON.parse(raw);
       if (cachedSession.exp > Date.now()) {
         return { tid: cachedSession.tid || '', teamName: cachedSession.teamName || '' };
       }
-      CacheService.getScriptCache().remove('login_v2_' + token);
+      CacheService.getScriptCache().remove(cacheKey);
     }
   } catch (e) { }
 
@@ -371,7 +330,7 @@ function getLoginSession(data) {
         };
         try {
           CacheService.getScriptCache().put(
-            'login_v2_' + token,
+            cacheKey,
             JSON.stringify({ tid: session.tid, teamName: session.teamName, exp: parsedPayload.exp }),
             LOGIN_SESSION_TTL_SECS
           );
@@ -398,23 +357,13 @@ function createLoginSession(tid, teamName) {
 
   try {
     CacheService.getScriptCache().put(
-      'login_v2_' + signedToken,
+      loginSessionCacheKey_(signedToken, secret),
       JSON.stringify({ tid: tid || '', teamName: teamName || '', exp: expiresAt }),
       LOGIN_SESSION_TTL_SECS
     );
   } catch (e) { }
 
   return signedToken;
-}
-
-function getTeamRoster_() {
-  try {
-    var list = readDataJson_('teams.json');
-    return Array.isArray(list) ? list : [];
-  } catch (e) {
-    Logger.log('Could not load data/teams.json: ' + e);
-    return [];
-  }
 }
 
 function resolveTeamKey_(tid, teamName) {
@@ -436,18 +385,7 @@ function resolveTeamKey_(tid, teamName) {
     }
   }
 
-  // Fallback: keys live in data/teams.json, the same roster the client loads.
-  var tId = String(tid || '').trim().toUpperCase();
-  var tName = String(teamName || '').trim().toUpperCase();
-  var roster = getTeamRoster_();
-  for (var r = 0; r < roster.length; r++) {
-    var row = roster[r] || {};
-    var rowTid = String(row.tid || '').trim().toUpperCase();
-    var rowName = String(row.team || '').trim().toUpperCase();
-    if ((tId && rowTid === tId) || (tName && rowName === tName)) {
-      return String(row.securityKey == null ? '' : row.securityKey);
-    }
-  }
+  Logger.log('TEAM_KEYS_JSON is not configured in Script Properties');
   return '';
 }
 
@@ -479,16 +417,8 @@ function getTeamRateIdentity_(tid, teamName) {
     }
   }
 
-  // Fallback: derive a stable bucket from data/teams.json.
-  var roster = getTeamRoster_();
-  for (var r = 0; r < roster.length; r++) {
-    var row = roster[r] || {};
-    var rowTid = String(row.tid || '').trim().toUpperCase();
-    var rowName = String(row.team || '').trim().toUpperCase();
-    if ((tName && rowName === tName) || (tId && rowTid === tId)) {
-      return 'team_' + String(rowTid || rowName).replace(/[^A-Za-z0-9_]/g, '_');
-    }
-  }
+  // Unknown or unconfigured teams share one bucket so arbitrary identities
+  // cannot evade the login rate limit by changing their submitted name.
   return 'unknown';
 }
 
@@ -635,10 +565,16 @@ function doPost(e) {
       if (!adminTokenCheck) {
         return jsonResponse_({ status: 'error', message: 'admin authentication is not configured' });
       }
+      if (!getLoginSessionSecret_()) {
+        return jsonResponse_({ status: 'error', message: 'session signing is not configured' });
+      }
       if (data.adminToken !== adminTokenCheck) {
         return jsonResponse_({ status: 'error', message: 'unauthorized' });
       }
       var adminSession = createAdminSession_();
+      if (!adminSession) {
+        return jsonResponse_({ status: 'error', message: 'session signing is not configured' });
+      }
       return jsonResponse_({ status: 'success', session: adminSession });
     }
 
@@ -692,6 +628,9 @@ function doPost(e) {
       if (!loginName && !loginTid) {
         return jsonResponse_({ status: 'error', message: 'missing team' });
       }
+      if (!PropertiesService.getScriptProperties().getProperty('TEAM_KEYS_JSON')) {
+        return jsonResponse_({ status: 'error', message: 'team authentication is not configured' });
+      }
       // Resolve the name and tid independently so a caller cannot pair their
       // own valid name with someone else's tid to read that team's rows.
       var keyByName = loginName ? resolveTeamKey_('', loginName) : '';
@@ -701,7 +640,7 @@ function doPost(e) {
       if (!checkLoginRate(loginRateIdentity)) {
         return jsonResponse_({ status: 'rate_limited', message: 'Too many login attempts', retryAfterSeconds: AUTH_RATE_WINDOW_SECS });
       }
-      if (!expectedKey || String(data.securityKey || '') !== expectedKey) {
+      if (!expectedKey || normalizeTokenValue(data.securityKey) !== normalizeTokenValue(expectedKey)) {
         return jsonResponse_({ status: 'error', message: 'invalid credentials' });
       }
       var canonicalTid = (keyByTid && keyByTid === expectedKey) ? loginTid : '';
@@ -769,6 +708,9 @@ function doPost(e) {
       var startCode = normalizeTokenValue(data.startCode || data.code || '');
       var requestedId = Number(data.puzzleId || 0);
       var matchedId = 0;
+      if (!Object.keys(getPuzzleCatalogue_()).length) {
+        return jsonResponse_({ status: 'error', message: 'puzzle verification is not configured' });
+      }
       if (requestedId > 0) {
         var requestedSecret = getPuzzleSecret(requestedId);
         if (requestedSecret && requestedSecret.startCode &&
@@ -1342,26 +1284,27 @@ function ensureSheetsExist(ss) {
 
 function createAdminSession_() {
   var secret = getLoginSessionSecret_();
+  if (!secret) return '';
   var exp = Date.now() + 21600 * 1000;
   var payload = JSON.stringify({ role: 'admin', exp: exp });
   var sig = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, secret));
   var token = Utilities.base64EncodeWebSafe(Utilities.newBlob(payload).getBytes()) + '.' + sig;
   try {
-    CacheService.getScriptCache().put('admin_sess_' + token, '1', 21600);
+    CacheService.getScriptCache().put(adminSessionCacheKey_(token, secret), '1', 21600);
   } catch (e) { }
   return token;
 }
 
 function isAdminSessionValid_(session) {
   if (!session) return false;
+  var secret = getLoginSessionSecret_();
+  if (!secret) return false;
   try {
-    if (CacheService.getScriptCache().get('admin_sess_' + session)) return true;
+    if (CacheService.getScriptCache().get(adminSessionCacheKey_(session, secret))) return true;
   } catch (e) { }
   try {
     var parts = String(session).split('.');
     if (parts.length === 2) {
-      var secret = getLoginSessionSecret_();
-      if (!secret) return false;
       var payloadBytes = Utilities.base64DecodeWebSafe(parts[0]);
       var payload = Utilities.newBlob(payloadBytes).getDataAsString();
       var expectedSig = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, secret));
@@ -1369,7 +1312,7 @@ function isAdminSessionValid_(session) {
         var parsed = JSON.parse(payload);
         if (parsed && parsed.role === 'admin' && typeof parsed.exp === 'number' && parsed.exp > Date.now()) {
           try {
-            CacheService.getScriptCache().put('admin_sess_' + session, '1', 21600);
+            CacheService.getScriptCache().put(adminSessionCacheKey_(session, secret), '1', 21600);
           } catch (ce) { }
           return true;
         }

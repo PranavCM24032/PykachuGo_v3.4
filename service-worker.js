@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pykachu-go-v3.4.3';
+const CACHE_NAME = 'pykachu-go-v3.4.4';
 const OPTIONAL_CACHE_NAME = 'pykachu-go-optional-v1';
 const ASSETS = [
     'index.html',

@@ -8,5 +8,6 @@ js/runtime-config.js
 .env
 .env.*
 !.env.example
+.local-secrets/
 .vercel/
 .codex-history/

@@ -11,11 +11,8 @@ function isHintValid(hint) {
     return false;
 }
 
-// Hint text ships in data/puzzle.json alongside the rest of the puzzle.
 function puzzleHasHint(puzzle) {
-    if (!puzzle) return false;
-    if (puzzle.hasHint === true) return true;
-    return isHintValid(puzzle.hint);
+    return Boolean(puzzle && puzzle.hasHint === true);
 }
 
 function setupHintSystem() {
@@ -30,7 +27,6 @@ function setupHintSystem() {
 
     if (!hintContainer) return;
 
-    // The hint text is read from the puzzle JSON when requested.
     currentPuzzleHint = null;
 
     // VALIDATION: no hint for this puzzle → no hint button
@@ -396,7 +392,17 @@ async function showHint() {
     }
 
     if (!currentPuzzleHint) {
-        currentPuzzleHint = isHintValid(currentPuzzle.hint) ? currentPuzzle.hint : null;
+        const requestedPuzzle = currentPuzzle;
+        const result = await fetchPuzzleHint(requestedPuzzle.id);
+        if (currentPuzzle !== requestedPuzzle) return;
+        if (result && result.ok && isHintValid(result.hint)) {
+            currentPuzzleHint = result.hint;
+        } else {
+            showToast(result && result.json && result.json.message === 'locked'
+                ? 'Puzzle is not unlocked on the server yet.'
+                : 'Could not load the hint. Check your connection and try again.', 'error');
+            return;
+        }
     }
     if (!currentPuzzleHint) {
         showToast('No hint available for this puzzle.', 'info');
