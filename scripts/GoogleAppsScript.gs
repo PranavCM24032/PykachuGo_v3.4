@@ -557,8 +557,7 @@ function doPost(e) {
       if (!adminTokenCheck || data.adminToken !== adminTokenCheck) {
         return jsonResponse_({ status: 'error', message: 'unauthorized' });
       }
-      var adminSession = Utilities.getUuid();
-      CacheService.getScriptCache().put('admin_sess_' + adminSession, '1', 21600);
+      var adminSession = createAdminSession_();
       return jsonResponse_({ status: 'success', session: adminSession });
     }
 
@@ -1245,9 +1244,43 @@ function ensureSheetsExist(ss) {
   });
 }
 
+function createAdminSession_() {
+  var secret = getLoginSessionSecret_();
+  var exp = Date.now() + 21600 * 1000;
+  var payload = JSON.stringify({ role: 'admin', exp: exp });
+  var sig = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, secret));
+  var token = Utilities.base64EncodeWebSafe(Utilities.newBlob(payload).getBytes()) + '.' + sig;
+  try {
+    CacheService.getScriptCache().put('admin_sess_' + token, '1', 21600);
+  } catch (e) { }
+  return token;
+}
+
 function isAdminSessionValid_(session) {
   if (!session) return false;
-  return Boolean(CacheService.getScriptCache().get('admin_sess_' + session));
+  try {
+    if (CacheService.getScriptCache().get('admin_sess_' + session)) return true;
+  } catch (e) { }
+  try {
+    var parts = String(session).split('.');
+    if (parts.length === 2) {
+      var secret = getLoginSessionSecret_();
+      if (!secret) return false;
+      var payloadBytes = Utilities.base64DecodeWebSafe(parts[0]);
+      var payload = Utilities.newBlob(payloadBytes).getDataAsString();
+      var expectedSig = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, secret));
+      if (parts[1] === expectedSig) {
+        var parsed = JSON.parse(payload);
+        if (parsed && parsed.role === 'admin' && typeof parsed.exp === 'number' && parsed.exp > Date.now()) {
+          try {
+            CacheService.getScriptCache().put('admin_sess_' + session, '1', 21600);
+          } catch (ce) { }
+          return true;
+        }
+      }
+    }
+  } catch (e) { }
+  return false;
 }
 
 function getAdminData_() {
