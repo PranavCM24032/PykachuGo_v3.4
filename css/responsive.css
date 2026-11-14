@@ -120,8 +120,12 @@
 
     #step1.flow-step input,
     #step1.flow-step select {
-        padding: 3px 6px !important;
-        font-size: 10px !important;
+        /* Keep mobile inputs legible and prevent iOS from zooming the page
+           when a player focuses a field. The CRT screen can scroll when the
+           taller controls need more room on a short viewport. */
+        min-height: 44px;
+        padding: 6px 8px !important;
+        font-size: 16px !important;
     }
 
     #step1.flow-step .space-y-1 > :not([hidden]) ~ :not([hidden]) {
@@ -129,8 +133,8 @@
     }
 
     #step1.flow-step label {
-        margin-bottom: 1px !important;
-        font-size: 7px !important;
+        margin-bottom: 2px !important;
+        font-size: 9px !important;
     }
 }
 

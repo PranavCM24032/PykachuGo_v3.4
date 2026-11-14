@@ -43,10 +43,13 @@ fs.writeFileSync(
 );
 
 if (!runtimeConfig.googleScriptUrl || !runtimeConfig.googleScriptToken) {
-    const message = process.env.VERCEL
-        ? '[Build] Warning: Runtime config generated without GOOGLE_SCRIPT_URL or GOOGLE_SCRIPT_TOKEN. Add them in Vercel Project Settings > Environment Variables for backend connectivity.'
-        : '[Build] Warning: Runtime config created without Google Sheets settings. Provide them via environment variables or .env for backend scoring.';
-    console.warn(message);
+    const message = '[Build] Runtime config is missing GOOGLE_SCRIPT_URL or GOOGLE_SCRIPT_TOKEN. Configure both for the deployment.';
+    if (process.env.VERCEL || process.env.CI) {
+        console.error(message);
+        process.exitCode = 1;
+    } else {
+        console.warn(message);
+    }
 } else {
     console.log('[Build] Runtime config generated successfully.');
 }

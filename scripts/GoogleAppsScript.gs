@@ -25,10 +25,11 @@ function getPlayerToken() {
 
 function getAdminToken() {
   var token = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
-  if (token && token !== getPlayerToken()) {
-    return String(token).trim();
-  }
-  return 'admin-26';
+  token = String(token || '').trim();
+  // Never fall back to a credential embedded in this public source file.
+  // Admin access must be configured explicitly in Apps Script properties.
+  if (!token || token === getPlayerToken()) return '';
+  return token;
 }
 
 function getLoginSessionSecret_() {
@@ -195,11 +196,11 @@ function teamRowMatches(row, tidIndex, teamIndex, tid, teamName) {
 
 function getTeamContext(ss, tid, teamName) {
   if (!ss) {
-    return { solved: [], points: 0, hintsUsed: [], currentPuzzle: null };
+    return { solved: [], points: 0, hintsUsed: [], currentPuzzle: null, rowIndexes: {} };
   }
   var cache = CacheService.getScriptCache();
-  var cKey = 'ctx_' + String(tid || teamName || '').replace(/[^A-Za-z0-9_]/g, '_');
-  var cached = cKey !== 'ctx_' ? cache.get(cKey) : null;
+  var cKey = teamContextCacheKey_(tid, teamName);
+  var cached = cKey ? cache.get(cKey) : null;
   if (cached) {
     try { return JSON.parse(cached); } catch (e) { }
   }
@@ -207,6 +208,7 @@ function getTeamContext(ss, tid, teamName) {
   var solved = [];
   var points = 0;
   var hintsUsed = [];
+  var rowIndexes = {};
   var currentPuzzle = null;
   var latestPuzzleTimestamp = -1;
 
@@ -219,6 +221,10 @@ function getTeamContext(ss, tid, teamName) {
       if (!teamRowMatches(rows[i], 0, 1, tid, teamName)) continue;
       var status = String(rows[i][9] || '');
       var pid = Number(rows[i][3] || 0);
+
+      if (pid > 0 && status !== 'REPEAT_SOLVE' && !rowIndexes[pid]) {
+        rowIndexes[pid] = { sheet: name, row: i + 1 };
+      }
 
       if (status === 'SOLVED' || status === 'REPEAT_SOLVE') {
         if (pid > 0) solved.push(pid);
@@ -242,20 +248,91 @@ function getTeamContext(ss, tid, teamName) {
     solved: uniqueNumbers(solved),
     points: points,
     hintsUsed: uniqueNumbers(hintsUsed),
-    currentPuzzle: currentPuzzle
+    currentPuzzle: currentPuzzle,
+    currentPuzzleTimestamp: latestPuzzleTimestamp,
+    rowIndexes: rowIndexes
   };
 
-  if (cKey !== 'ctx_') {
-    try { cache.put(cKey, JSON.stringify(result), 180); } catch (e) { }
-  }
+  cacheTeamContext_(tid, teamName, result);
   return result;
 }
 
 function invalidateTeamContext(tid, teamName) {
   try {
-    var cKey = 'ctx_' + String(tid || teamName || '').replace(/[^A-Za-z0-9_]/g, '_');
-    if (cKey !== 'ctx_') CacheService.getScriptCache().remove(cKey);
+    var cKey = teamContextCacheKey_(tid, teamName);
+    if (cKey) CacheService.getScriptCache().remove(cKey);
   } catch (e) { }
+}
+
+function teamContextCacheKey_(tid, teamName) {
+  var identity = String(tid || teamName || '').replace(/[^A-Za-z0-9_]/g, '_').substring(0, 180);
+  if (!identity) return '';
+  var epoch = PropertiesService.getScriptProperties().getProperty('gameEpoch') || '0';
+  return 'ctx2_' + epoch + '_' + identity;
+}
+
+function cacheTeamContext_(tid, teamName, context) {
+  var cKey = teamContextCacheKey_(tid, teamName);
+  if (!cKey || !context) return;
+  try {
+    CacheService.getScriptCache().put(cKey, JSON.stringify(context), TEAM_CONTEXT_CACHE_TTL_SECS);
+  } catch (e) {
+    Logger.log('Could not cache team context: ' + e);
+  }
+}
+
+function getCachedTeamContext_(tid, teamName) {
+  var cKey = teamContextCacheKey_(tid, teamName);
+  if (!cKey) return null;
+  try {
+    var cached = CacheService.getScriptCache().get(cKey);
+    return cached ? JSON.parse(cached) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function updateTeamContextForEvent_(context, sheet, rowIdx, data, row) {
+  if (!context || rowIdx <= 0 || !row) return;
+  var puzzleId = Number(data.puzzleId || row[3] || 0);
+  if (puzzleId <= 0) return;
+
+  context.rowIndexes = context.rowIndexes || {};
+  if (String(row[9] || '') !== 'REPEAT_SOLVE' && !context.rowIndexes[puzzleId]) {
+    context.rowIndexes[puzzleId] = { sheet: sheet.getName(), row: rowIdx };
+  }
+  if (isHintFlag(row[6]) && context.hintsUsed.indexOf(puzzleId) === -1) {
+    context.hintsUsed.push(puzzleId);
+  }
+
+  var rowTimestamp = new Date(row[5]).getTime();
+  if (isNaN(rowTimestamp)) rowTimestamp = 0;
+  if (rowTimestamp >= Number(context.currentPuzzleTimestamp || -1)) {
+    context.currentPuzzle = puzzleId;
+    context.currentPuzzleTimestamp = rowTimestamp;
+  }
+}
+
+function getAnswerRows_(sheet, context, tid, teamName, puzzleId) {
+  var location = context && context.rowIndexes && context.rowIndexes[puzzleId];
+  var lastRow = sheet.getLastRow();
+  if (!location) return new Array(lastRow);
+  if (location && location.sheet === sheet.getName() &&
+      location.row > 1 && location.row <= lastRow) {
+    try {
+      var row = sheet.getRange(location.row, 1, 1, LEVEL_HEADERS.length).getValues()[0];
+      if (teamRowMatches(row, 0, 1, tid, teamName) &&
+          Number(row[3]) === Number(puzzleId) &&
+          String(row[9] || '') !== 'REPEAT_SOLVE') {
+        var rows = new Array(lastRow);
+        rows[location.row - 1] = row;
+        return rows;
+      }
+    } catch (e) {
+      Logger.log('Could not read cached answer row; scanning the level sheet: ' + e);
+    }
+  }
+  return sheet.getDataRange().getValues();
 }
 
 function getLoginSession(data) {
@@ -459,6 +536,7 @@ function jsonResponse_(obj) {
 
 var TEAM_RATE_LIMIT = 90;
 var TEAM_RATE_WINDOW_SECS = 60;
+var TEAM_CONTEXT_CACHE_TTL_SECS = 21600;
 
 function checkTeamRate(teamKey) {
   var key = String(teamKey || '').trim();
@@ -554,7 +632,10 @@ function doPost(e) {
         });
       }
       var adminTokenCheck = getAdminToken();
-      if (!adminTokenCheck || data.adminToken !== adminTokenCheck) {
+      if (!adminTokenCheck) {
+        return jsonResponse_({ status: 'error', message: 'admin authentication is not configured' });
+      }
+      if (data.adminToken !== adminTokenCheck) {
         return jsonResponse_({ status: 'error', message: 'unauthorized' });
       }
       var adminSession = createAdminSession_();
@@ -775,7 +856,7 @@ function doPost(e) {
 
       var answerSheet = ss.getSheetByName('L' + answerSecret.level);
       if (!answerSheet) return jsonResponse_({ status: 'error', message: 'missing level sheet' });
-      var answerRows = answerSheet.getDataRange().getValues();
+      var answerRows = getAnswerRows_(answerSheet, answerCtx, answerTid, answerTeamName, answerPid);
       var answerEvent = {
         action: 'SOLVED',
         teamName: answerTeamName,
@@ -797,7 +878,14 @@ function doPost(e) {
       if (answerRowIdx > 0) {
         writeRow(answerSheet, answerRows, answerRowIdx);
         if (answerEventId) markEventProcessed(answerEventId);
-        invalidateTeamContext(answerTid, answerTeamName);
+        var storedAnswerRow = answerRows[answerRowIdx - 1];
+        if (storedAnswerRow && String(storedAnswerRow[9] || '') !== 'REPEAT_SOLVE') {
+          answerCtx.rowIndexes = answerCtx.rowIndexes || {};
+          answerCtx.rowIndexes[answerPid] = { sheet: answerSheet.getName(), row: answerRowIdx };
+        }
+        answerCtx.currentPuzzle = answerPid;
+        answerCtx.currentPuzzleTimestamp = new Date(answerEvent.timestamp).getTime();
+        cacheTeamContext_(answerTid, answerTeamName, answerCtx);
       }
       SpreadsheetApp.flush();
 
@@ -842,6 +930,7 @@ function doPost(e) {
           if (rowIdx > 0) {
             touched[rowIdx] = true;
             applied.push(eid);
+            updateTeamContextForEvent_(batchCtx, sheet, rowIdx, event, rows[rowIdx - 1]);
           }
         });
 
@@ -849,7 +938,9 @@ function doPost(e) {
           writeRow(sheet, rows, Number(idx));
         });
         applied.forEach(markEventProcessed);
-        invalidateTeamContext(writeSession.tid, writeSession.teamName);
+        if (Object.keys(touched).length > 0) {
+          cacheTeamContext_(writeSession.tid, writeSession.teamName, batchCtx);
+        }
       });
     } else {
       data.tid = writeSession.tid || data.tid;
@@ -905,6 +996,11 @@ function processEvent(ss, data) {
   if (rowIdx > 0) {
     writeRow(sheet, rows, rowIdx);
     markEventProcessed(data.eventId);
+    var cachedContext = getCachedTeamContext_(data.tid, data.teamName);
+    if (cachedContext) {
+      updateTeamContextForEvent_(cachedContext, sheet, rowIdx, data, rows[rowIdx - 1]);
+      cacheTeamContext_(data.tid, data.teamName, cachedContext);
+    }
   }
 }
 
