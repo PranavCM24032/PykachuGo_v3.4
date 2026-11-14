@@ -4,3 +4,6 @@
 assets/docs/
 scripts/GoogleAppsScript.gs
 *.docx
+.env
+.env.*
+js/runtime-config.js

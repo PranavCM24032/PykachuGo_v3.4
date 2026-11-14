@@ -4,6 +4,7 @@ node_modules/
 .DS_Store
 Thumbs.db
 scripts/runtime-config.js
+js/runtime-config.js
 .env
 .env.*
 !.env.example
