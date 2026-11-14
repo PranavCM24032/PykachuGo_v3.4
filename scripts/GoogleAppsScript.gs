@@ -366,29 +366,6 @@ function createLoginSession(tid, teamName) {
   return signedToken;
 }
 
-function resolveTeamKey_(tid, teamName) {
-  var raw = PropertiesService.getScriptProperties().getProperty('TEAM_KEYS_JSON');
-  if (raw) {
-    try {
-      var map = JSON.parse(raw) || {};
-      var configuredId = String(tid || '').trim().toUpperCase();
-      var configuredName = String(teamName || '').trim().toUpperCase();
-      var keys = Object.keys(map);
-      for (var i = 0; i < keys.length; i++) {
-        var k = String(keys[i]).trim().toUpperCase();
-        if ((configuredId && k === configuredId) || (configuredName && k === configuredName)) return String(map[keys[i]] || '');
-      }
-      return '';
-    } catch (e) {
-      Logger.log('Invalid TEAM_KEYS_JSON: ' + e);
-      return '';
-    }
-  }
-
-  Logger.log('TEAM_KEYS_JSON is not configured in Script Properties');
-  return '';
-}
-
 function getTeamRateIdentity_(tid, teamName) {
   var raw = PropertiesService.getScriptProperties().getProperty('TEAM_KEYS_JSON');
   var tId = String(tid || '').trim().toUpperCase();
@@ -398,7 +375,7 @@ function getTeamRateIdentity_(tid, teamName) {
     try {
       var map = JSON.parse(raw) || {};
       var keys = Object.keys(map);
-      // Match the same precedence as LOGIN: a configured name key wins over TID.
+      // Use configured IDs as separate rate-limit buckets where available.
       for (var i = 0; i < keys.length; i++) {
         if (tName && String(keys[i]).trim().toUpperCase() === tName) {
           return 'team_' + String(keys[i]).replace(/[^A-Za-z0-9_]/g, '_');
@@ -409,17 +386,17 @@ function getTeamRateIdentity_(tid, teamName) {
           return 'team_' + String(keys[j]).replace(/[^A-Za-z0-9_]/g, '_');
         }
       }
-      // Unknown names share one bucket, so varying arbitrary names cannot reset it.
-      return 'unknown';
+      // Keep unknown IDs separate so one unlisted team cannot throttle every player.
+      var unknownIdentity = tId || tName;
+      return unknownIdentity ? 'team_' + unknownIdentity.replace(/[^A-Za-z0-9_]/g, '_') : 'unknown';
     } catch (e) {
       Logger.log('Invalid TEAM_KEYS_JSON while rate limiting: ' + e);
       return 'unknown';
     }
   }
 
-  // Unknown or unconfigured teams share one bucket so arbitrary identities
-  // cannot evade the login rate limit by changing their submitted name.
-  return 'unknown';
+  var fallbackIdentity = tId || tName;
+  return fallbackIdentity ? 'team_' + fallbackIdentity.replace(/[^A-Za-z0-9_]/g, '_') : 'unknown';
 }
 
 function checkSlidingWindowRate_(scope, identity, limit) {
@@ -628,31 +605,20 @@ function doPost(e) {
       if (!loginName && !loginTid) {
         return jsonResponse_({ status: 'error', message: 'missing team' });
       }
-      if (!PropertiesService.getScriptProperties().getProperty('TEAM_KEYS_JSON')) {
-        return jsonResponse_({ status: 'error', message: 'team authentication is not configured' });
-      }
-      // Resolve the name and tid independently so a caller cannot pair their
-      // own valid name with someone else's tid to read that team's rows.
-      var keyByName = loginName ? resolveTeamKey_('', loginName) : '';
-      var keyByTid = loginTid ? resolveTeamKey_(loginTid, '') : '';
-      var expectedKey = keyByName || keyByTid;
       var loginRateIdentity = getTeamRateIdentity_(loginTid, loginName);
       if (!checkLoginRate(loginRateIdentity)) {
         return jsonResponse_({ status: 'rate_limited', message: 'Too many login attempts', retryAfterSeconds: AUTH_RATE_WINDOW_SECS });
       }
-      if (!expectedKey || normalizeTokenValue(data.securityKey) !== normalizeTokenValue(expectedKey)) {
-        return jsonResponse_({ status: 'error', message: 'invalid credentials' });
-      }
-      var canonicalTid = (keyByTid && keyByTid === expectedKey) ? loginTid : '';
-      var canonicalName = (keyByName && keyByName === expectedKey) ? loginName : '';
-      var loginToken = createLoginSession(canonicalTid, canonicalName);
+      // Player identity is self-selected; only the server session is signed.
+      // This deliberately trades team impersonation protection for easy entry.
+      var loginToken = createLoginSession(loginTid, loginName);
       if (!loginToken) {
         return jsonResponse_({ status: 'error', message: 'login sessions are not configured' });
       }
       return jsonResponse_({
         status: 'success',
-        tid: canonicalTid,
-        teamName: canonicalName,
+        tid: loginTid,
+        teamName: loginName,
         loginToken: loginToken
       });
     }

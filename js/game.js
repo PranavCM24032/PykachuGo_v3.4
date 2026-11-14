@@ -11,7 +11,6 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     e.preventDefault();
     const thisLoginFlow = ++loginFlowId;
     const teamInput = document.getElementById('teamName').value.trim();
-    const securityKeyInput = document.getElementById('teamSecurityKey').value.trim();
     const missionLevel = document.getElementById('missionLevel').value;
     const codeLanguage = document.getElementById('codeLanguage').value;
 
@@ -20,12 +19,12 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         return;
     }
 
-    if (!teamInput || !securityKeyInput) {
-        showFeedback('registrationFeedback', 'Team name and security key are required!', 'error');
+    if (!teamInput) {
+        showFeedback('registrationFeedback', 'Select your team name to continue.', 'error');
         return;
     }
 
-    if (teamInput.length > 50 || securityKeyInput.length > 50) {
+    if (teamInput.length > 50) {
         showFeedback('registrationFeedback', 'Max 50 characters!', 'error');
         return;
     }
@@ -43,15 +42,15 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     const submitButton = this.querySelector('button[type="submit"]');
     if (submitButton) {
         submitButton.disabled = true;
-        submitButton.textContent = 'AUTHENTICATING...';
+        submitButton.textContent = 'CONNECTING...';
     }
-    showFeedback('registrationFeedback', 'Verifying team credentials...', 'info');
+    showFeedback('registrationFeedback', 'Starting your team session...', 'info');
     const slowLoginNotice = setTimeout(() => {
         if (thisLoginFlow === loginFlowId) {
             showFeedback('registrationFeedback', 'Still connecting to the game server. This can take a few seconds...', 'info');
         }
     }, 4000);
-    const login = await loginTeam(foundTeam.team, lookupTid, securityKeyInput);
+    const login = await loginTeam(foundTeam.team, lookupTid);
     clearTimeout(slowLoginNotice);
     if (submitButton && thisLoginFlow === loginFlowId) {
         submitButton.disabled = false;
@@ -63,7 +62,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         const message = response.status === 'rate_limited'
             ? 'Too many attempts. Wait a minute and try again.'
             : response.message === 'invalid credentials'
-                ? 'Invalid team name or security key.'
+                ? 'This team is not configured. Contact the administrator.'
                 : response.message === 'team authentication is not configured'
                     ? 'Team login is not configured. Contact the administrator.'
                     : response.message === 'login sessions are not configured'
@@ -74,7 +73,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
                             ? 'The login server is taking too long. Please retry in a moment.'
                         : 'Could not reach the login server. Check your connection and try again.';
         showFeedback('registrationFeedback', message, 'error');
-        triggerShake(response.message === 'invalid credentials' ? 'teamSecurityKey' : 'teamName');
+        triggerShake('teamName');
         playSound('error');
         return;
     }
@@ -632,15 +631,3 @@ function removeBlackout() {
 function showAntiCopyToast() {
     // Managed by security.js
 }
-
-function toggleSecurityKeyVisibility() {
-    const keyInput = document.getElementById('teamSecurityKey');
-    const icon = document.getElementById('securityKeyToggleIcon');
-    if (keyInput && icon) {
-        const isMasked = keyInput.type === 'password';
-        keyInput.type = isMasked ? 'text' : 'password';
-        icon.textContent = isMasked ? 'visibility' : 'visibility_off';
-    }
-}
-
-window.toggleSecurityKeyVisibility = toggleSecurityKeyVisibility;

@@ -4,7 +4,7 @@ A mobile-first, PWA-ready **binary signal decryption hunt** where teams solve
 programming-riddle puzzles (Python & C++), scan QR codes, and progress through a
 branching puzzle graph — all inside a Pokédex-styled CRT terminal UI.
 
-Teams register with a team name + code, enter a `startCode` to unlock the first
+Teams register with a team name, then enter a `startCode` to unlock the first
 puzzle, then solve puzzles in **forward-linked chains** where each correct answer
 unlocks the next location. Progress, penalties, and points stream to a **Google
 Sheets workbook** via a **Google Apps Script** backend, and an **Admin
@@ -12,7 +12,7 @@ dashboard** livetracks every team.
 
 ## What players do
 
-1. Register with a team name and security key (mission level + language).
+1. Register with a team name (mission level + language).
 2. Scan the starting QR code or enter its start key.
 3. Solve the displayed coding riddle (Python or C++ variant).
 4. View the revealed next location and scan its QR code.
@@ -27,7 +27,7 @@ dashboard** livetracks every team.
 - **Dual-language riddles** — every puzzle ships a Python (`questionPython`) and
   a C++ (`questionCpp`) version; teams pick a language at registration.
 - **Manual login on reload** — players must submit the login form again after a
-  page reload; the last-used team name, security key, language and mission are
+  page reload; the last-used team name, language and mission are
   prefilled from local storage (tap to sign out/in via the power button).
 - **Branching puzzle graph** — each puzzle declares what it unlocks via
   `nextPuzzleId`, so progression is a forward-linked DAG (see
@@ -152,7 +152,7 @@ Player screens:
 | Screen | Purpose |
 |--------|---------|
 | `step0` | Rules and introduction (Professor Oak briefing) |
-| `step1` | Team login: name + security key, mission level, language |
+| `step1` | Team login: name, mission level, language |
 | `step2` | QR camera scanner OR manual code / deep-link entry |
 | `startcode` | Enter the puzzle's start key (e.g. `START`) to begin the chain |
 | `step3` | Riddle, answer form, hint request, anti-switch monitoring |
@@ -346,13 +346,13 @@ flowchart TD
     RULES["STEP 0 — Rules briefing"] -->|"acceptRules()"| REG["STEP 1 — Registration"]
 
     subgraph REGS["2 · REGISTRATION"]
-        REG --> EMPTYREQ{"Team or security key<br/>empty?"}
+        REG --> EMPTYREQ{"Team name<br/>empty?"}
         EMPTYREQ -- "Yes" --> REGERR["Toast: fields required"]
         REGERR --> REG
         EMPTYREQ -- "No" --> TEXIST{"Team in<br/>teams.json?"}
         TEXIST -- "No" --> TNOTF["'Trainer not found'<br/>+ shake"]
         TNOTF --> REG
-        TEXIST -- "Yes" --> SERVERAUTH{"Backend accepts<br/>team + security key?"}
+        TEXIST -- "Yes" --> SERVERAUTH{"Backend issues<br/>signed team session?"}
         SERVERAUTH -- "No" --> PWBAD["Show auth / connection error"]
         PWBAD --> REG
         SERVERAUTH -- "Yes" --> TEAMSET["Set team / tid / mission / language<br/>create sessionId · REGISTRATION log"]
@@ -594,13 +594,13 @@ The Admin dashboard's **LEADERBOARD** tab aggregates records by TID:
 ]
 ```
 
-- The public JSON roster contains names and stable IDs only. The player waits
-  for Apps Script to validate the key and issue a login session before entering
-  the game.
+- The public JSON roster contains names and stable IDs only. Apps Script issues
+  a signed login session for the selected team without checking a team key.
+  Players can therefore impersonate another team; this is the selected
+  low-friction login mode.
 - `tid` is the stable team id used inside the backend spreadsheet.
-- Team keys are stored in the private Apps Script `TEAM_KEYS_JSON` property,
-  keyed by team ID. This property is required; there is no public roster
-  fallback.
+- Team identity is selected by the player. The Apps Script still requires a
+  private session-signing secret, but does not require `TEAM_KEYS_JSON`.
 
 ---
 
@@ -683,8 +683,8 @@ The backend creates these tabs automatically on first use.
   display and compatibility.
 - Events are routed by puzzle **level** to `L1`/`L2`/`L3` (fallback: team's
   registered mission level).
-- `Registration` events only touch the Registration tab; the security key column is
-  stored but **never** returned by the admin data endpoint.
+- `Registration` events only touch the Registration tab; legacy security-key
+  columns are **never** returned by the admin data endpoint.
 - **`REGISTRATION`** writes immediately so the registration row is available
   to the admin panel as soon as the player signs in.
 - Gameplay telemetry is saved in a per-browser localStorage queue and sent in
@@ -713,7 +713,7 @@ The backend creates these tabs automatically on first use.
   requires the private `ADMIN_TOKEN`, and team sessions are signed with the
   separate private `LOGIN_SESSION_SECRET`.
 - Script properties include `PLAYER_TOKEN`, `ADMIN_TOKEN`,
-  `LOGIN_SESSION_SECRET`, `TEAM_KEYS_JSON`, `PUZZLE_SECRETS_JSON`, and
+  `LOGIN_SESSION_SECRET`, `PUZZLE_SECRETS_JSON`, and
   `SPREADSHEET_ID`; no login keys, answers, start keys, or hint text are read
   from public JSON.
 
@@ -899,7 +899,7 @@ notepad — zero requests fire during solving.
 
 ## ⌨ Input caps & hidden IDs
 
-- All user text inputs (team name, security key, start key, answer, manual signal
+- All user text inputs (team name, start key, answer, manual signal
   id) are capped at **50 characters** via both `maxlength` and JS guards in the
   submit handlers.
 - Puzzle signal IDs (e.g. `XG01`) are **never displayed** in the UI — only used
@@ -998,15 +998,14 @@ GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit
 ```
 
 The repo-wide security cleanup created ignored local setup files under
-`.local-secrets/`. Copy the values from `apps-script-properties.json` into the
-Apps Script project's **Script properties**. It includes a new unique team key
-for every TID, rotated start keys, a new `ADMIN_TOKEN`, a private
-`LOGIN_SESSION_SECRET`, and the player token from `.env`. Do not commit or
-share that file publicly. Distribute the new team keys to their teams and
-replace any printed start keys with the rotated values in `PUZZLE_SECRETS_JSON`.
+`.local-secrets/`. Copy the required values from `apps-script-properties.json`
+into the Apps Script project's **Script properties**. It includes rotated
+start keys, a new `ADMIN_TOKEN`, a private `LOGIN_SESSION_SECRET`, and the
+player token from `.env`. Do not commit or share that file publicly. Replace
+printed start keys with the rotated values in `PUZZLE_SECRETS_JSON`.
 
 Required properties are `PLAYER_TOKEN`, `ADMIN_TOKEN`, `LOGIN_SESSION_SECRET`,
-`TEAM_KEYS_JSON`, `PUZZLE_SECRETS_JSON`, and `SPREADSHEET_ID`. `ADMIN_TOKEN` and
+`PUZZLE_SECRETS_JSON`, and `SPREADSHEET_ID`. `ADMIN_TOKEN` and
 `LOGIN_SESSION_SECRET` must each be unique, private, and at least 32 characters;
 the signing secret cannot match the player token. Apps Script fails closed if
 these properties are missing or invalid. `GOOGLE_SCRIPT_TOKEN` is included in
@@ -1046,7 +1045,7 @@ Open the local URL printed by `serve`. Camera access generally requires either
 ## 🚀 Deployment
 
 Set the Apps Script Script Properties (`PLAYER_TOKEN`, `ADMIN_TOKEN`,
-`LOGIN_SESSION_SECRET`, `TEAM_KEYS_JSON`, `PUZZLE_SECRETS_JSON`, and
+`LOGIN_SESSION_SECRET`, `PUZZLE_SECRETS_JSON`, and
 `SPREADSHEET_ID`) and deploy the latest Apps Script version before using either
 host. Admin tokens must be
 unique from the public player token and at least 32 characters; login-session
@@ -1119,7 +1118,7 @@ updated puzzles, teams, and memes are installed into the new offline cache.
 | Task | How |
 |------|-----|
 | **Add a puzzle** | Add public presentation data to `data/puzzle.json`, then add its answer, start key and hint to `PUZZLE_SECRETS_JSON` in Apps Script Script Properties. |
-| **Add / edit teams** | Edit `data/teams.json` metadata and add a unique team key to `TEAM_KEYS_JSON` in Apps Script Script Properties. |
+| **Add / edit teams** | Edit team names and IDs in `data/teams.json`. |
 | **Add a meme reward** | Push a `{ memeid, ytlink, starttime, endtime }` object to `data/meme.json`. |
 | **Reset the whole event** | Call the backend `RESET_ALL` (wipes all 4 tabs + bumps epoch; clients auto-wipe stale progress). |
 | **Tune sheet quota** | Adjust `limit`/`windowMs` on `sheetsRateLimiter` in `js/google-sheets.js`. |

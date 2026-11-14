@@ -358,9 +358,8 @@ async function flushSessionBuffer() {
     }
 }
 
-// Exchange a team key for a short-lived server login session. The token is
-// the only thing the backend will accept as proof of team identity.
-async function loginTeam(teamName, tid, securityKey) {
+// Exchange a team selection for a short-lived server session.
+async function loginTeam(teamName, tid) {
     if (!GOOGLE_SCRIPT_URL || !GOOGLE_SCRIPT_TOKEN || GOOGLE_SCRIPT_URL.includes("SCRIPT_URL_HERE")) {
         return { ok: false, json: { status: 'configuration_error' } };
     }
@@ -368,8 +367,7 @@ async function loginTeam(teamName, tid, securityKey) {
         const result = await postToGoogleSheets({
             action: 'LOGIN',
             teamName: teamName || '',
-            tid: tid || '',
-            securityKey: securityKey || ''
+            tid: tid || ''
         }, 'LOGIN', { rateLimit: false, timeoutMs: 15000, maxRetries: 0 });
         if (isSheetsSuccess(result) && result.json && result.json.loginToken) {
             return { ok: true, ...result.json };
