@@ -25,8 +25,8 @@ function getPlayerToken() {
 
 function getAdminToken() {
   var token = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
-  if (token && token.length >= 32 && token !== getPlayerToken()) {
-    return token;
+  if (token && token !== getPlayerToken()) {
+    return String(token);
   }
   var playerToken = getPlayerToken();
   if (!playerToken) {
