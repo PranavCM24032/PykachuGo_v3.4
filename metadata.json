@@ -1,0 +1,6 @@
+{
+  "name": "Pykachu Go",
+  "description": "Pykachu Go is a Pokédex-styled binary signal decryption hunt: teams solve Python and C++ riddles, scan QR signals and follow a branching puzzle graph inside a CRT terminal.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
